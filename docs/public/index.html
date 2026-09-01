@@ -74,6 +74,20 @@
     display: flex; flex-direction: column; overflow-y: auto;
   }
 
+  /* Same vignette + scanline pair as chat-cmd's .fx-vignette/.fx-scanline,
+     scoped to the sidebar instead of the full viewport. Vignette under,
+     scanline (multiply-blended) on top — matches chat-cmd's own z-order. */
+  .sidebar-vignette, .sidebar-scanline {
+    position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  }
+  .sidebar-vignette {
+    background: radial-gradient(ellipse at center, transparent 62%, rgba(0,0,0,0.3) 100%);
+  }
+  .sidebar-scanline {
+    mix-blend-mode: multiply;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.13) 0px, rgba(0,0,0,0.13) 1px, transparent 1px, transparent 3px);
+  }
+
   nav.sidebar-nav { flex: 1; padding: 20px 8px; overflow-y: auto; }
 
   .section-label {
@@ -248,6 +262,8 @@
 <div class="shell">
 
   <aside class="sidebar">
+    <div class="sidebar-vignette"></div>
+    <div class="sidebar-scanline"></div>
     <div class="sidebar-content">
     <nav class="sidebar-nav">
       <span class="section-label">Install</span>
@@ -630,7 +646,7 @@ function mountWaveBackground(container, accentRgb) {
   new ResizeObserver(size).observe(container);
 
   function draw() {
-    t += reduceMotion ? 0.0015 : 0.002; // speed: normal (multiplier 1)
+    t += reduceMotion ? 0.00075 : 0.001; // speed: slower than chat-cmd's 'normal' (half)
     const W = container.clientWidth, H = container.clientHeight;
     ctx.clearRect(0, 0, W, H);
 
@@ -648,7 +664,7 @@ function mountWaveBackground(container, accentRgb) {
     });
 
     parts.forEach((p) => {
-      p.y -= p.s * 0.004;
+      p.y -= p.s * 0.002;
       if (p.y < -0.02) { p.y = 1.02; p.x = Math.random(); }
       ctx.beginPath();
       ctx.arc(p.x * W, p.y * H, p.r, 0, 6.28);
