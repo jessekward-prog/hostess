@@ -64,6 +64,14 @@ app.delete('/api/apps/:name', async (req, res) => {
   }
 });
 
+app.post('/api/apps/:name/scan', async (req, res) => {
+  try {
+    res.json(await engine.scanApp(req.params.name));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.get('/api/apps/:name/logs', async (req, res) => {
   try {
     res.type('text/plain').send(await engine.getLogs(req.params.name));
