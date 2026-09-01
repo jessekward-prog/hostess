@@ -1,0 +1,333 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hostess — install selfhost-wizard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧙</text></svg>">
+<style>
+  :root {
+    --bg: #0c0d10;
+    --panel: #16181d;
+    --border: #2a2d34;
+    --text: #e7e6e2;
+    --dim: #8b8d95;
+    --amber: #d98f3c;
+    --amber-bright: #f2ab5c;
+    --code-bg: #0a0b0d;
+    --ok: #4caf6d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.55;
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 56px 20px 80px; }
+  header { margin-bottom: 40px; }
+  h1 {
+    font-size: 2rem;
+    margin: 0 0 6px;
+    letter-spacing: -0.02em;
+  }
+  h1 .wiz { color: var(--amber-bright); }
+  .tagline { color: var(--dim); font-size: 1.02rem; margin: 0 0 18px; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; font-size: 0.8rem; }
+  .badge {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px 12px;
+    color: var(--dim);
+  }
+  .badge a { color: var(--amber); text-decoration: none; }
+  .badge a:hover { text-decoration: underline; }
+
+  h2 { font-size: 1.2rem; margin: 40px 0 14px; }
+  p { color: #c9c8c4; }
+
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .tab {
+    background: none; border: none; color: var(--dim);
+    font: inherit; font-size: 0.92rem; padding: 10px 16px; cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tab.active { color: var(--text); border-bottom-color: var(--amber); }
+  .tab:hover { color: var(--text); }
+
+  .pane { display: none; }
+  .pane.active { display: block; }
+
+  .oneliner {
+    position: relative;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 52px 16px 16px;
+    margin-bottom: 8px;
+    overflow-x: auto;
+  }
+  .oneliner code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.88rem; color: var(--amber-bright); white-space: pre-wrap; word-break: break-all; }
+  .copy-btn {
+    position: absolute; top: 10px; right: 10px;
+    background: var(--panel); border: 1px solid var(--border); color: var(--dim);
+    border-radius: 6px; padding: 5px 9px; font-size: 0.75rem; cursor: pointer;
+  }
+  .copy-btn:hover { color: var(--text); border-color: var(--amber); }
+  .copy-btn.copied { color: var(--ok); border-color: var(--ok); }
+
+  .verify {
+    font-size: 0.82rem; color: var(--dim); margin: 0 0 28px;
+  }
+  .verify a { color: var(--dim); }
+
+  details {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    background: var(--panel);
+  }
+  summary {
+    cursor: pointer;
+    padding: 12px 16px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    list-style: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; color: var(--amber); }
+  details[open] summary::before { content: "▾ "; }
+  .steps { padding: 0 16px 16px; }
+  .steps ol { margin: 0; padding-left: 20px; color: #c9c8c4; }
+  .steps li { margin-bottom: 14px; }
+  .steps li:last-child { margin-bottom: 0; }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    overflow-x: auto;
+    margin: 6px 0 0;
+  }
+  pre code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.82rem; color: #d7d6d2; white-space: pre-wrap; word-break: break-word; }
+
+  .note {
+    border-left: 3px solid var(--amber);
+    padding: 10px 14px;
+    background: rgba(217,143,60,0.08);
+    border-radius: 0 8px 8px 0;
+    font-size: 0.88rem;
+    color: #d7d3c8;
+    margin: 16px 0;
+  }
+
+  .manifest pre { margin-top: 0; }
+  footer { margin-top: 56px; color: var(--dim); font-size: 0.82rem; }
+  footer a { color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>🧙 <span class="wiz">hostess</span></h1>
+    <p class="tagline">One command turns a clean machine into a self-hosted app platform. Point selfhost-wizard at any repo with an <code>app.yaml</code> and it builds, deploys, and manages it in Docker for you.</p>
+    <div class="badges">
+      <span class="badge">Dashboard on <code>localhost:5300</code>, loopback only</span>
+      <span class="badge"><a href="https://github.com/jessekward-prog/selfhost-wizard" target="_blank" rel="noopener">Source on GitHub ↗</a></span>
+    </div>
+  </header>
+
+  <h2>Install</h2>
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-pane="linux">Linux</button>
+    <button class="tab" data-pane="macos">macOS</button>
+    <button class="tab" data-pane="windows">Windows</button>
+  </div>
+
+  <!-- LINUX -->
+  <section id="linux" class="pane active">
+    <div class="oneliner">
+      <code id="cmd-linux">curl -fsSL https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.sh | bash</code>
+      <button class="copy-btn" data-target="cmd-linux">Copy</button>
+    </div>
+    <p class="verify">Prefer to read it first? <a href="https://github.com/jessekward-prog/selfhost-wizard/blob/main/install.sh" target="_blank" rel="noopener">view install.sh on GitHub</a> before piping it to bash.</p>
+
+    <details>
+      <summary>What it does / do it by hand</summary>
+      <div class="steps">
+        <ol>
+          <li>Installs <strong>Docker</strong>, <strong>Node.js 18+</strong>, and <strong>git</strong> if any are missing (via <code>apt</code> and Docker's official install script). Adds your user to the <code>docker</code> group — you'll need to log out and back in (or run <code>newgrp docker</code>) before containers work.
+<pre><code>sudo apt-get update -y && sudo apt-get install -y git
+curl -fsSL https://get.docker.com | sudo sh
+sudo usermod -aG docker "$USER"</code></pre>
+          </li>
+          <li>Clones the repo and installs dependencies:
+<pre><code>git clone --depth 1 https://github.com/jessekward-prog/selfhost-wizard.git ~/selfhost-wizard
+cd ~/selfhost-wizard && npm install --omit=dev</code></pre>
+          </li>
+          <li>Registers a <strong>user-level systemd service</strong> so the dashboard survives reboot and logout:
+<pre><code>mkdir -p ~/.config/systemd/user
+cat > ~/.config/systemd/user/selfhost-wizard.service &lt;&lt;EOF
+[Unit]
+Description=Self-Host Wizard dashboard
+After=network.target docker.service
+
+[Service]
+WorkingDirectory=%h/selfhost-wizard
+ExecStart=$(command -v node) server.js
+Restart=on-failure
+
+[Install]
+WantedBy=default.target
+EOF
+systemctl --user daemon-reload
+systemctl --user enable --now selfhost-wizard
+loginctl enable-linger "$USER"</code></pre>
+          </li>
+          <li>Open <a href="http://localhost:5300">http://localhost:5300</a>. Manage it any time with:
+<pre><code>systemctl --user status  selfhost-wizard
+systemctl --user restart selfhost-wizard
+systemctl --user stop    selfhost-wizard</code></pre>
+          </li>
+        </ol>
+      </div>
+    </details>
+    <p class="note">Tested against Debian/Ubuntu-family distros (<code>apt</code>). On another distro, install Docker/Node/git yourself first, then run steps 2–3.</p>
+  </section>
+
+  <!-- MACOS -->
+  <section id="macos" class="pane">
+    <div class="oneliner">
+      <code id="cmd-macos">curl -fsSL https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install-macos.sh | bash</code>
+      <button class="copy-btn" data-target="cmd-macos">Copy</button>
+    </div>
+    <p class="verify">Prefer to read it first? <a href="https://github.com/jessekward-prog/selfhost-wizard/blob/main/install-macos.sh" target="_blank" rel="noopener">view install-macos.sh on GitHub</a> before piping it to bash.</p>
+
+    <details>
+      <summary>What it does / do it by hand</summary>
+      <div class="steps">
+        <ol>
+          <li>Installs <strong>Homebrew</strong> if missing, then <strong>git</strong>, <strong>node</strong>, and <strong>Docker Desktop</strong>:
+<pre><code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install git node
+brew install --cask docker</code></pre>
+          </li>
+          <li>Launches Docker Desktop and waits for it to come up — the <strong>first run needs you to click through its permissions dialog</strong>:
+<pre><code>open -a Docker</code></pre>
+          </li>
+          <li>Clones the repo and installs dependencies:
+<pre><code>git clone --depth 1 https://github.com/jessekward-prog/selfhost-wizard.git ~/selfhost-wizard
+cd ~/selfhost-wizard && npm install --omit=dev</code></pre>
+          </li>
+          <li>Registers a <strong>launchd agent</strong> so the dashboard survives logout and reboot:
+<pre><code>cat > ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist &lt;&lt;EOF
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;plist version="1.0"&gt;&lt;dict&gt;
+  &lt;key&gt;Label&lt;/key&gt;&lt;string&gt;xyz.cmdward.selfhost-wizard&lt;/string&gt;
+  &lt;key&gt;ProgramArguments&lt;/key&gt;
+  &lt;array&gt;&lt;string&gt;$(command -v node)&lt;/string&gt;&lt;string&gt;server.js&lt;/string&gt;&lt;/array&gt;
+  &lt;key&gt;WorkingDirectory&lt;/key&gt;&lt;string&gt;$HOME/selfhost-wizard&lt;/string&gt;
+  &lt;key&gt;RunAtLoad&lt;/key&gt;&lt;true/&gt;
+  &lt;key&gt;KeepAlive&lt;/key&gt;&lt;true/&gt;
+&lt;/dict&gt;&lt;/plist&gt;
+EOF
+launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist</code></pre>
+          </li>
+          <li>Open <a href="http://localhost:5300">http://localhost:5300</a>. Manage it any time with:
+<pre><code>launchctl unload ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist
+launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist</code></pre>
+          </li>
+        </ol>
+      </div>
+    </details>
+    <p class="note">Works on both Apple Silicon and Intel Macs. Logs go to <code>/tmp/selfhost-wizard.log</code>.</p>
+  </section>
+
+  <!-- WINDOWS -->
+  <section id="windows" class="pane">
+    <div class="oneliner">
+      <code id="cmd-windows">iwr -useb https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.ps1 | iex</code>
+      <button class="copy-btn" data-target="cmd-windows">Copy</button>
+    </div>
+    <p class="verify">Run this in <strong>PowerShell</strong> (Start → type "PowerShell"). It re-launches itself elevated — approve the UAC prompt. Prefer to read it first? <a href="https://github.com/jessekward-prog/selfhost-wizard/blob/main/install.ps1" target="_blank" rel="noopener">view install.ps1 on GitHub</a>.</p>
+
+    <details>
+      <summary>What it does / do it by hand</summary>
+      <div class="steps">
+        <ol>
+          <li>Installs <strong>git</strong>, <strong>Node.js LTS</strong>, and <strong>Docker Desktop</strong> via <code>winget</code> (built into Windows 10/11 — if missing, get "App Installer" from the Microsoft Store first):
+<pre><code>winget install --id Git.Git -e
+winget install --id OpenJS.NodeJS.LTS -e
+winget install --id Docker.DockerDesktop -e</code></pre>
+          </li>
+          <li>Enables the <strong>WSL2</strong> backend Docker Desktop needs, if not already on:
+<pre><code>wsl --install --no-distribution</code></pre>
+            If this was just installed, <strong>Windows needs a reboot</strong> before Docker will start — the installer tells you this and stops cleanly; just re-run it after rebooting.
+          </li>
+          <li>Launches Docker Desktop and waits for it to be ready — first run needs you to click through its setup:
+<pre><code>Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"</code></pre>
+          </li>
+          <li>Clones the repo and installs dependencies:
+<pre><code>git clone --depth 1 https://github.com/jessekward-prog/selfhost-wizard.git $HOME\selfhost-wizard
+cd $HOME\selfhost-wizard
+npm install --omit=dev</code></pre>
+          </li>
+          <li>Registers a <strong>Scheduled Task</strong> (runs hidden, at logon, restarts on failure) so the dashboard survives reboot:
+<pre><code>$action = New-ScheduledTaskAction -Execute "powershell.exe" `
+  -Argument '-NoProfile -WindowStyle Hidden -Command "Set-Location $HOME\selfhost-wizard; node server.js"'
+$trigger = New-ScheduledTaskTrigger -AtLogOn
+Register-ScheduledTask -TaskName selfhost-wizard -Action $action -Trigger $trigger -Force
+Start-ScheduledTask -TaskName selfhost-wizard</code></pre>
+          </li>
+          <li>Open <a href="http://localhost:5300">http://localhost:5300</a>. Manage it any time with:
+<pre><code>Start-ScheduledTask -TaskName selfhost-wizard
+Stop-ScheduledTask  -TaskName selfhost-wizard</code></pre>
+          </li>
+        </ol>
+      </div>
+    </details>
+    <p class="note">Docker Desktop on Windows requires WSL2 — on a truly clean machine this means one reboot mid-install. That's Docker's requirement, not this script's.</p>
+  </section>
+
+  <h2>Deploying an app</h2>
+  <p>Once it's running, point selfhost-wizard at any repo with a <code>Dockerfile</code> and an <code>app.yaml</code> at its root:</p>
+  <div class="manifest">
+<pre><code>name: my-app          # lowercase letters/numbers/hyphens, 2-50 chars
+port: 3000             # port your app listens on *inside* the container
+postgres: false        # true to get a DATABASE_URL wired to a shared Postgres
+env: []                 # optional — extra env var names</code></pre>
+  </div>
+  <p>Paste the repo URL (or a local path) into the dashboard, or from the CLI: <code>node deploy.js &lt;source&gt;</code>. Full manifest reference and dashboard walkthrough in the <a href="https://github.com/jessekward-prog/selfhost-wizard#readme" target="_blank" rel="noopener">README</a>.</p>
+
+  <footer>
+    <a href="https://github.com/jessekward-prog/selfhost-wizard" target="_blank" rel="noopener">jessekward-prog/selfhost-wizard</a> — MIT-style personal project, no telemetry, nothing leaves your machine.
+  </footer>
+</main>
+
+<script>
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.pane).classList.add('active');
+  });
+});
+
+document.querySelectorAll('.copy-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const text = document.getElementById(btn.dataset.target).textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.textContent = 'Copied';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
+    } catch {
+      btn.textContent = 'Select & copy manually';
+    }
+  });
+});
+</script>
+</body>
+</html>

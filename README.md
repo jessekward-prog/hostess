@@ -6,25 +6,40 @@ CLI, no external accounts, nothing leaves the machine.
 
 ## Install
 
+Full walkthrough with copy-paste commands for every option: **[hostess.cmdward.xyz](https://hostess.cmdward.xyz)**
+
+**Linux** (Debian/Ubuntu-family):
 ```
 curl -fsSL https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.sh | bash
 ```
 
-This installs Docker/Node/git if missing, clones the repo to `~/selfhost-wizard`, and registers
-a user-level systemd service so the dashboard survives reboots and logouts.
+**macOS:**
+```
+curl -fsSL https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install-macos.sh | bash
+```
 
-Already have the repo checked out? Run `./install.sh` from inside it instead — it detects the
-existing checkout and skips the clone.
+**Windows** (PowerShell — re-launches itself elevated, approve the UAC prompt):
+```
+iwr -useb https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.ps1 | iex
+```
+
+Each installs Docker/Node/git if missing, clones the repo to `~/selfhost-wizard`
+(`$HOME\selfhost-wizard` on Windows), and registers a persistent background service —
+a user-level systemd service on Linux, a launchd agent on macOS, a Scheduled Task on Windows —
+so the dashboard survives reboots and logouts.
+
+Already have the repo checked out? Run the installer for your OS from inside it instead — it
+detects the existing checkout and skips the clone.
 
 Dashboard: **http://localhost:5300** (binds to loopback only — not reachable off the box).
 
 Manage the service:
 
-```
-systemctl --user status  selfhost-wizard
-systemctl --user restart selfhost-wizard
-systemctl --user stop    selfhost-wizard
-```
+| OS | Status | Restart | Stop |
+|---|---|---|---|
+| Linux | `systemctl --user status selfhost-wizard` | `systemctl --user restart selfhost-wizard` | `systemctl --user stop selfhost-wizard` |
+| macOS | `launchctl list \| grep selfhost` | `launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist` | `launchctl unload ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist` |
+| Windows | `Get-ScheduledTask -TaskName selfhost-wizard` | `Start-ScheduledTask -TaskName selfhost-wizard` | `Stop-ScheduledTask -TaskName selfhost-wizard` |
 
 ## Deploying an app
 
@@ -36,8 +51,8 @@ Any repo you point it at needs two files at its root:
 name: my-app          # lowercase letters/numbers/hyphens, 2-50 chars
 port: 3000             # port your app listens on *inside* the container
 postgres: false        # true to get a DATABASE_URL env var wired to a shared Postgres
-env:                   # optional — extra env var names (values come from the deploy)
-  - SOME_KEY
+env:                   # optional — documents required var names; not yet injected at deploy
+  - SOME_KEY            # time (see Known limitations) — give the app its own way to set these
 ```
 
 **`Dockerfile`** — anything that builds and listens on `port`.
@@ -60,6 +75,14 @@ Postgres — its existing database and role, so `DATABASE_URL` doesn't rotate on
 - One shared `postgres:16-alpine` container (`selfhost-postgres`) on a dedicated Docker
   network; each Postgres-backed app gets its own database + role inside it
 - Host ports are auto-assigned from the `4000–4999` range and stick for the life of the app
+
+## Known limitations
+
+- **`app.yaml`'s `env` list isn't injected yet.** It's parsed and stored, but nothing collects
+  values for it or passes them to the container — the only env variable actually set today is
+  `DATABASE_URL` (when `postgres: true`). Until a deploy-time prompt exists, give your app its
+  own way to set config post-deploy (an admin UI backed by its own DB, for example) rather than
+  relying on `env:` to deliver secrets.
 
 ## Requirements
 
