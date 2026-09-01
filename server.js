@@ -1,6 +1,8 @@
 const path = require('path');
 const express = require('express');
 const engine = require('./lib/engine');
+const guard = require('./lib/guard');
+const settings = require('./lib/settings');
 
 const app = express();
 const PORT = 5300;
@@ -68,6 +70,35 @@ app.get('/api/apps/:name/logs', async (req, res) => {
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
+});
+
+// Lists what the configured endpoint actually has loaded, so the picker
+// offers real ids instead of asking someone to type one from memory.
+app.get('/api/lm', async (req, res) => {
+  const { url, model } = guard.lmConfig();
+  const out = { url, selected: model, models: [], apiKeySet: !!settings.get('lmApiKey') };
+  if (!url) return res.json(out);
+  try {
+    const { apiKey } = guard.lmConfig();
+    const r = await fetch(`${url}/v1/models`, {
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!r.ok) throw new Error(`endpoint returned ${r.status}`);
+    const data = await r.json();
+    out.models = (data.data || []).map((m) => m.id).filter(Boolean);
+  } catch (err) {
+    out.error = err.message;
+  }
+  res.json(out);
+});
+
+app.put('/api/lm', (req, res) => {
+  if (typeof req.body.url === 'string') settings.set('lmUrl', req.body.url.trim().replace(/\/+$/, ''));
+  if (typeof req.body.apiKey === 'string') settings.set('lmApiKey', req.body.apiKey.trim());
+  if (typeof req.body.model === 'string') settings.set('lmModel', req.body.model.trim());
+  const { url, model } = guard.lmConfig();
+  res.json({ url, selected: model, apiKeySet: !!settings.get('lmApiKey') });
 });
 
 app.listen(PORT, '127.0.0.1', () => {

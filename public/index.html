@@ -57,6 +57,34 @@
   .status-dot.exited, .status-dot.created { background: var(--warn); }
   .status-dot.absent, .status-dot.unknown { background: var(--danger); }
 
+  .myai-toggle { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 6px; font-size: 12.5px; color: var(--s-text-2); transition: background 0.12s, color 0.12s; }
+  .myai-toggle:hover { color: var(--s-text-0); background: var(--s-surface-2); }
+  .myai-toggle .chev { font-size: 10px; transition: transform 0.18s; display: inline-block; }
+  .myai-toggle.open .chev { transform: rotate(90deg); }
+  .myai-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--s-border); margin-left: auto; flex-shrink: 0; }
+  .myai-dot.connected { background: var(--ok); }
+  .myai-panel { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.22s cubic-bezier(0.32,0.72,0,1), opacity 0.18s; }
+  .myai-panel.open { max-height: 640px; opacity: 1; }
+  .myai-body { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 7px; }
+  .myai-hint { font-size: 9.5px; color: var(--s-text-3); line-height: 1.5; }
+  .myai-status { font-size: 9.5px; color: var(--s-text-3); line-height: 1.5; }
+  .myai-presets { display: flex; gap: 4px; flex-wrap: wrap; }
+  .myai-preset { font-size: 9px; padding: 3px 7px; border-radius: 4px; border: 1px solid var(--s-border); background: var(--s-surface-2); color: var(--s-text-2); }
+  .myai-preset.active { background: var(--s-accent); color: var(--s-bg); border-color: var(--s-accent); }
+  .myai-input { width: 100%; background: var(--s-bg); border: 1px solid var(--s-border); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: var(--s-text-1); outline: none; font-family: inherit; }
+  .myai-input:focus { border-color: var(--s-accent); }
+  .myai-input::placeholder { color: var(--s-text-3); }
+  .myai-save { font-size: 10px; padding: 6px 10px; border-radius: 4px; background: var(--s-accent); color: var(--s-bg); align-self: flex-start; }
+  .myai-save:disabled { opacity: 0.5; cursor: default; }
+  .myai-saved-flash { font-size: 9px; color: var(--ok); }
+  .myai-info-btn { background: none; border: none; padding: 0; cursor: pointer; color: var(--s-text-3); display: inline-flex; }
+  .myai-info-btn.active { color: var(--s-accent); }
+  .myai-tutorial { font-size: 10px; line-height: 1.6; color: var(--s-text-2); background: var(--s-bg); border: 1px solid var(--s-border); border-left: 2px solid var(--s-accent); border-radius: 6px; padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .myai-tutorial[hidden] { display: none; }
+  .myai-tutorial b { color: var(--s-text-0); }
+  .myai-select { width: 100%; background: var(--s-bg); border: 1px solid var(--s-border); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: var(--s-text-1); outline: none; font-family: inherit; }
+  .myai-label { font-size: 9px; color: var(--s-text-3); letter-spacing: 0.1em; }
+
   .sidebar-stats { padding: 12px 16px; border-top: 1px solid var(--s-border); }
   .stat-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 10px; letter-spacing: 0.14em; color: var(--s-text-3); margin-top: 4px; }
   .stat-row:first-child { margin-top: 0; }
@@ -117,7 +145,7 @@
   .chip.guard-low { border-color: rgba(63,179,127,0.35); color: var(--ok); }
   .chip.guard-medium { border-color: rgba(224,165,63,0.35); color: var(--warn); }
   .chip.guard-high { border-color: rgba(224,86,79,0.35); color: var(--danger); }
-  .chip.guard-unknown { border-style: dashed; }
+  .chip.guard-unknown, .chip.guard-skipped { border-style: dashed; }
 
   .app-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; margin-top: 12px; border-top: 1px solid var(--s-surface-2); }
   .icon-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 6px; font-size: 11px; color: var(--s-text-3); transition: color 0.12s, background 0.12s; }
@@ -153,6 +181,39 @@
       <span class="section-label">Apps</span>
       <div id="sidebar-apps"></div>
     </nav>
+    <div class="myai-section">
+      <button class="myai-toggle" id="myai-toggle">
+        <span class="chev">▸</span><span>MY AI</span>
+        <span class="myai-dot" id="myai-dot"></span>
+      </button>
+      <div class="myai-panel" id="myai-panel">
+        <div class="myai-body">
+          <div style="display:flex;align-items:center;justify-content:space-between;">
+            <span class="myai-hint" style="max-width:80%;">Powers the pre-deploy security guard — points at your own local LM Studio, Ollama, or similar. Nothing is set until you set it.</span>
+            <button class="myai-info-btn" id="myai-info-btn" title="how do I find my address?">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+            </button>
+          </div>
+          <div class="myai-tutorial" id="myai-tutorial" hidden>
+            <div><b>LM Studio</b> — open the app, go to the <b>Developer</b> tab, toggle <b>Status</b> to Running, then copy the address next to <b>"Reachable at"</b>.</div>
+            <div><b>Ollama</b> — runs on port 11434 automatically once it's installed; nothing to turn on.</div>
+            <div><b>text-generation-webui</b> — launch it with the <code>--api</code> flag; it listens on port 5000 by default.</div>
+            <div style="border-top:1px solid var(--s-border);padding-top:6px;">That address is usually on <b>your computer</b>, not this server.</div>
+          </div>
+          <span class="myai-status" id="myai-status"></span>
+          <div class="myai-presets" id="myai-presets"></div>
+          <input class="myai-input" id="myai-url-input" placeholder="its address, e.g. http://localhost:1234" autocomplete="off">
+          <input class="myai-input" id="myai-key-input" type="password" placeholder="API key (only if it needs one)" autocomplete="off">
+          <button class="myai-save" id="myai-save-btn" disabled>save</button>
+          <span class="myai-saved-flash" id="myai-saved-flash" hidden>saved</span>
+          <div id="myai-model-wrap" hidden>
+            <div style="border-top:1px solid var(--s-border);margin:2px 0 7px;"></div>
+            <span class="myai-label">MODEL</span>
+            <select class="myai-select" id="myai-model-select" style="margin-top:5px;"></select>
+          </div>
+        </div>
+      </div>
+    </div>
     <div class="sidebar-stats">
       <div class="stat-row"><span>APPS</span><span class="v" id="stat-total">0</span></div>
       <div class="stat-row"><span>RUNNING</span><span class="v" id="stat-running">0</span></div>
@@ -227,9 +288,9 @@ function iconSvg(name) {
 }
 
 function guardChip(g) {
-  if (!g) return '';
-  const title = [g.summary, ...(g.findings || [])].filter(Boolean).join('\n');
-  return `<span class="chip guard-${g.risk}" title="${title.replace(/"/g, '&quot;')}">guard: ${g.risk}</span>`;
+  if (!g || g.risk === 'skipped') return '';
+  const lines = [g.summary, ...(g.findings || []).map((f) => `- ${f.issue}: ${f.why}`)].filter(Boolean);
+  return `<span class="chip guard-${g.risk}" title="${lines.join('\n').replace(/"/g, '&quot;')}">guard: ${g.risk}</span>`;
 }
 
 function appCard(app) {
@@ -353,6 +414,115 @@ deployForm.addEventListener('submit', async (e) => {
 });
 
 load();
+
+// ── MY AI panel — same "input your server info" pattern as shelf-cmd's
+// MyAiPanel.jsx, ported to vanilla JS/inline-expand since this dashboard has
+// no framework. Every field starts genuinely blank; nothing is assumed.
+const LM_PRESETS = [
+  { label: 'LM Studio', port: 1234 },
+  { label: 'Ollama', port: 11434 },
+  { label: 'text-generation-webui', port: 5000 },
+];
+
+const myaiToggle = document.getElementById('myai-toggle');
+const myaiPanel = document.getElementById('myai-panel');
+const myaiDot = document.getElementById('myai-dot');
+const myaiInfoBtn = document.getElementById('myai-info-btn');
+const myaiTutorial = document.getElementById('myai-tutorial');
+const myaiStatus = document.getElementById('myai-status');
+const myaiPresets = document.getElementById('myai-presets');
+const myaiUrlInput = document.getElementById('myai-url-input');
+const myaiKeyInput = document.getElementById('myai-key-input');
+const myaiSaveBtn = document.getElementById('myai-save-btn');
+const myaiSavedFlash = document.getElementById('myai-saved-flash');
+const myaiModelWrap = document.getElementById('myai-model-wrap');
+const myaiModelSelect = document.getElementById('myai-model-select');
+
+let myaiSelectedPreset = null;
+
+myaiPresets.innerHTML = LM_PRESETS.map((p) => `<button class="myai-preset" data-label="${p.label}">${p.label}</button>`).join('');
+myaiPresets.querySelectorAll('.myai-preset').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    myaiSelectedPreset = LM_PRESETS.find((p) => p.label === btn.dataset.label);
+    myaiPresets.querySelectorAll('.myai-preset').forEach((b) => b.classList.toggle('active', b === btn));
+    myaiUrlInput.placeholder = `its address, e.g. http://localhost:${myaiSelectedPreset.port}`;
+  });
+});
+
+myaiInfoBtn.addEventListener('click', () => {
+  const showing = !myaiTutorial.hidden;
+  myaiTutorial.hidden = showing;
+  myaiInfoBtn.classList.toggle('active', !showing);
+});
+
+myaiUrlInput.addEventListener('input', () => { myaiSaveBtn.disabled = !myaiUrlInput.value.trim(); });
+
+async function loadMyAi() {
+  let lm;
+  try { lm = await api('/api/lm'); } catch (err) { myaiStatus.textContent = `can't load settings: ${err.message}`; return; }
+
+  myaiDot.classList.toggle('connected', !!(lm.url && !lm.error));
+
+  if (!lm.url) {
+    myaiStatus.textContent = '';
+  } else {
+    myaiStatus.textContent = `currently: ${lm.url}`;
+    if (lm.error) {
+      myaiStatus.textContent += ` — can't reach it: ${lm.error}`;
+      if (/401/.test(lm.error)) myaiStatus.textContent += ' (wants an API key, above)';
+    }
+  }
+
+  if (lm.url && !lm.error && lm.models && lm.models.length) {
+    myaiModelWrap.hidden = false;
+    myaiModelSelect.innerHTML =
+      '<option value="">endpoint default</option>' +
+      lm.models.map((id) => `<option value="${id}"${id === lm.selected ? ' selected' : ''}>${id}</option>`).join('');
+  } else {
+    myaiModelWrap.hidden = true;
+  }
+}
+
+myaiToggle.addEventListener('click', () => {
+  const opening = !myaiToggle.classList.contains('open');
+  myaiToggle.classList.toggle('open');
+  myaiPanel.classList.toggle('open');
+  if (opening) loadMyAi();
+});
+
+loadMyAi();
+
+myaiSaveBtn.addEventListener('click', async () => {
+  const url = myaiUrlInput.value.trim();
+  if (!url) return;
+  const body = { url };
+  if (myaiKeyInput.value.trim()) body.apiKey = myaiKeyInput.value.trim();
+  myaiSaveBtn.disabled = true;
+  try {
+    await api('/api/lm', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    myaiUrlInput.value = '';
+    myaiKeyInput.value = '';
+    myaiSelectedPreset = null;
+    myaiPresets.querySelectorAll('.myai-preset').forEach((b) => b.classList.remove('active'));
+    myaiSavedFlash.hidden = false;
+    setTimeout(() => { myaiSavedFlash.hidden = true; }, 1500);
+    await loadMyAi();
+  } catch (err) {
+    myaiStatus.textContent = `save failed: ${err.message}`;
+  } finally {
+    myaiSaveBtn.disabled = !myaiUrlInput.value.trim();
+  }
+});
+
+myaiModelSelect.addEventListener('change', async () => {
+  try {
+    await api('/api/lm', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model: myaiModelSelect.value }) });
+    myaiSavedFlash.hidden = false;
+    setTimeout(() => { myaiSavedFlash.hidden = true; }, 1500);
+  } catch (err) {
+    myaiStatus.textContent = `save failed: ${err.message}`;
+  }
+});
 
 // Ported from chat-cmd's WaveBackground.jsx (itself ported from apps-cmd's XMB
 // wave) — same sine-band + particle canvas, fixed to 'outline' style / 'normal'

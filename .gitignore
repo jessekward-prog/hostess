@@ -2,4 +2,5 @@ node_modules/
 apps/*
 !apps/.gitkeep
 registry.json
+settings.json
 test-fleet.js

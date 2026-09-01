@@ -75,13 +75,21 @@ Postgres — its existing database and role, so `DATABASE_URL` doesn't rotate on
 - One shared `postgres:16-alpine` container (`selfhost-postgres`) on a dedicated Docker
   network; each Postgres-backed app gets its own database + role inside it
 - Host ports are auto-assigned from the `4000–4999` range and stick for the life of the app
-- **Security guard:** before building, each repo's `Dockerfile`, `app.yaml`, and entrypoint file
-  are sent to a local LLM (LM Studio) for a quick review — hardcoded secrets, curl-pipe-to-bash,
-  privilege escalation, exfiltration, obfuscated code. `risk: high` blocks the deploy (error shown
-  in the dashboard/CLI); `low`/`medium` just get logged and shown as a `guard: <risk>` chip on the
-  app card (hover for details). If the LLM is unreachable, the scan is skipped and the deploy
-  proceeds unscanned — see `lib/guard.js`. Points at the shared "library" LM Studio instance by
-  default; override with `HOSTESS_GUARD_LM_URL` / `HOSTESS_GUARD_LM_KEY` / `HOSTESS_GUARD_LM_MODEL`.
+- **MY AI:** sidebar panel (bottom-left) where you point Hostess at your own local LM Studio,
+  Ollama, or text-generation-webui — address, optional API key, and which loaded model to use.
+  Same "paste your server info" pattern as shelf-cmd's MY AI panel. Nothing is set until you set
+  it; settings persist in `settings.json` (**not committed** — holds a live API key if you set
+  one). `HOSTESS_GUARD_LM_URL` / `HOSTESS_GUARD_LM_KEY` / `HOSTESS_GUARD_LM_MODEL` env vars work
+  as a headless fallback if you never touch the panel.
+- **Security guard:** once a model is connected, every deploy gets its `Dockerfile`, `app.yaml`,
+  and entrypoint file reviewed before building — framed as "would this be dangerous for an
+  ordinary person to run on their own computer," covering both malicious code (hardcoded secrets,
+  curl-pipe-to-bash, exfiltration, obfuscation) and home-hosting exposure (requests for
+  privileged/docker-socket/host-network access, unauthenticated admin endpoints, LAN scanning).
+  Each finding comes with a plain-language reason, not jargon. `risk: high` blocks the deploy
+  (reason shown in the dashboard/CLI); `low`/`medium` just get logged and shown as a
+  `guard: <risk>` chip on the app card (hover for details). No model connected, or the LLM's
+  unreachable mid-scan → scan is skipped and the deploy proceeds unscanned — see `lib/guard.js`.
 
 ## Known limitations
 
