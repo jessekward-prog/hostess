@@ -114,6 +114,10 @@
   .meta-row a { color: var(--s-text-1); text-decoration: none; word-break: break-all; }
   .meta-row a:hover { color: var(--s-accent); text-decoration: underline; }
   .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; border: 1px solid var(--s-border); border-radius: 999px; padding: 2px 8px; color: var(--s-text-2); margin-right: 4px; }
+  .chip.guard-low { border-color: rgba(63,179,127,0.35); color: var(--ok); }
+  .chip.guard-medium { border-color: rgba(224,165,63,0.35); color: var(--warn); }
+  .chip.guard-high { border-color: rgba(224,86,79,0.35); color: var(--danger); }
+  .chip.guard-unknown { border-style: dashed; }
 
   .app-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; margin-top: 12px; border-top: 1px solid var(--s-surface-2); }
   .icon-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 6px; font-size: 11px; color: var(--s-text-3); transition: color 0.12s, background 0.12s; }
@@ -222,6 +226,12 @@ function iconSvg(name) {
   return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icons[name]}</svg>`;
 }
 
+function guardChip(g) {
+  if (!g) return '';
+  const title = [g.summary, ...(g.findings || [])].filter(Boolean).join('\n');
+  return `<span class="chip guard-${g.risk}" title="${title.replace(/"/g, '&quot;')}">guard: ${g.risk}</span>`;
+}
+
 function appCard(app) {
   const sc = statusClass(app.status);
   const url = `http://localhost:${app.port}`;
@@ -237,6 +247,7 @@ function appCard(app) {
       <div class="meta-row"><span class="k">image</span><span>${app.image}</span></div>
       <div class="meta-row" title="${app.repoSource}"><span class="k">source</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${app.repoSource}</span></div>
       ${app.postgres ? '<span class="chip">postgres</span>' : ''}
+      ${guardChip(app.guard)}
     </div>
     <button class="reveal-toggle" data-act="logs">
       <span class="chev">▸</span><span>show logs</span>

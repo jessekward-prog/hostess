@@ -75,6 +75,13 @@ Postgres — its existing database and role, so `DATABASE_URL` doesn't rotate on
 - One shared `postgres:16-alpine` container (`selfhost-postgres`) on a dedicated Docker
   network; each Postgres-backed app gets its own database + role inside it
 - Host ports are auto-assigned from the `4000–4999` range and stick for the life of the app
+- **Security guard:** before building, each repo's `Dockerfile`, `app.yaml`, and entrypoint file
+  are sent to a local LLM (LM Studio) for a quick review — hardcoded secrets, curl-pipe-to-bash,
+  privilege escalation, exfiltration, obfuscated code. `risk: high` blocks the deploy (error shown
+  in the dashboard/CLI); `low`/`medium` just get logged and shown as a `guard: <risk>` chip on the
+  app card (hover for details). If the LLM is unreachable, the scan is skipped and the deploy
+  proceeds unscanned — see `lib/guard.js`. Points at the shared "library" LM Studio instance by
+  default; override with `HOSTESS_GUARD_LM_URL` / `HOSTESS_GUARD_LM_KEY` / `HOSTESS_GUARD_LM_MODEL`.
 
 ## Known limitations
 
