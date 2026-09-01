@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL="https://github.com/jessekward-prog/selfhost-wizard.git"
-INSTALL_DIR="${SELFHOST_WIZARD_DIR:-$HOME/selfhost-wizard}"
-PLIST_LABEL="xyz.cmdward.selfhost-wizard"
+REPO_URL="https://github.com/jessekward-prog/hostess.git"
+INSTALL_DIR="${HOSTESS_DIR:-$HOME/hostess}"
+PLIST_LABEL="xyz.cmdward.hostess"
 PLIST_PATH="$HOME/Library/LaunchAgents/${PLIST_LABEL}.plist"
 
-echo "== selfhost-wizard installer (macOS) =="
+echo "== hostess installer (macOS) =="
 
 if [ "$(uname -s)" != "Darwin" ]; then
   echo "This script is for macOS. Use install.sh on Linux or install.ps1 on Windows." >&2
@@ -49,7 +49,7 @@ fi
 
 # --- fetch the app ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$SCRIPT_DIR/package.json" ] && grep -q '"name": "selfhost-wizard"' "$SCRIPT_DIR/package.json"; then
+if [ -f "$SCRIPT_DIR/package.json" ] && grep -q '"name": "hostess"' "$SCRIPT_DIR/package.json"; then
   INSTALL_DIR="$SCRIPT_DIR"
   echo "Running from existing checkout at $INSTALL_DIR"
 elif [ -d "$INSTALL_DIR/.git" ]; then
@@ -79,8 +79,8 @@ cat > "$PLIST_PATH" <<EOF
   <key>WorkingDirectory</key><string>${INSTALL_DIR}</string>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>/tmp/selfhost-wizard.log</string>
-  <key>StandardErrorPath</key><string>/tmp/selfhost-wizard.log</string>
+  <key>StandardOutPath</key><string>/tmp/hostess.log</string>
+  <key>StandardErrorPath</key><string>/tmp/hostess.log</string>
 </dict>
 </plist>
 EOF
@@ -89,6 +89,6 @@ launchctl unload "$PLIST_PATH" >/dev/null 2>&1 || true
 launchctl load -w "$PLIST_PATH"
 
 echo ""
-echo "selfhost-wizard is running at http://localhost:5300"
+echo "hostess is running at http://localhost:5300"
 echo "Manage it with: launchctl {unload,load -w} $PLIST_PATH"
-echo "Logs: /tmp/selfhost-wizard.log"
+echo "Logs: /tmp/hostess.log"

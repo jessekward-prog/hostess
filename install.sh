@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_URL="https://github.com/jessekward-prog/selfhost-wizard.git"
-INSTALL_DIR="${SELFHOST_WIZARD_DIR:-$HOME/selfhost-wizard}"
-SERVICE_NAME="selfhost-wizard"
+REPO_URL="https://github.com/jessekward-prog/hostess.git"
+INSTALL_DIR="${HOSTESS_DIR:-$HOME/hostess}"
+SERVICE_NAME="hostess"
 
-echo "== selfhost-wizard installer =="
+echo "== hostess installer =="
 
 SUDO=""
 if command -v sudo >/dev/null 2>&1; then SUDO="sudo"; fi
@@ -35,7 +35,7 @@ fi
 
 # --- fetch the app ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$SCRIPT_DIR/package.json" ] && grep -q '"name": "selfhost-wizard"' "$SCRIPT_DIR/package.json"; then
+if [ -f "$SCRIPT_DIR/package.json" ] && grep -q '"name": "hostess"' "$SCRIPT_DIR/package.json"; then
   INSTALL_DIR="$SCRIPT_DIR"
   echo "Running from existing checkout at $INSTALL_DIR"
 elif [ -d "$INSTALL_DIR/.git" ]; then
@@ -53,7 +53,7 @@ npm install --omit=dev
 mkdir -p "$HOME/.config/systemd/user"
 cat > "$HOME/.config/systemd/user/${SERVICE_NAME}.service" <<EOF
 [Unit]
-Description=Self-Host Wizard dashboard
+Description=Hostess dashboard
 After=network.target docker.service
 
 [Service]
@@ -70,5 +70,5 @@ systemctl --user enable --now "$SERVICE_NAME"
 loginctl enable-linger "$USER" 2>/dev/null || true
 
 echo ""
-echo "selfhost-wizard is running at http://localhost:5300"
+echo "hostess is running at http://localhost:5300"
 echo "Manage it with: systemctl --user {status,restart,stop} $SERVICE_NAME"

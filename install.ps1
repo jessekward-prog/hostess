@@ -1,10 +1,10 @@
 #Requires -Version 5.1
-# selfhost-wizard installer (Windows / PowerShell)
-# Usage:  iwr -useb https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.ps1 | iex
+# hostess installer (Windows / PowerShell)
+# Usage:  iwr -useb https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.ps1 | iex
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "== selfhost-wizard installer (Windows) =="
+Write-Host "== hostess installer (Windows) =="
 
 # --- re-launch elevated (winget machine-scope installs + WSL need it) ---
 $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
@@ -16,8 +16,8 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
         Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
     } else {
         # running via `iex` (no file on disk) — re-download and run elevated
-        $tmp = Join-Path $env:TEMP "selfhost-wizard-install.ps1"
-        Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.ps1" -OutFile $tmp
+        $tmp = Join-Path $env:TEMP "hostess-install.ps1"
+        Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.ps1" -OutFile $tmp
         Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$tmp`""
     }
     exit
@@ -75,13 +75,13 @@ if (-not $dockerRunning) {
 }
 
 # --- fetch the app ---
-$RepoUrl = "https://github.com/jessekward-prog/selfhost-wizard.git"
-$InstallDir = if ($env:SELFHOST_WIZARD_DIR) { $env:SELFHOST_WIZARD_DIR } else { Join-Path $env:USERPROFILE "selfhost-wizard" }
+$RepoUrl = "https://github.com/jessekward-prog/hostess.git"
+$InstallDir = if ($env:HOSTESS_DIR) { $env:HOSTESS_DIR } else { Join-Path $env:USERPROFILE "hostess" }
 
 $scriptDir = if ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path } else { $null }
 $pkgJson = if ($scriptDir) { Join-Path $scriptDir "package.json" } else { $null }
 
-if ($pkgJson -and (Test-Path $pkgJson) -and (Select-String -Path $pkgJson -Pattern '"name":\s*"selfhost-wizard"' -Quiet)) {
+if ($pkgJson -and (Test-Path $pkgJson) -and (Select-String -Path $pkgJson -Pattern '"name":\s*"hostess"' -Quiet)) {
     $InstallDir = $scriptDir
     Write-Host "Running from existing checkout at $InstallDir"
 } elseif (Test-Path (Join-Path $InstallDir ".git")) {
@@ -96,7 +96,7 @@ Set-Location $InstallDir
 npm install --omit=dev
 
 # --- scheduled task (survives logoff/reboot, runs hidden) ---
-$TaskName = "selfhost-wizard"
+$TaskName = "hostess"
 $action = New-ScheduledTaskAction -Execute "powershell.exe" `
     -Argument "-NoProfile -WindowStyle Hidden -Command `"Set-Location '$InstallDir'; node server.js`""
 $trigger = New-ScheduledTaskTrigger -AtLogOn
@@ -109,5 +109,5 @@ Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
 Start-ScheduledTask -TaskName $TaskName
 
 Write-Host ""
-Write-Host "selfhost-wizard is running at http://localhost:5300"
+Write-Host "hostess is running at http://localhost:5300"
 Write-Host "Manage it with: Start-ScheduledTask/Stop-ScheduledTask -TaskName $TaskName"

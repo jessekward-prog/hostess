@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>hostess — install selfhost-wizard</title>
+<title>Hostess — install</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><rect width=%2224%22 height=%2224%22 rx=%224%22 fill=%22%23000%22/><rect x=%224%22 y=%224%22 width=%2216%22 height=%2216%22 rx=%222%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%222%22/></svg>">
 <style>
   /* ── shelf-cmd "CMD" theme tokens — the app's real default, not the amber
@@ -280,7 +280,7 @@
     </nav>
 
     <div class="sidebar-stats">
-      <div class="stat-row"><span>SOURCE</span><a href="https://github.com/jessekward-prog/selfhost-wizard" target="_blank" rel="noopener">GitHub ↗</a></div>
+      <div class="stat-row"><span>SOURCE</span><a href="https://github.com/jessekward-prog/hostess" target="_blank" rel="noopener">GitHub ↗</a></div>
       <div class="stat-row"><span>DASHBOARD</span><span class="v">:5300 loopback</span></div>
     </div>
     </div>
@@ -289,10 +289,10 @@
   <main>
     <header class="top">
       <h1><span class="mark"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>hostess</h1>
-      <p class="tagline">One command turns a clean machine into a self-hosted app platform. Point <strong style="color:var(--s-text-1)">selfhost-wizard</strong> at any repo with an <code style="color:var(--s-text-0)">app.yaml</code> and it builds, deploys, and manages it in Docker for you.</p>
+      <p class="tagline">One command turns a clean machine into a self-hosted app platform. Point <strong style="color:var(--s-text-1)">hostess</strong> at any repo with an <code style="color:var(--s-text-0)">app.yaml</code> and it builds, deploys, and manages it in Docker for you.</p>
       <div class="badges">
         <span class="badge">Dashboard on <code>localhost:5300</code>, loopback only</span>
-        <span class="badge"><a href="https://github.com/jessekward-prog/selfhost-wizard" target="_blank" rel="noopener">Source on GitHub ↗</a></span>
+        <span class="badge"><a href="https://github.com/jessekward-prog/hostess" target="_blank" rel="noopener">Source on GitHub ↗</a></span>
       </div>
     </header>
 
@@ -313,21 +313,21 @@
             <p class="card-desc">One command. Works on a clean machine, safe to re-run.</p>
           </div>
           <div class="card-body">
-            <div class="code-block accent" id="cmd-linux">curl -fsSL https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.sh | bash</div>
+            <div class="code-block accent" id="cmd-linux">curl -fsSL https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.sh | bash</div>
           </div>
           <div class="card-foot">
             <button class="icon-btn" data-copy="cmd-linux" onclick="copyCmd(this)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               <span>Copy</span>
             </button>
-            <a class="link-out" href="https://github.com/jessekward-prog/selfhost-wizard/blob/main/install.sh" target="_blank" rel="noopener">view source ↗</a>
+            <a class="link-out" href="https://github.com/jessekward-prog/hostess/blob/main/install.sh" target="_blank" rel="noopener">view source ↗</a>
           </div>
         </div>
 
         <div class="card">
           <div class="card-head">
             <p class="card-title">What it sets up</p>
-            <p class="card-desc">Installs Docker, Node.js 18+, and git if missing (adds you to the <code style="color:var(--s-text-0)">docker</code> group — log out/in after). Clones to <code style="color:var(--s-text-0)">~/selfhost-wizard</code> and registers a systemd user service so the dashboard survives reboot and logout.</p>
+            <p class="card-desc">Installs Docker, Node.js 18+, and git if missing (adds you to the <code style="color:var(--s-text-0)">docker</code> group — log out/in after). Clones to <code style="color:var(--s-text-0)">~/hostess</code> and registers a systemd user service so the dashboard survives reboot and logout.</p>
           </div>
           <div class="card-body">
             <button class="reveal-toggle" onclick="toggleReveal(this)">
@@ -343,19 +343,19 @@ sudo usermod -aG docker "$USER"</div>
                 </div>
                 <div class="step">
                   <p class="step-label"><span class="step-num">2</span><b>Clone + install</b></p>
-                  <div class="code-block">git clone --depth 1 https://github.com/jessekward-prog/selfhost-wizard.git ~/selfhost-wizard
-cd ~/selfhost-wizard && npm install --omit=dev</div>
+                  <div class="code-block">git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess
+cd ~/hostess && npm install --omit=dev</div>
                 </div>
                 <div class="step">
                   <p class="step-label"><span class="step-num">3</span><b>systemd service</b></p>
                   <div class="code-block">mkdir -p ~/.config/systemd/user
-cat > ~/.config/systemd/user/selfhost-wizard.service &lt;&lt;EOF
+cat > ~/.config/systemd/user/hostess.service &lt;&lt;EOF
 [Unit]
-Description=Self-Host Wizard dashboard
+Description=Hostess dashboard
 After=network.target docker.service
 
 [Service]
-WorkingDirectory=%h/selfhost-wizard
+WorkingDirectory=%h/hostess
 ExecStart=$(command -v node) server.js
 Restart=on-failure
 
@@ -363,14 +363,14 @@ Restart=on-failure
 WantedBy=default.target
 EOF
 systemctl --user daemon-reload
-systemctl --user enable --now selfhost-wizard
+systemctl --user enable --now hostess
 loginctl enable-linger "$USER"</div>
                 </div>
                 <div class="step">
                   <p class="step-label"><span class="step-num">4</span><b>Manage it</b></p>
-                  <div class="code-block">systemctl --user status  selfhost-wizard
-systemctl --user restart selfhost-wizard
-systemctl --user stop    selfhost-wizard</div>
+                  <div class="code-block">systemctl --user status  hostess
+systemctl --user restart hostess
+systemctl --user stop    hostess</div>
                 </div>
               </div>
             </div>
@@ -390,21 +390,21 @@ systemctl --user stop    selfhost-wizard</div>
             <p class="card-desc">One command. Works on a clean machine, safe to re-run.</p>
           </div>
           <div class="card-body">
-            <div class="code-block accent" id="cmd-macos">curl -fsSL https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install-macos.sh | bash</div>
+            <div class="code-block accent" id="cmd-macos">curl -fsSL https://raw.githubusercontent.com/jessekward-prog/hostess/main/install-macos.sh | bash</div>
           </div>
           <div class="card-foot">
             <button class="icon-btn" data-copy="cmd-macos" onclick="copyCmd(this)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               <span>Copy</span>
             </button>
-            <a class="link-out" href="https://github.com/jessekward-prog/selfhost-wizard/blob/main/install-macos.sh" target="_blank" rel="noopener">view source ↗</a>
+            <a class="link-out" href="https://github.com/jessekward-prog/hostess/blob/main/install-macos.sh" target="_blank" rel="noopener">view source ↗</a>
           </div>
         </div>
 
         <div class="card">
           <div class="card-head">
             <p class="card-title">What it sets up</p>
-            <p class="card-desc">Installs Homebrew if missing, then git/node/Docker Desktop. Docker's first run needs you to click through its permissions dialog. Clones to <code style="color:var(--s-text-0)">~/selfhost-wizard</code> and registers a launchd agent so the dashboard survives reboot and logout.</p>
+            <p class="card-desc">Installs Homebrew if missing, then git/node/Docker Desktop. Docker's first run needs you to click through its permissions dialog. Clones to <code style="color:var(--s-text-0)">~/hostess</code> and registers a launchd agent so the dashboard survives reboot and logout.</p>
           </div>
           <div class="card-body">
             <button class="reveal-toggle" onclick="toggleReveal(this)">
@@ -421,28 +421,28 @@ open -a Docker</div>
                 </div>
                 <div class="step">
                   <p class="step-label"><span class="step-num">2</span><b>Clone + install</b></p>
-                  <div class="code-block">git clone --depth 1 https://github.com/jessekward-prog/selfhost-wizard.git ~/selfhost-wizard
-cd ~/selfhost-wizard && npm install --omit=dev</div>
+                  <div class="code-block">git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess
+cd ~/hostess && npm install --omit=dev</div>
                 </div>
                 <div class="step">
                   <p class="step-label"><span class="step-num">3</span><b>launchd agent</b></p>
-                  <div class="code-block">cat > ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist &lt;&lt;EOF
+                  <div class="code-block">cat > ~/Library/LaunchAgents/xyz.cmdward.hostess.plist &lt;&lt;EOF
 &lt;?xml version="1.0" encoding="UTF-8"?&gt;
 &lt;plist version="1.0"&gt;&lt;dict&gt;
-  &lt;key&gt;Label&lt;/key&gt;&lt;string&gt;xyz.cmdward.selfhost-wizard&lt;/string&gt;
+  &lt;key&gt;Label&lt;/key&gt;&lt;string&gt;xyz.cmdward.hostess&lt;/string&gt;
   &lt;key&gt;ProgramArguments&lt;/key&gt;
   &lt;array&gt;&lt;string&gt;$(command -v node)&lt;/string&gt;&lt;string&gt;server.js&lt;/string&gt;&lt;/array&gt;
-  &lt;key&gt;WorkingDirectory&lt;/key&gt;&lt;string&gt;$HOME/selfhost-wizard&lt;/string&gt;
+  &lt;key&gt;WorkingDirectory&lt;/key&gt;&lt;string&gt;$HOME/hostess&lt;/string&gt;
   &lt;key&gt;RunAtLoad&lt;/key&gt;&lt;true/&gt;
   &lt;key&gt;KeepAlive&lt;/key&gt;&lt;true/&gt;
 &lt;/dict&gt;&lt;/plist&gt;
 EOF
-launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist</div>
+launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.hostess.plist</div>
                 </div>
                 <div class="step">
                   <p class="step-label"><span class="step-num">4</span><b>Manage it</b></p>
-                  <div class="code-block">launchctl unload ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist
-launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist</div>
+                  <div class="code-block">launchctl unload ~/Library/LaunchAgents/xyz.cmdward.hostess.plist
+launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.hostess.plist</div>
                 </div>
               </div>
             </div>
@@ -462,21 +462,21 @@ launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist</div>
             <p class="card-desc">Run in PowerShell (Start → type "PowerShell"). Approve the UAC prompt.</p>
           </div>
           <div class="card-body">
-            <div class="code-block accent" id="cmd-windows">iwr -useb https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.ps1 | iex</div>
+            <div class="code-block accent" id="cmd-windows">iwr -useb https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.ps1 | iex</div>
           </div>
           <div class="card-foot">
             <button class="icon-btn" data-copy="cmd-windows" onclick="copyCmd(this)">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
               <span>Copy</span>
             </button>
-            <a class="link-out" href="https://github.com/jessekward-prog/selfhost-wizard/blob/main/install.ps1" target="_blank" rel="noopener">view source ↗</a>
+            <a class="link-out" href="https://github.com/jessekward-prog/hostess/blob/main/install.ps1" target="_blank" rel="noopener">view source ↗</a>
           </div>
         </div>
 
         <div class="card">
           <div class="card-head">
             <p class="card-title">What it sets up</p>
-            <p class="card-desc">Installs git/Node LTS/Docker Desktop via winget, enables WSL2 if needed (a truly clean machine needs one reboot here — Docker's requirement, not this script's). Clones to <code style="color:var(--s-text-0)">$HOME\selfhost-wizard</code> and registers a Scheduled Task so the dashboard survives reboot.</p>
+            <p class="card-desc">Installs git/Node LTS/Docker Desktop via winget, enables WSL2 if needed (a truly clean machine needs one reboot here — Docker's requirement, not this script's). Clones to <code style="color:var(--s-text-0)">$HOME\hostess</code> and registers a Scheduled Task so the dashboard survives reboot.</p>
           </div>
           <div class="card-body">
             <button class="reveal-toggle" onclick="toggleReveal(this)">
@@ -497,22 +497,22 @@ winget install --id Docker.DockerDesktop -e</div>
                 </div>
                 <div class="step">
                   <p class="step-label"><span class="step-num">3</span><b>Clone + install</b></p>
-                  <div class="code-block">git clone --depth 1 https://github.com/jessekward-prog/selfhost-wizard.git $HOME\selfhost-wizard
-cd $HOME\selfhost-wizard
+                  <div class="code-block">git clone --depth 1 https://github.com/jessekward-prog/hostess.git $HOME\hostess
+cd $HOME\hostess
 npm install --omit=dev</div>
                 </div>
                 <div class="step">
                   <p class="step-label"><span class="step-num">4</span><b>Scheduled Task</b></p>
                   <div class="code-block">$action = New-ScheduledTaskAction -Execute "powershell.exe" `
-  -Argument '-NoProfile -WindowStyle Hidden -Command "Set-Location $HOME\selfhost-wizard; node server.js"'
+  -Argument '-NoProfile -WindowStyle Hidden -Command "Set-Location $HOME\hostess; node server.js"'
 $trigger = New-ScheduledTaskTrigger -AtLogOn
-Register-ScheduledTask -TaskName selfhost-wizard -Action $action -Trigger $trigger -Force
-Start-ScheduledTask -TaskName selfhost-wizard</div>
+Register-ScheduledTask -TaskName hostess -Action $action -Trigger $trigger -Force
+Start-ScheduledTask -TaskName hostess</div>
                 </div>
                 <div class="step">
                   <p class="step-label"><span class="step-num">5</span><b>Manage it</b></p>
-                  <div class="code-block">Start-ScheduledTask -TaskName selfhost-wizard
-Stop-ScheduledTask  -TaskName selfhost-wizard</div>
+                  <div class="code-block">Start-ScheduledTask -TaskName hostess
+Stop-ScheduledTask  -TaskName hostess</div>
                 </div>
               </div>
             </div>
@@ -564,7 +564,7 @@ node deploy.js /path/to/local/repo</div>
     </section>
 
     <footer class="page-foot">
-      <a href="https://github.com/jessekward-prog/selfhost-wizard" target="_blank" rel="noopener">jessekward-prog/selfhost-wizard</a> — personal project, no telemetry, nothing leaves your machine.
+      <a href="https://github.com/jessekward-prog/hostess" target="_blank" rel="noopener">jessekward-prog/hostess</a> — personal project, no telemetry, nothing leaves your machine.
     </footer>
   </main>
 </div>

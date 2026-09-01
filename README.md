@@ -1,4 +1,4 @@
-# Self-Host Wizard
+# Hostess
 
 A tiny self-hosted PaaS for one Linux box: paste a git URL (or local path), it builds a Docker
 image, wires up Postgres if the app needs one, and runs it on an auto-picked port. Dashboard +
@@ -10,21 +10,21 @@ Full walkthrough with copy-paste commands for every option: **[hostess.cmdward.x
 
 **Linux** (Debian/Ubuntu-family):
 ```
-curl -fsSL https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.sh | bash
 ```
 
 **macOS:**
 ```
-curl -fsSL https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install-macos.sh | bash
+curl -fsSL https://raw.githubusercontent.com/jessekward-prog/hostess/main/install-macos.sh | bash
 ```
 
 **Windows** (PowerShell — re-launches itself elevated, approve the UAC prompt):
 ```
-iwr -useb https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.ps1 | iex
+iwr -useb https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.ps1 | iex
 ```
 
-Each installs Docker/Node/git if missing, clones the repo to `~/selfhost-wizard`
-(`$HOME\selfhost-wizard` on Windows), and registers a persistent background service —
+Each installs Docker/Node/git if missing, clones the repo to `~/hostess`
+(`$HOME\hostess` on Windows), and registers a persistent background service —
 a user-level systemd service on Linux, a launchd agent on macOS, a Scheduled Task on Windows —
 so the dashboard survives reboots and logouts.
 
@@ -37,9 +37,9 @@ Manage the service:
 
 | OS | Status | Restart | Stop |
 |---|---|---|---|
-| Linux | `systemctl --user status selfhost-wizard` | `systemctl --user restart selfhost-wizard` | `systemctl --user stop selfhost-wizard` |
-| macOS | `launchctl list \| grep selfhost` | `launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist` | `launchctl unload ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist` |
-| Windows | `Get-ScheduledTask -TaskName selfhost-wizard` | `Start-ScheduledTask -TaskName selfhost-wizard` | `Stop-ScheduledTask -TaskName selfhost-wizard` |
+| Linux | `systemctl --user status hostess` | `systemctl --user restart hostess` | `systemctl --user stop hostess` |
+| macOS | `launchctl list \| grep hostess` | `launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.hostess.plist` | `launchctl unload ~/Library/LaunchAgents/xyz.cmdward.hostess.plist` |
+| Windows | `Get-ScheduledTask -TaskName hostess` | `Start-ScheduledTask -TaskName hostess` | `Stop-ScheduledTask -TaskName hostess` |
 
 ## Deploying an app
 

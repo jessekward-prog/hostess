@@ -71,5 +71,5 @@ app.get('/api/apps/:name/logs', async (req, res) => {
 });
 
 app.listen(PORT, '127.0.0.1', () => {
-  console.log(`selfhost-wizard dashboard: http://localhost:${PORT}`);
+  console.log(`hostess dashboard: http://localhost:${PORT}`);
 });
