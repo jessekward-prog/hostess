@@ -4,170 +4,323 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>hostess — install selfhost-wizard</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧙</text></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><rect width=%2224%22 height=%2224%22 rx=%224%22 fill=%22%23000%22/><rect x=%224%22 y=%224%22 width=%2216%22 height=%2216%22 rx=%222%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%222%22/></svg>">
 <style>
+  /* ── shelf-cmd "CMD" theme tokens — the app's real default, not the amber
+     phosphor one the CSS comment implies. Grayscale-first; --s-accent is the
+     only color, reserved for interactive/active state. ── */
   :root {
-    --bg: #0c0d10;
-    --panel: #16181d;
-    --border: #2a2d34;
-    --text: #e7e6e2;
-    --dim: #8b8d95;
-    --amber: #d98f3c;
-    --amber-bright: #f2ab5c;
-    --code-bg: #0a0b0d;
-    --ok: #4caf6d;
+    --s-font: 'JetBrains Mono', 'Fira Mono', ui-monospace, Menlo, Consolas, monospace;
+    --s-bg:            #000000;
+    --s-surface:       #111111;
+    --s-surface-2:     #1e1e1e;
+    --s-border:        #333333;
+    --s-accent:        #ffffff;
+    --s-accent-faint:  rgba(255,255,255,0.07);
+    --s-accent-glow:   rgba(255,255,255,0.18);
+    --s-accent-strong: rgba(255,255,255,0.95);
+    --s-text-0:        #ffffff;
+    --s-text-1:        #b0b0b0;
+    --s-text-2:        #666666;
+    --s-text-3:        #444444;
+    --danger:          #c0392b;
+    --danger-strong:   rgba(180,40,0,0.9);
+    --ok:              #3fb37f;
   }
-  * { box-sizing: border-box; }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; padding: 0; }
   body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
-    line-height: 1.55;
+    background: var(--s-bg);
+    color: var(--s-text-1);
+    font-family: var(--s-font);
+    -webkit-font-smoothing: antialiased;
   }
-  main { max-width: 760px; margin: 0 auto; padding: 56px 20px 80px; }
-  header { margin-bottom: 40px; }
+  button { cursor: pointer; border: none; background: none; padding: 0; font-family: inherit; color: inherit; }
+  a { color: inherit; }
+
+  :focus-visible { outline: 2px solid var(--s-accent); outline-offset: 2px; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--s-surface); }
+  ::-webkit-scrollbar-thumb { background: var(--s-border); border-radius: 2px; }
+  @media (min-width: 1024px) {
+    ::-webkit-scrollbar { width: 10px; }
+    ::-webkit-scrollbar-thumb { background: var(--s-border); border: 3px solid var(--s-surface); border-radius: 5px; }
+  }
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
+
+  /* ── Shell: sidebar + main, exactly shelf-cmd's aside/nav split ── */
+  .shell { display: flex; min-height: 100vh; align-items: flex-start; }
+
+  aside.sidebar {
+    width: 240px; flex-shrink: 0;
+    background: var(--s-surface);
+    border-right: 1px solid var(--s-border);
+    position: sticky; top: 0; height: 100vh;
+    display: flex; flex-direction: column;
+    overflow-y: auto;
+  }
+  @media (max-width: 1023px) { aside.sidebar { display: none; } }
+
+  nav.sidebar-nav { flex: 1; padding: 20px 8px; overflow-y: auto; }
+
+  .section-label {
+    font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--s-text-3); padding: 0 12px; margin: 20px 0 6px; display: block;
+  }
+  .section-label:first-child { margin-top: 0; }
+
+  .row {
+    width: 100%; display: flex; align-items: center; gap: 10px;
+    padding: 7px 12px; border-radius: 6px; font-size: 13px;
+    text-align: left; color: var(--s-text-2); position: relative;
+    transition: background 0.12s, color 0.12s;
+  }
+  .row svg { flex-shrink: 0; }
+  .row:hover { background: var(--s-surface-2); color: var(--s-text-0); }
+  .row.active { background: var(--s-accent-faint); color: var(--s-accent); }
+  .row.active::before {
+    content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    width: 2px; height: 18px; border-radius: 2px; background: var(--s-accent);
+  }
+
+  .sidebar-stats { padding: 12px 16px; border-top: 1px solid var(--s-border); }
+  .stat-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 10px; letter-spacing: 0.14em; color: var(--s-text-3); margin-top: 4px;
+  }
+  .stat-row:first-child { margin-top: 0; }
+  .stat-row .v { color: var(--s-text-2); font-variant-numeric: tabular-nums; }
+  .sidebar-stats a { color: var(--s-text-2); text-decoration: none; }
+  .sidebar-stats a:hover { color: var(--s-accent); text-decoration: underline; }
+
+  /* ── Main content ── */
+  main { flex: 1; min-width: 0; padding: 32px 32px 90px; max-width: 900px; }
+  @media (max-width: 1023px) { main { padding: 20px 16px 60px; } }
+
+  header.top { margin-bottom: 26px; }
   h1 {
-    font-size: 2rem;
-    margin: 0 0 6px;
-    letter-spacing: -0.02em;
+    font-size: 1.3rem; margin: 0 0 8px; letter-spacing: -0.01em;
+    color: var(--s-text-0); display: flex; align-items: center; gap: 9px;
   }
-  h1 .wiz { color: var(--amber-bright); }
-  .tagline { color: var(--dim); font-size: 1.02rem; margin: 0 0 18px; }
-  .badges { display: flex; gap: 8px; flex-wrap: wrap; font-size: 0.8rem; }
-  .badge {
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 4px 12px;
-    color: var(--dim);
+  h1 .mark {
+    display: flex; align-items: center; justify-content: center;
+    width: 26px; height: 26px; border-radius: 6px;
+    border: 1.5px solid var(--s-text-0);
   }
-  .badge a { color: var(--amber); text-decoration: none; }
+  .tagline { color: var(--s-text-2); font-size: 0.85rem; max-width: 58ch; margin: 0 0 14px; line-height: 1.6; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; font-size: 0.72rem; }
+  .badge { border: 1px solid var(--s-border); border-radius: 999px; padding: 4px 11px; color: var(--s-text-2); }
+  .badge code { color: var(--s-text-1); font-size: 0.72rem; }
+  .badge a { color: var(--s-text-0); text-decoration: none; }
   .badge a:hover { text-decoration: underline; }
 
-  h2 { font-size: 1.2rem; margin: 40px 0 14px; }
-  p { color: #c9c8c4; }
+  /* Mobile OS picker — replaces the sidebar's INSTALL section below 1024px,
+     same horizontal-strip pattern shelf uses for its mobile shelf/tab bars. */
+  .mobile-os-tabs {
+    display: none; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 22px;
+  }
+  @media (max-width: 1023px) { .mobile-os-tabs { display: flex; } }
+  .pill {
+    flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 999px; font-size: 12px;
+    border: 1px solid var(--s-border); color: var(--s-text-2);
+  }
+  .pill.active { border-color: var(--s-accent); color: var(--s-accent); background: var(--s-accent-faint); }
 
-  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
-  .tab {
-    background: none; border: none; color: var(--dim);
-    font: inherit; font-size: 0.92rem; padding: 10px 16px; cursor: pointer;
-    border-bottom: 2px solid transparent; margin-bottom: -1px;
-  }
-  .tab.active { color: var(--text); border-bottom-color: var(--amber); }
-  .tab:hover { color: var(--text); }
+  h2 { font-size: 0.95rem; color: var(--s-text-0); margin: 0 0 3px; display: flex; align-items: center; gap: 8px; }
+  .h2-sub { font-size: 0.78rem; color: var(--s-text-3); margin: 0 0 16px; }
 
-  .pane { display: none; }
-  .pane.active { display: block; }
-
-  .oneliner {
-    position: relative;
-    background: var(--code-bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px 52px 16px 16px;
-    margin-bottom: 8px;
-    overflow-x: auto;
-  }
-  .oneliner code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.88rem; color: var(--amber-bright); white-space: pre-wrap; word-break: break-all; }
-  .copy-btn {
-    position: absolute; top: 10px; right: 10px;
-    background: var(--panel); border: 1px solid var(--border); color: var(--dim);
-    border-radius: 6px; padding: 5px 9px; font-size: 0.75rem; cursor: pointer;
-  }
-  .copy-btn:hover { color: var(--text); border-color: var(--amber); }
-  .copy-btn.copied { color: var(--ok); border-color: var(--ok); }
-
-  .verify {
-    font-size: 0.82rem; color: var(--dim); margin: 0 0 28px;
-  }
-  .verify a { color: var(--dim); }
-
-  details {
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    margin-bottom: 12px;
-    background: var(--panel);
-  }
-  summary {
-    cursor: pointer;
-    padding: 12px 16px;
-    font-size: 0.92rem;
-    font-weight: 600;
-    list-style: none;
-  }
-  summary::-webkit-details-marker { display: none; }
-  summary::before { content: "▸ "; color: var(--amber); }
-  details[open] summary::before { content: "▾ "; }
-  .steps { padding: 0 16px 16px; }
-  .steps ol { margin: 0; padding-left: 20px; color: #c9c8c4; }
-  .steps li { margin-bottom: 14px; }
-  .steps li:last-child { margin-bottom: 0; }
-  pre {
-    background: var(--code-bg);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 12px;
-    overflow-x: auto;
-    margin: 6px 0 0;
-  }
-  pre code { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 0.82rem; color: #d7d6d2; white-space: pre-wrap; word-break: break-word; }
-
-  .note {
-    border-left: 3px solid var(--amber);
-    padding: 10px 14px;
-    background: rgba(217,143,60,0.08);
-    border-radius: 0 8px 8px 0;
-    font-size: 0.88rem;
-    color: #d7d3c8;
-    margin: 16px 0;
+  .grid {
+    display: grid; gap: 14px; margin-bottom: 30px;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   }
 
-  .manifest pre { margin-top: 0; }
-  footer { margin-top: 56px; color: var(--dim); font-size: 0.82rem; }
-  footer a { color: var(--dim); }
+  .card {
+    border-radius: 12px; overflow: hidden;
+    background: var(--s-surface); border: 1px solid var(--s-border);
+    transition: border-color 0.18s, transform 0.18s cubic-bezier(0.2,0.8,0.2,1);
+  }
+  .card:hover { border-color: var(--s-text-3); }
+  .card-head { padding: 15px 16px 0; }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--s-text-0); margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
+  .card-desc { font-size: 12px; color: var(--s-text-2); line-height: 1.55; margin: 0 0 13px; }
+  .card-body { padding: 0 16px; }
+  .card-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; margin-top: 13px; border-top: 1px solid var(--s-surface-2);
+  }
+
+  .icon-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 9px; border-radius: 6px; font-size: 11px;
+    color: var(--s-text-3); transition: color 0.12s, background 0.12s;
+  }
+  .icon-btn:hover { color: var(--s-accent); background: var(--s-surface-2); }
+  .icon-btn.copied { color: var(--ok); }
+  .icon-btn svg { flex-shrink: 0; }
+
+  .link-out { font-size: 11px; color: var(--s-text-3); text-decoration: none; display: inline-flex; align-items: center; gap: 3px; }
+  .link-out:hover { color: var(--s-accent); }
+
+  pre.code-block, .code-block {
+    background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 8px;
+    padding: 11px 12px; margin: 0 0 13px; overflow-x: auto;
+    font-size: 12px; line-height: 1.6; color: var(--s-text-1);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .code-block.accent { color: var(--s-text-0); }
+
+  /* Reveal-panel toggle — same chevron+label+height-expand shelf uses for a
+     card's "tutorial plan" panel. Never a native <details>/<summary>. */
+  .reveal-toggle {
+    display: flex; align-items: center; gap: 5px; font-size: 12px;
+    color: var(--s-accent); margin-bottom: 8px;
+  }
+  .reveal-toggle .chev { font-size: 10px; transition: transform 0.18s; display: inline-block; }
+  .reveal-toggle.open .chev { transform: rotate(90deg); }
+  .reveal-panel {
+    max-height: 0; overflow: hidden; opacity: 0;
+    transition: max-height 0.22s cubic-bezier(0.32,0.72,0,1), opacity 0.18s;
+  }
+  .reveal-panel.open { max-height: 2400px; opacity: 1; }
+  .steps { padding: 2px 2px 12px; }
+  .step { margin-bottom: 14px; }
+  .step:last-child { margin-bottom: 0; }
+  .step-label { font-size: 11.5px; color: var(--s-text-1); line-height: 1.55; margin: 0 0 5px; }
+  .step-label b { color: var(--s-text-0); font-weight: 600; }
+  .step-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--s-border);
+    font-size: 9.5px; color: var(--s-text-2); margin-right: 6px; flex-shrink: 0;
+  }
+
+  .note-box {
+    border: 1px dashed var(--s-border); border-radius: 8px; padding: 11px 13px;
+    font-size: 12px; color: var(--s-text-2); line-height: 1.55; margin-top: 10px;
+  }
+
+  .os-panel { display: none; }
+  .os-panel.active { display: block; }
+
+  .manifest-list { list-style: none; margin: 0 0 8px; padding: 0; font-size: 12px; color: var(--s-text-2); }
+  .manifest-list li { display: flex; gap: 8px; padding: 3px 0; }
+  .manifest-list code { color: var(--s-text-0); flex-shrink: 0; }
+
+  footer.page-foot {
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--s-border);
+    font-size: 11px; color: var(--s-text-3);
+  }
+  footer.page-foot a { color: var(--s-text-2); text-decoration: none; }
+  footer.page-foot a:hover { color: var(--s-accent); text-decoration: underline; }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>🧙 <span class="wiz">hostess</span></h1>
-    <p class="tagline">One command turns a clean machine into a self-hosted app platform. Point selfhost-wizard at any repo with an <code>app.yaml</code> and it builds, deploys, and manages it in Docker for you.</p>
-    <div class="badges">
-      <span class="badge">Dashboard on <code>localhost:5300</code>, loopback only</span>
-      <span class="badge"><a href="https://github.com/jessekward-prog/selfhost-wizard" target="_blank" rel="noopener">Source on GitHub ↗</a></span>
+<div class="shell">
+
+  <aside class="sidebar">
+    <nav class="sidebar-nav">
+      <span class="section-label">Install</span>
+      <button class="row active" data-os="linux" onclick="selectOS('linux')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        <span class="truncate flex-1">Linux</span>
+      </button>
+      <button class="row" data-os="macos" onclick="selectOS('macos')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.7 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.8-1.5 0-3 .9-3.7 2.3-1.6 2.8-.4 6.9 1.1 9.2.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.2.6-.9 1-1.7 1.3-2.5-1.7-.7-2.5-2.4-2.5-3.9z"/><path d="M14.2 5.4c.6-.7 1-1.7.9-2.6-.9 0-2 .6-2.6 1.3-.6.6-1.1 1.6-1 2.6 1 .1 2-.5 2.7-1.3z"/></svg>
+        <span class="truncate flex-1">macOS</span>
+      </button>
+      <button class="row" data-os="windows" onclick="selectOS('windows')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>
+        <span class="truncate flex-1">Windows</span>
+      </button>
+
+      <div style="border-top:1px solid var(--s-border); margin:16px 8px 12px;"></div>
+      <span class="section-label" style="margin-top:0;">Reference</span>
+      <button class="row" onclick="scrollToId('deploy-section')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
+        <span class="truncate flex-1">Deploying an app</span>
+      </button>
+      <button class="row" onclick="scrollToId('limits-section')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span class="truncate flex-1">Known limitations</span>
+      </button>
+    </nav>
+
+    <div class="sidebar-stats">
+      <div class="stat-row"><span>SOURCE</span><a href="https://github.com/jessekward-prog/selfhost-wizard" target="_blank" rel="noopener">GitHub ↗</a></div>
+      <div class="stat-row"><span>DASHBOARD</span><span class="v">:5300 loopback</span></div>
     </div>
-  </header>
+  </aside>
 
-  <h2>Install</h2>
-  <div class="tabs" role="tablist">
-    <button class="tab active" data-pane="linux">Linux</button>
-    <button class="tab" data-pane="macos">macOS</button>
-    <button class="tab" data-pane="windows">Windows</button>
-  </div>
+  <main>
+    <header class="top">
+      <h1><span class="mark"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>hostess</h1>
+      <p class="tagline">One command turns a clean machine into a self-hosted app platform. Point <strong style="color:var(--s-text-1)">selfhost-wizard</strong> at any repo with an <code style="color:var(--s-text-0)">app.yaml</code> and it builds, deploys, and manages it in Docker for you.</p>
+      <div class="badges">
+        <span class="badge">Dashboard on <code>localhost:5300</code>, loopback only</span>
+        <span class="badge"><a href="https://github.com/jessekward-prog/selfhost-wizard" target="_blank" rel="noopener">Source on GitHub ↗</a></span>
+      </div>
+    </header>
 
-  <!-- LINUX -->
-  <section id="linux" class="pane active">
-    <div class="oneliner">
-      <code id="cmd-linux">curl -fsSL https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.sh | bash</code>
-      <button class="copy-btn" data-target="cmd-linux">Copy</button>
+    <div class="mobile-os-tabs no-scrollbar">
+      <button class="pill active" data-os="linux" onclick="selectOS('linux')">Linux</button>
+      <button class="pill" data-os="macos" onclick="selectOS('macos')">macOS</button>
+      <button class="pill" data-os="windows" onclick="selectOS('windows')">Windows</button>
     </div>
-    <p class="verify">Prefer to read it first? <a href="https://github.com/jessekward-prog/selfhost-wizard/blob/main/install.sh" target="_blank" rel="noopener">view install.sh on GitHub</a> before piping it to bash.</p>
 
-    <details>
-      <summary>What it does / do it by hand</summary>
-      <div class="steps">
-        <ol>
-          <li>Installs <strong>Docker</strong>, <strong>Node.js 18+</strong>, and <strong>git</strong> if any are missing (via <code>apt</code> and Docker's official install script). Adds your user to the <code>docker</code> group — you'll need to log out and back in (or run <code>newgrp docker</code>) before containers work.
-<pre><code>sudo apt-get update -y && sudo apt-get install -y git
+    <!-- LINUX -->
+    <section class="os-panel active" id="panel-linux">
+      <h2>Linux</h2>
+      <p class="h2-sub">Debian / Ubuntu-family — apt + a user-level systemd service</p>
+      <div class="grid">
+        <div class="card">
+          <div class="card-head">
+            <p class="card-title">Quick install</p>
+            <p class="card-desc">One command. Works on a clean machine, safe to re-run.</p>
+          </div>
+          <div class="card-body">
+            <div class="code-block accent" id="cmd-linux">curl -fsSL https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.sh | bash</div>
+          </div>
+          <div class="card-foot">
+            <button class="icon-btn" data-copy="cmd-linux" onclick="copyCmd(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>Copy</span>
+            </button>
+            <a class="link-out" href="https://github.com/jessekward-prog/selfhost-wizard/blob/main/install.sh" target="_blank" rel="noopener">view source ↗</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <p class="card-title">What it sets up</p>
+            <p class="card-desc">Installs Docker, Node.js 18+, and git if missing (adds you to the <code style="color:var(--s-text-0)">docker</code> group — log out/in after). Clones to <code style="color:var(--s-text-0)">~/selfhost-wizard</code> and registers a systemd user service so the dashboard survives reboot and logout.</p>
+          </div>
+          <div class="card-body">
+            <button class="reveal-toggle" onclick="toggleReveal(this)">
+              <span class="chev">▸</span><span>show manual commands</span>
+            </button>
+            <div class="reveal-panel">
+              <div class="steps">
+                <div class="step">
+                  <p class="step-label"><span class="step-num">1</span><b>Docker, Node, git</b></p>
+                  <div class="code-block">sudo apt-get update -y && sudo apt-get install -y git
 curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker "$USER"</code></pre>
-          </li>
-          <li>Clones the repo and installs dependencies:
-<pre><code>git clone --depth 1 https://github.com/jessekward-prog/selfhost-wizard.git ~/selfhost-wizard
-cd ~/selfhost-wizard && npm install --omit=dev</code></pre>
-          </li>
-          <li>Registers a <strong>user-level systemd service</strong> so the dashboard survives reboot and logout:
-<pre><code>mkdir -p ~/.config/systemd/user
+sudo usermod -aG docker "$USER"</div>
+                </div>
+                <div class="step">
+                  <p class="step-label"><span class="step-num">2</span><b>Clone + install</b></p>
+                  <div class="code-block">git clone --depth 1 https://github.com/jessekward-prog/selfhost-wizard.git ~/selfhost-wizard
+cd ~/selfhost-wizard && npm install --omit=dev</div>
+                </div>
+                <div class="step">
+                  <p class="step-label"><span class="step-num">3</span><b>systemd service</b></p>
+                  <div class="code-block">mkdir -p ~/.config/systemd/user
 cat > ~/.config/systemd/user/selfhost-wizard.service &lt;&lt;EOF
 [Unit]
 Description=Self-Host Wizard dashboard
@@ -183,45 +336,69 @@ WantedBy=default.target
 EOF
 systemctl --user daemon-reload
 systemctl --user enable --now selfhost-wizard
-loginctl enable-linger "$USER"</code></pre>
-          </li>
-          <li>Open <a href="http://localhost:5300">http://localhost:5300</a>. Manage it any time with:
-<pre><code>systemctl --user status  selfhost-wizard
+loginctl enable-linger "$USER"</div>
+                </div>
+                <div class="step">
+                  <p class="step-label"><span class="step-num">4</span><b>Manage it</b></p>
+                  <div class="code-block">systemctl --user status  selfhost-wizard
 systemctl --user restart selfhost-wizard
-systemctl --user stop    selfhost-wizard</code></pre>
-          </li>
-        </ol>
+systemctl --user stop    selfhost-wizard</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </details>
-    <p class="note">Tested against Debian/Ubuntu-family distros (<code>apt</code>). On another distro, install Docker/Node/git yourself first, then run steps 2–3.</p>
-  </section>
+    </section>
 
-  <!-- MACOS -->
-  <section id="macos" class="pane">
-    <div class="oneliner">
-      <code id="cmd-macos">curl -fsSL https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install-macos.sh | bash</code>
-      <button class="copy-btn" data-target="cmd-macos">Copy</button>
-    </div>
-    <p class="verify">Prefer to read it first? <a href="https://github.com/jessekward-prog/selfhost-wizard/blob/main/install-macos.sh" target="_blank" rel="noopener">view install-macos.sh on GitHub</a> before piping it to bash.</p>
+    <!-- MACOS -->
+    <section class="os-panel" id="panel-macos">
+      <h2>macOS</h2>
+      <p class="h2-sub">Apple Silicon or Intel — Homebrew + a launchd agent</p>
+      <div class="grid">
+        <div class="card">
+          <div class="card-head">
+            <p class="card-title">Quick install</p>
+            <p class="card-desc">One command. Works on a clean machine, safe to re-run.</p>
+          </div>
+          <div class="card-body">
+            <div class="code-block accent" id="cmd-macos">curl -fsSL https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install-macos.sh | bash</div>
+          </div>
+          <div class="card-foot">
+            <button class="icon-btn" data-copy="cmd-macos" onclick="copyCmd(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>Copy</span>
+            </button>
+            <a class="link-out" href="https://github.com/jessekward-prog/selfhost-wizard/blob/main/install-macos.sh" target="_blank" rel="noopener">view source ↗</a>
+          </div>
+        </div>
 
-    <details>
-      <summary>What it does / do it by hand</summary>
-      <div class="steps">
-        <ol>
-          <li>Installs <strong>Homebrew</strong> if missing, then <strong>git</strong>, <strong>node</strong>, and <strong>Docker Desktop</strong>:
-<pre><code>/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+        <div class="card">
+          <div class="card-head">
+            <p class="card-title">What it sets up</p>
+            <p class="card-desc">Installs Homebrew if missing, then git/node/Docker Desktop. Docker's first run needs you to click through its permissions dialog. Clones to <code style="color:var(--s-text-0)">~/selfhost-wizard</code> and registers a launchd agent so the dashboard survives reboot and logout.</p>
+          </div>
+          <div class="card-body">
+            <button class="reveal-toggle" onclick="toggleReveal(this)">
+              <span class="chev">▸</span><span>show manual commands</span>
+            </button>
+            <div class="reveal-panel">
+              <div class="steps">
+                <div class="step">
+                  <p class="step-label"><span class="step-num">1</span><b>Homebrew, git, node, Docker</b></p>
+                  <div class="code-block">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 brew install git node
-brew install --cask docker</code></pre>
-          </li>
-          <li>Launches Docker Desktop and waits for it to come up — the <strong>first run needs you to click through its permissions dialog</strong>:
-<pre><code>open -a Docker</code></pre>
-          </li>
-          <li>Clones the repo and installs dependencies:
-<pre><code>git clone --depth 1 https://github.com/jessekward-prog/selfhost-wizard.git ~/selfhost-wizard
-cd ~/selfhost-wizard && npm install --omit=dev</code></pre>
-          </li>
-          <li>Registers a <strong>launchd agent</strong> so the dashboard survives logout and reboot:
-<pre><code>cat > ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist &lt;&lt;EOF
+brew install --cask docker
+open -a Docker</div>
+                </div>
+                <div class="step">
+                  <p class="step-label"><span class="step-num">2</span><b>Clone + install</b></p>
+                  <div class="code-block">git clone --depth 1 https://github.com/jessekward-prog/selfhost-wizard.git ~/selfhost-wizard
+cd ~/selfhost-wizard && npm install --omit=dev</div>
+                </div>
+                <div class="step">
+                  <p class="step-label"><span class="step-num">3</span><b>launchd agent</b></p>
+                  <div class="code-block">cat > ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist &lt;&lt;EOF
 &lt;?xml version="1.0" encoding="UTF-8"?&gt;
 &lt;plist version="1.0"&gt;&lt;dict&gt;
   &lt;key&gt;Label&lt;/key&gt;&lt;string&gt;xyz.cmdward.selfhost-wizard&lt;/string&gt;
@@ -232,102 +409,169 @@ cd ~/selfhost-wizard && npm install --omit=dev</code></pre>
   &lt;key&gt;KeepAlive&lt;/key&gt;&lt;true/&gt;
 &lt;/dict&gt;&lt;/plist&gt;
 EOF
-launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist</code></pre>
-          </li>
-          <li>Open <a href="http://localhost:5300">http://localhost:5300</a>. Manage it any time with:
-<pre><code>launchctl unload ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist
-launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist</code></pre>
-          </li>
-        </ol>
+launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist</div>
+                </div>
+                <div class="step">
+                  <p class="step-label"><span class="step-num">4</span><b>Manage it</b></p>
+                  <div class="code-block">launchctl unload ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist
+launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </details>
-    <p class="note">Works on both Apple Silicon and Intel Macs. Logs go to <code>/tmp/selfhost-wizard.log</code>.</p>
-  </section>
+    </section>
 
-  <!-- WINDOWS -->
-  <section id="windows" class="pane">
-    <div class="oneliner">
-      <code id="cmd-windows">iwr -useb https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.ps1 | iex</code>
-      <button class="copy-btn" data-target="cmd-windows">Copy</button>
-    </div>
-    <p class="verify">Run this in <strong>PowerShell</strong> (Start → type "PowerShell"). It re-launches itself elevated — approve the UAC prompt. Prefer to read it first? <a href="https://github.com/jessekward-prog/selfhost-wizard/blob/main/install.ps1" target="_blank" rel="noopener">view install.ps1 on GitHub</a>.</p>
+    <!-- WINDOWS -->
+    <section class="os-panel" id="panel-windows">
+      <h2>Windows</h2>
+      <p class="h2-sub">PowerShell — winget + a Scheduled Task, self-elevates via UAC</p>
+      <div class="grid">
+        <div class="card">
+          <div class="card-head">
+            <p class="card-title">Quick install</p>
+            <p class="card-desc">Run in PowerShell (Start → type "PowerShell"). Approve the UAC prompt.</p>
+          </div>
+          <div class="card-body">
+            <div class="code-block accent" id="cmd-windows">iwr -useb https://raw.githubusercontent.com/jessekward-prog/selfhost-wizard/main/install.ps1 | iex</div>
+          </div>
+          <div class="card-foot">
+            <button class="icon-btn" data-copy="cmd-windows" onclick="copyCmd(this)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>Copy</span>
+            </button>
+            <a class="link-out" href="https://github.com/jessekward-prog/selfhost-wizard/blob/main/install.ps1" target="_blank" rel="noopener">view source ↗</a>
+          </div>
+        </div>
 
-    <details>
-      <summary>What it does / do it by hand</summary>
-      <div class="steps">
-        <ol>
-          <li>Installs <strong>git</strong>, <strong>Node.js LTS</strong>, and <strong>Docker Desktop</strong> via <code>winget</code> (built into Windows 10/11 — if missing, get "App Installer" from the Microsoft Store first):
-<pre><code>winget install --id Git.Git -e
+        <div class="card">
+          <div class="card-head">
+            <p class="card-title">What it sets up</p>
+            <p class="card-desc">Installs git/Node LTS/Docker Desktop via winget, enables WSL2 if needed (a truly clean machine needs one reboot here — Docker's requirement, not this script's). Clones to <code style="color:var(--s-text-0)">$HOME\selfhost-wizard</code> and registers a Scheduled Task so the dashboard survives reboot.</p>
+          </div>
+          <div class="card-body">
+            <button class="reveal-toggle" onclick="toggleReveal(this)">
+              <span class="chev">▸</span><span>show manual commands</span>
+            </button>
+            <div class="reveal-panel">
+              <div class="steps">
+                <div class="step">
+                  <p class="step-label"><span class="step-num">1</span><b>git, Node, Docker Desktop</b></p>
+                  <div class="code-block">winget install --id Git.Git -e
 winget install --id OpenJS.NodeJS.LTS -e
-winget install --id Docker.DockerDesktop -e</code></pre>
-          </li>
-          <li>Enables the <strong>WSL2</strong> backend Docker Desktop needs, if not already on:
-<pre><code>wsl --install --no-distribution</code></pre>
-            If this was just installed, <strong>Windows needs a reboot</strong> before Docker will start — the installer tells you this and stops cleanly; just re-run it after rebooting.
-          </li>
-          <li>Launches Docker Desktop and waits for it to be ready — first run needs you to click through its setup:
-<pre><code>Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"</code></pre>
-          </li>
-          <li>Clones the repo and installs dependencies:
-<pre><code>git clone --depth 1 https://github.com/jessekward-prog/selfhost-wizard.git $HOME\selfhost-wizard
+winget install --id Docker.DockerDesktop -e</div>
+                </div>
+                <div class="step">
+                  <p class="step-label"><span class="step-num">2</span><b>WSL2</b></p>
+                  <div class="code-block">wsl --install --no-distribution</div>
+                  <p class="step-label" style="margin-top:5px;">If this just installed it, reboot Windows and re-run the installer — it stops cleanly and tells you this.</p>
+                </div>
+                <div class="step">
+                  <p class="step-label"><span class="step-num">3</span><b>Clone + install</b></p>
+                  <div class="code-block">git clone --depth 1 https://github.com/jessekward-prog/selfhost-wizard.git $HOME\selfhost-wizard
 cd $HOME\selfhost-wizard
-npm install --omit=dev</code></pre>
-          </li>
-          <li>Registers a <strong>Scheduled Task</strong> (runs hidden, at logon, restarts on failure) so the dashboard survives reboot:
-<pre><code>$action = New-ScheduledTaskAction -Execute "powershell.exe" `
+npm install --omit=dev</div>
+                </div>
+                <div class="step">
+                  <p class="step-label"><span class="step-num">4</span><b>Scheduled Task</b></p>
+                  <div class="code-block">$action = New-ScheduledTaskAction -Execute "powershell.exe" `
   -Argument '-NoProfile -WindowStyle Hidden -Command "Set-Location $HOME\selfhost-wizard; node server.js"'
 $trigger = New-ScheduledTaskTrigger -AtLogOn
 Register-ScheduledTask -TaskName selfhost-wizard -Action $action -Trigger $trigger -Force
-Start-ScheduledTask -TaskName selfhost-wizard</code></pre>
-          </li>
-          <li>Open <a href="http://localhost:5300">http://localhost:5300</a>. Manage it any time with:
-<pre><code>Start-ScheduledTask -TaskName selfhost-wizard
-Stop-ScheduledTask  -TaskName selfhost-wizard</code></pre>
-          </li>
-        </ol>
+Start-ScheduledTask -TaskName selfhost-wizard</div>
+                </div>
+                <div class="step">
+                  <p class="step-label"><span class="step-num">5</span><b>Manage it</b></p>
+                  <div class="code-block">Start-ScheduledTask -TaskName selfhost-wizard
+Stop-ScheduledTask  -TaskName selfhost-wizard</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-    </details>
-    <p class="note">Docker Desktop on Windows requires WSL2 — on a truly clean machine this means one reboot mid-install. That's Docker's requirement, not this script's.</p>
-  </section>
+    </section>
 
-  <h2>Deploying an app</h2>
-  <p>Once it's running, point selfhost-wizard at any repo with a <code>Dockerfile</code> and an <code>app.yaml</code> at its root:</p>
-  <div class="manifest">
-<pre><code>name: my-app          # lowercase letters/numbers/hyphens, 2-50 chars
-port: 3000             # port your app listens on *inside* the container
-postgres: false        # true to get a DATABASE_URL wired to a shared Postgres
-env: []                 # optional — extra env var names</code></pre>
-  </div>
-  <p>Paste the repo URL (or a local path) into the dashboard, or from the CLI: <code>node deploy.js &lt;source&gt;</code>. Full manifest reference and dashboard walkthrough in the <a href="https://github.com/jessekward-prog/selfhost-wizard#readme" target="_blank" rel="noopener">README</a>.</p>
+    <section id="deploy-section">
+      <h2>Deploying an app</h2>
+      <p class="h2-sub">Once it's running, point it at any repo with a Dockerfile + app.yaml at its root</p>
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
+        <div class="card">
+          <div class="card-head">
+            <p class="card-title">app.yaml</p>
+          </div>
+          <div class="card-body">
+            <div class="code-block">name: my-app
+port: 3000
+postgres: false
+env: []</div>
+            <ul class="manifest-list">
+              <li><code>name</code> lowercase letters/numbers/hyphens, 2-50 chars</li>
+              <li><code>port</code> what your app listens on inside the container</li>
+              <li><code>postgres</code> true wires a DATABASE_URL + DB_* vars to a shared Postgres</li>
+              <li><code>env</code> documents required var names (see Known limitations)</li>
+            </ul>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <p class="card-title">Deploy it</p>
+            <p class="card-desc">Paste the repo URL (or a local path) into the dashboard, or from the CLI:</p>
+          </div>
+          <div class="card-body">
+            <div class="code-block">node deploy.js https://github.com/you/your-app
+node deploy.js /path/to/local/repo</div>
+            <p class="card-desc" style="margin-top:2px;">Redeploying the same app name reuses its host port, container name, and — for Postgres apps — its existing role password.</p>
+          </div>
+        </div>
+      </div>
+    </section>
 
-  <footer>
-    <a href="https://github.com/jessekward-prog/selfhost-wizard" target="_blank" rel="noopener">jessekward-prog/selfhost-wizard</a> — MIT-style personal project, no telemetry, nothing leaves your machine.
-  </footer>
-</main>
+    <section id="limits-section">
+      <h2>Known limitations</h2>
+      <div class="note-box">
+        <code style="color:var(--s-text-0)">app.yaml</code>'s <code style="color:var(--s-text-0)">env</code> list isn't injected yet — it's parsed and stored, but nothing collects values for it or passes them to the container. The only env variable actually set today is <code style="color:var(--s-text-0)">DATABASE_URL</code> / <code style="color:var(--s-text-0)">DB_*</code> (when <code style="color:var(--s-text-0)">postgres: true</code>). Give your app its own way to set config post-deploy — an admin UI backed by its own DB, for example — rather than relying on <code style="color:var(--s-text-0)">env:</code> to deliver secrets.
+      </div>
+    </section>
+
+    <footer class="page-foot">
+      <a href="https://github.com/jessekward-prog/selfhost-wizard" target="_blank" rel="noopener">jessekward-prog/selfhost-wizard</a> — personal project, no telemetry, nothing leaves your machine.
+    </footer>
+  </main>
+</div>
 
 <script>
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
-    tab.classList.add('active');
-    document.getElementById(tab.dataset.pane).classList.add('active');
-  });
-});
+function selectOS(os) {
+  document.querySelectorAll('.row[data-os]').forEach(el => el.classList.toggle('active', el.dataset.os === os));
+  document.querySelectorAll('.pill[data-os]').forEach(el => el.classList.toggle('active', el.dataset.os === os));
+  document.querySelectorAll('.os-panel').forEach(el => el.classList.remove('active'));
+  document.getElementById('panel-' + os).classList.add('active');
+}
 
-document.querySelectorAll('.copy-btn').forEach(btn => {
-  btn.addEventListener('click', async () => {
-    const text = document.getElementById(btn.dataset.target).textContent;
-    try {
-      await navigator.clipboard.writeText(text);
-      btn.textContent = 'Copied';
-      btn.classList.add('copied');
-      setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1500);
-    } catch {
-      btn.textContent = 'Select & copy manually';
-    }
-  });
-});
+function toggleReveal(btn) {
+  btn.classList.toggle('open');
+  const panel = btn.nextElementSibling;
+  panel.classList.toggle('open');
+  btn.querySelector('span:last-child').textContent = btn.classList.contains('open') ? 'hide manual commands' : 'show manual commands';
+}
+
+async function copyCmd(btn) {
+  const text = document.getElementById(btn.dataset.copy).textContent;
+  const label = btn.querySelector('span:last-child');
+  try {
+    await navigator.clipboard.writeText(text);
+    btn.classList.add('copied');
+    label.textContent = 'Copied';
+    setTimeout(() => { btn.classList.remove('copied'); label.textContent = 'Copy'; }, 1500);
+  } catch {
+    label.textContent = 'select & copy';
+  }
+}
+
+function scrollToId(id) {
+  document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 </script>
 </body>
 </html>
