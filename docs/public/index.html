@@ -84,11 +84,14 @@
   }
   .row svg { flex-shrink: 0; }
   .row:hover { background: var(--s-surface-2); color: var(--s-text-0); }
-  .row.active { background: var(--s-accent-faint); color: var(--s-accent); }
+  .row.active { background: var(--s-accent-faint); color: var(--os-accent, var(--s-accent)); }
   .row.active::before {
     content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
-    width: 2px; height: 18px; border-radius: 2px; background: var(--s-accent);
+    width: 2px; height: 18px; border-radius: 2px; background: var(--os-accent, var(--s-accent));
   }
+  /* PlayStation face-button colors — shelf's own category-color convention,
+     one per OS, applied the same low-alpha "tint don't fight the theme" way. */
+  .os-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--os-accent, var(--s-text-3)); flex-shrink: 0; }
 
   .sidebar-stats { padding: 12px 16px; border-top: 1px solid var(--s-border); }
   .stat-row {
@@ -132,7 +135,7 @@
     padding: 7px 14px; border-radius: 999px; font-size: 12px;
     border: 1px solid var(--s-border); color: var(--s-text-2);
   }
-  .pill.active { border-color: var(--s-accent); color: var(--s-accent); background: var(--s-accent-faint); }
+  .pill.active { border-color: var(--os-accent, var(--s-accent)); color: var(--os-accent, var(--s-accent)); background: var(--s-accent-faint); }
 
   h2 { font-size: 0.95rem; color: var(--s-text-0); margin: 0 0 3px; display: flex; align-items: center; gap: 8px; }
   .h2-sub { font-size: 0.78rem; color: var(--s-text-3); margin: 0 0 16px; }
@@ -209,6 +212,20 @@
   .os-panel { display: none; }
   .os-panel.active { display: block; }
 
+  /* One PlayStation face-button color per OS, scoped to that panel — everything
+     inside (card border, code accent, reveal-toggle) reads var(--os-accent)
+     rather than hardcoding it, same token-cascade trick shelf uses per-theme. */
+  #panel-linux   { --os-accent: #3fb37f; --os-tint: rgba(63,179,127,0.33); }   /* △ green */
+  #panel-macos   { --os-accent: #e0559c; --os-tint: rgba(224,85,156,0.33); }  /* □ pink */
+  #panel-windows { --os-accent: #4f8fe0; --os-tint: rgba(79,143,224,0.33); }  /* ✕ blue */
+
+  .os-panel .card { border-color: var(--os-tint, var(--s-border)); }
+  .os-panel .code-block.accent { color: var(--os-accent, var(--s-text-0)); }
+  .os-panel .reveal-toggle { color: var(--os-accent, var(--s-accent)); }
+  .os-panel .icon-btn:hover { color: var(--os-accent, var(--s-accent)); background: var(--s-surface-2); }
+  .os-panel .link-out:hover { color: var(--os-accent, var(--s-accent)); }
+  .os-panel .step-num { color: var(--os-accent, var(--s-text-2)); border-color: var(--os-tint, var(--s-border)); }
+
   .manifest-list { list-style: none; margin: 0 0 8px; padding: 0; font-size: 12px; color: var(--s-text-2); }
   .manifest-list li { display: flex; gap: 8px; padding: 3px 0; }
   .manifest-list code { color: var(--s-text-0); flex-shrink: 0; }
@@ -227,17 +244,20 @@
   <aside class="sidebar">
     <nav class="sidebar-nav">
       <span class="section-label">Install</span>
-      <button class="row active" data-os="linux" onclick="selectOS('linux')">
+      <button class="row active" data-os="linux" style="--os-accent:#3fb37f" onclick="selectOS('linux')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
         <span class="truncate flex-1">Linux</span>
+        <span class="os-dot"></span>
       </button>
-      <button class="row" data-os="macos" onclick="selectOS('macos')">
+      <button class="row" data-os="macos" style="--os-accent:#e0559c" onclick="selectOS('macos')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.7 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.8-1.5 0-3 .9-3.7 2.3-1.6 2.8-.4 6.9 1.1 9.2.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.2.6-.9 1-1.7 1.3-2.5-1.7-.7-2.5-2.4-2.5-3.9z"/><path d="M14.2 5.4c.6-.7 1-1.7.9-2.6-.9 0-2 .6-2.6 1.3-.6.6-1.1 1.6-1 2.6 1 .1 2-.5 2.7-1.3z"/></svg>
         <span class="truncate flex-1">macOS</span>
+        <span class="os-dot"></span>
       </button>
-      <button class="row" data-os="windows" onclick="selectOS('windows')">
+      <button class="row" data-os="windows" style="--os-accent:#4f8fe0" onclick="selectOS('windows')">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>
         <span class="truncate flex-1">Windows</span>
+        <span class="os-dot"></span>
       </button>
 
       <div style="border-top:1px solid var(--s-border); margin:16px 8px 12px;"></div>
@@ -269,14 +289,14 @@
     </header>
 
     <div class="mobile-os-tabs no-scrollbar">
-      <button class="pill active" data-os="linux" onclick="selectOS('linux')">Linux</button>
-      <button class="pill" data-os="macos" onclick="selectOS('macos')">macOS</button>
-      <button class="pill" data-os="windows" onclick="selectOS('windows')">Windows</button>
+      <button class="pill active" data-os="linux" style="--os-accent:#3fb37f" onclick="selectOS('linux')">Linux</button>
+      <button class="pill" data-os="macos" style="--os-accent:#e0559c" onclick="selectOS('macos')">macOS</button>
+      <button class="pill" data-os="windows" style="--os-accent:#4f8fe0" onclick="selectOS('windows')">Windows</button>
     </div>
 
     <!-- LINUX -->
     <section class="os-panel active" id="panel-linux">
-      <h2>Linux</h2>
+      <h2><span class="os-dot"></span>Linux</h2>
       <p class="h2-sub">Debian / Ubuntu-family — apt + a user-level systemd service</p>
       <div class="grid">
         <div class="card">
@@ -353,7 +373,7 @@ systemctl --user stop    selfhost-wizard</div>
 
     <!-- MACOS -->
     <section class="os-panel" id="panel-macos">
-      <h2>macOS</h2>
+      <h2><span class="os-dot"></span>macOS</h2>
       <p class="h2-sub">Apple Silicon or Intel — Homebrew + a launchd agent</p>
       <div class="grid">
         <div class="card">
@@ -425,7 +445,7 @@ launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.selfhost-wizard.plist</div>
 
     <!-- WINDOWS -->
     <section class="os-panel" id="panel-windows">
-      <h2>Windows</h2>
+      <h2><span class="os-dot"></span>Windows</h2>
       <p class="h2-sub">PowerShell — winget + a Scheduled Task, self-elevates via UAC</p>
       <div class="grid">
         <div class="card">
