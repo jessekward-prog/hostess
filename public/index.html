@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Self-Host Wizard</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: -apple-system, system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; }
+  .sub { color: #888; margin-top: 0; margin-bottom: 24px; font-size: 0.9rem; }
+  form { display: flex; gap: 8px; margin-bottom: 28px; }
+  input[type=text] { flex: 1; padding: 8px 10px; font-size: 0.95rem; }
+  button { padding: 8px 14px; font-size: 0.9rem; cursor: pointer; }
+  .card { border: 1px solid #444; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
+  .card-head { display: flex; justify-content: space-between; align-items: center; }
+  .name { font-weight: 600; }
+  .status { font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; }
+  .status.running { background: #1f7a3d; color: #fff; }
+  .status.exited, .status.absent { background: #7a1f1f; color: #fff; }
+  .status.created { background: #7a6a1f; color: #fff; }
+  .meta { font-size: 0.85rem; color: #888; margin: 6px 0; }
+  .actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .actions button { font-size: 0.8rem; padding: 4px 10px; }
+  .error { color: #d33; margin-bottom: 16px; white-space: pre-wrap; }
+  pre#logs { background: #111; color: #ddd; padding: 12px; max-height: 300px; overflow: auto; white-space: pre-wrap; border-radius: 6px; }
+  dialog { width: min(90vw, 640px); border-radius: 8px; }
+  #empty { color: #888; }
+</style>
+</head>
+<body>
+  <h1>Self-Host Wizard</h1>
+  <p class="sub">Paste a repo URL or local path with an <code>app.yaml</code> to deploy it.</p>
+
+  <form id="deploy-form">
+    <input type="text" id="source" placeholder="https://github.com/you/your-app or /path/to/repo" required>
+    <button type="submit">Deploy</button>
+  </form>
+  <div class="error" id="error" hidden></div>
+
+  <div id="apps"></div>
+  <p id="empty" hidden>No apps deployed yet.</p>
+
+  <dialog id="logs-dialog">
+    <h3 id="logs-title"></h3>
+    <pre id="logs"></pre>
+    <button onclick="document.getElementById('logs-dialog').close()">Close</button>
+  </dialog>
+
+<script>
+const appsEl = document.getElementById('apps');
+const emptyEl = document.getElementById('empty');
+const errorEl = document.getElementById('error');
+
+function showError(msg) {
+  errorEl.textContent = msg;
+  errorEl.hidden = !msg;
+}
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const data = await (res.headers.get('content-type')?.includes('json') ? res.json() : res.text());
+  if (!res.ok) throw new Error(typeof data === 'string' ? data : data.error || 'Request failed');
+  return data;
+}
+
+async function refresh() {
+  const apps = await api('/api/apps');
+  emptyEl.hidden = apps.length > 0;
+  appsEl.innerHTML = apps.map(renderCard).join('');
+}
+
+function renderCard(a) {
+  return `
+    <div class="card">
+      <div class="card-head">
+        <span class="name">${a.name}</span>
+        <span class="status ${a.status}">${a.status}</span>
+      </div>
+      <div class="meta">
+        http://localhost:${a.port} &middot; ${a.postgres ? 'postgres' : 'no db'} &middot; source: ${a.repoSource}
+      </div>
+      <div class="actions">
+        ${a.status === 'running'
+          ? `<button onclick="doAction('${a.name}','stop')">Stop</button>`
+          : `<button onclick="doAction('${a.name}','start')">Start</button>`}
+        <button onclick="doAction('${a.name}','redeploy')">Redeploy</button>
+        <button onclick="showLogs('${a.name}')">Logs</button>
+        <button onclick="removeApp('${a.name}')">Remove</button>
+      </div>
+    </div>`;
+}
+
+async function doAction(name, action) {
+  showError('');
+  try {
+    await api(`/api/apps/${name}/${action}`, { method: 'POST' });
+    await refresh();
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+async function removeApp(name) {
+  if (!confirm(`Remove "${name}"? This deletes its container and cloned repo.`)) return;
+  showError('');
+  try {
+    await api(`/api/apps/${name}`, { method: 'DELETE' });
+    await refresh();
+  } catch (err) {
+    showError(err.message);
+  }
+}
+
+async function showLogs(name) {
+  document.getElementById('logs-title').textContent = `Logs: ${name}`;
+  document.getElementById('logs').textContent = 'Loading...';
+  document.getElementById('logs-dialog').showModal();
+  try {
+    document.getElementById('logs').textContent = await api(`/api/apps/${name}/logs`);
+  } catch (err) {
+    document.getElementById('logs').textContent = err.message;
+  }
+}
+
+document.getElementById('deploy-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const source = document.getElementById('source').value.trim();
+  showError('');
+  const btn = e.target.querySelector('button');
+  btn.disabled = true;
+  btn.textContent = 'Deploying...';
+  try {
+    await api('/api/apps', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source }),
+    });
+    document.getElementById('source').value = '';
+    await refresh();
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Deploy';
+  }
+});
+
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

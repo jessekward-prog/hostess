@@ -1,0 +1,14 @@
+{
+  "name": "selfhost-wizard",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "deploy": "node deploy.js"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "js-yaml": "^4.1.0"
+  }
+}
