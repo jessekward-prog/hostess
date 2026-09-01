@@ -2,151 +2,337 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Self-Host Wizard</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><rect width=%2224%22 height=%2224%22 rx=%224%22 fill=%22%23000%22/><rect x=%224%22 y=%224%22 width=%2216%22 height=%2216%22 rx=%222%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%222%22/></svg>">
 <style>
-  :root { color-scheme: light dark; }
-  body { font-family: -apple-system, system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; }
-  h1 { font-size: 1.3rem; margin-bottom: 4px; }
-  .sub { color: #888; margin-top: 0; margin-bottom: 24px; font-size: 0.9rem; }
-  form { display: flex; gap: 8px; margin-bottom: 28px; }
-  input[type=text] { flex: 1; padding: 8px 10px; font-size: 0.95rem; }
-  button { padding: 8px 14px; font-size: 0.9rem; cursor: pointer; }
-  .card { border: 1px solid #444; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px; }
-  .card-head { display: flex; justify-content: space-between; align-items: center; }
-  .name { font-weight: 600; }
-  .status { font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; }
-  .status.running { background: #1f7a3d; color: #fff; }
-  .status.exited, .status.absent { background: #7a1f1f; color: #fff; }
-  .status.created { background: #7a6a1f; color: #fff; }
-  .meta { font-size: 0.85rem; color: #888; margin: 6px 0; }
-  .actions { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-  .actions button { font-size: 0.8rem; padding: 4px 10px; }
-  .error { color: #d33; margin-bottom: 16px; white-space: pre-wrap; }
-  pre#logs { background: #111; color: #ddd; padding: 12px; max-height: 300px; overflow: auto; white-space: pre-wrap; border-radius: 6px; }
-  dialog { width: min(90vw, 640px); border-radius: 8px; }
-  #empty { color: #888; }
+  /* shelf-cmd "CMD" theme tokens — see hostess.cmdward.xyz / Shelf-Style-UI-Rules
+     for the source. Grayscale-first; color reserved for status/interactive state. */
+  :root {
+    --s-font: 'JetBrains Mono', 'Fira Mono', ui-monospace, Menlo, Consolas, monospace;
+    --s-bg: #000000; --s-surface: #111111; --s-surface-2: #1e1e1e; --s-border: #333333;
+    --s-accent: #ffffff; --s-accent-faint: rgba(255,255,255,0.07); --s-accent-glow: rgba(255,255,255,0.18);
+    --s-text-0: #ffffff; --s-text-1: #b0b0b0; --s-text-2: #666666; --s-text-3: #444444;
+    --ok: #3fb37f; --warn: #e0a53f; --danger: #e0564f; --danger-strong: rgba(180,40,0,0.9);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; padding: 0; }
+  body { background: var(--s-bg); color: var(--s-text-1); font-family: var(--s-font); -webkit-font-smoothing: antialiased; }
+  button { cursor: pointer; border: none; background: none; padding: 0; font-family: inherit; color: inherit; }
+  a { color: inherit; }
+  input { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--s-accent); outline-offset: 2px; }
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--s-surface); }
+  ::-webkit-scrollbar-thumb { background: var(--s-border); border-radius: 2px; }
+  @media (min-width: 1024px) {
+    ::-webkit-scrollbar { width: 10px; }
+    ::-webkit-scrollbar-thumb { background: var(--s-border); border: 3px solid var(--s-surface); border-radius: 5px; }
+  }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
+
+  .shell { display: flex; min-height: 100vh; align-items: flex-start; }
+
+  aside.sidebar {
+    width: 240px; flex-shrink: 0; background: var(--s-surface); border-right: 1px solid var(--s-border);
+    position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; overflow-y: auto;
+  }
+  @media (max-width: 1023px) { aside.sidebar { display: none; } }
+  nav.sidebar-nav { flex: 1; padding: 20px 8px; overflow-y: auto; }
+  .section-label { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--s-text-3); padding: 0 12px; margin: 20px 0 6px; display: block; }
+  .section-label:first-child { margin-top: 0; }
+  .row {
+    width: 100%; display: flex; align-items: center; gap: 10px; padding: 7px 12px; border-radius: 6px;
+    font-size: 13px; text-align: left; color: var(--s-text-2); position: relative; transition: background 0.12s, color 0.12s;
+  }
+  .row:hover { background: var(--s-surface-2); color: var(--s-text-0); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+  .status-dot.running { background: var(--ok); }
+  .status-dot.exited, .status-dot.created { background: var(--warn); }
+  .status-dot.absent, .status-dot.unknown { background: var(--danger); }
+
+  .sidebar-stats { padding: 12px 16px; border-top: 1px solid var(--s-border); }
+  .stat-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 10px; letter-spacing: 0.14em; color: var(--s-text-3); margin-top: 4px; }
+  .stat-row:first-child { margin-top: 0; }
+  .stat-row .v { color: var(--s-text-2); font-variant-numeric: tabular-nums; }
+  .sidebar-stats a { color: var(--s-text-2); text-decoration: none; }
+  .sidebar-stats a:hover { color: var(--s-accent); text-decoration: underline; }
+
+  main { flex: 1; min-width: 0; padding: 32px 32px 90px; max-width: 1000px; }
+  @media (max-width: 1023px) { main { padding: 20px 16px 60px; } }
+
+  header.top { margin-bottom: 26px; }
+  h1 { font-size: 1.3rem; margin: 0 0 8px; letter-spacing: -0.01em; color: var(--s-text-0); display: flex; align-items: center; gap: 9px; }
+  h1 .mark { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; border: 1.5px solid var(--s-text-0); }
+  .tagline { color: var(--s-text-2); font-size: 0.85rem; max-width: 60ch; margin: 0 0 14px; line-height: 1.6; }
+  .badges { display: flex; gap: 8px; flex-wrap: wrap; font-size: 0.72rem; }
+  .badge { border: 1px solid var(--s-border); border-radius: 999px; padding: 4px 11px; color: var(--s-text-2); }
+  .badge a { color: var(--s-text-0); text-decoration: none; }
+  .badge a:hover { text-decoration: underline; }
+
+  h2 { font-size: 0.9rem; color: var(--s-text-0); margin: 0 0 12px; }
+
+  .card { border-radius: 12px; overflow: hidden; background: var(--s-surface); border: 1px solid var(--s-border); transition: border-color 0.18s; }
+  .card:hover { border-color: var(--s-text-3); }
+
+  .deploy-card { padding: 16px; margin-bottom: 28px; }
+  .deploy-row { display: flex; gap: 8px; }
+  .deploy-row input {
+    flex: 1; background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 8px;
+    padding: 9px 12px; font-size: 12.5px; color: var(--s-text-0); outline: none;
+  }
+  .deploy-row input:focus { border-color: var(--s-accent); }
+  .deploy-row input::placeholder { color: var(--s-text-3); }
+  .deploy-btn { background: var(--s-accent); color: var(--s-bg); border-radius: 8px; padding: 9px 18px; font-size: 12.5px; font-weight: 600; }
+  .deploy-btn:hover { background: var(--s-text-1); }
+  .deploy-btn:disabled { background: var(--s-border); color: var(--s-text-3); cursor: default; }
+  .deploy-error {
+    margin-top: 10px; border: 1px dashed var(--danger); border-radius: 8px; padding: 9px 12px;
+    font-size: 12px; color: #ff9a90; white-space: pre-wrap;
+  }
+  .deploy-log { margin-top: 10px; font-size: 11.5px; color: var(--s-text-3); }
+
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .empty { color: var(--s-text-3); font-size: 13px; padding: 30px 0; text-align: center; }
+
+  .app-card-head { padding: 15px 16px 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  .app-title { font-size: 13.5px; font-weight: 600; color: var(--s-text-0); margin: 0; display: flex; align-items: center; gap: 7px; word-break: break-all; }
+  .status-pill { font-size: 10px; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 999px; flex-shrink: 0; white-space: nowrap; text-transform: uppercase; }
+  .status-pill.running { background: rgba(63,179,127,0.15); color: var(--ok); }
+  .status-pill.exited, .status-pill.created { background: rgba(224,165,63,0.15); color: var(--warn); }
+  .status-pill.absent, .status-pill.unknown { background: rgba(224,86,79,0.15); color: var(--danger); }
+
+  .app-body { padding: 10px 16px 0; }
+  .meta-row { display: flex; gap: 6px; font-size: 11.5px; color: var(--s-text-2); margin-bottom: 5px; align-items: baseline; }
+  .meta-row .k { color: var(--s-text-3); flex-shrink: 0; width: 44px; }
+  .meta-row a { color: var(--s-text-1); text-decoration: none; word-break: break-all; }
+  .meta-row a:hover { color: var(--s-accent); text-decoration: underline; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; border: 1px solid var(--s-border); border-radius: 999px; padding: 2px 8px; color: var(--s-text-2); margin-right: 4px; }
+
+  .app-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; margin-top: 12px; border-top: 1px solid var(--s-surface-2); }
+  .icon-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 6px; font-size: 11px; color: var(--s-text-3); transition: color 0.12s, background 0.12s; }
+  .icon-btn:hover { color: var(--s-accent); background: var(--s-surface-2); }
+  .icon-btn.danger:hover { color: var(--danger); }
+  .icon-btn.confirm { background: var(--danger-strong); color: #fff; padding: 5px 10px; }
+  .icon-btn.confirm:hover { color: #fff; background: var(--danger-strong); }
+  .icon-btn:disabled { color: var(--s-text-3); background: none; cursor: default; }
+
+  .reveal-toggle { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--s-accent); padding: 8px 16px 0; }
+  .reveal-toggle .chev { font-size: 10px; transition: transform 0.18s; display: inline-block; }
+  .reveal-toggle.open .chev { transform: rotate(90deg); }
+  .reveal-panel { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.22s cubic-bezier(0.32,0.72,0,1), opacity 0.18s; }
+  .reveal-panel.open { max-height: 320px; opacity: 1; }
+  .log-box {
+    margin: 8px 16px 4px; background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 8px;
+    padding: 10px 11px; font-size: 11px; line-height: 1.55; color: var(--s-text-1);
+    white-space: pre-wrap; word-break: break-word; max-height: 260px; overflow-y: auto;
+  }
+
+  footer.page-foot { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--s-border); font-size: 11px; color: var(--s-text-3); }
+  footer.page-foot a { color: var(--s-text-2); text-decoration: none; }
+  footer.page-foot a:hover { color: var(--s-accent); text-decoration: underline; }
 </style>
 </head>
 <body>
-  <h1>Self-Host Wizard</h1>
-  <p class="sub">Paste a repo URL or local path with an <code>app.yaml</code> to deploy it.</p>
+<div class="shell">
 
-  <form id="deploy-form">
-    <input type="text" id="source" placeholder="https://github.com/you/your-app or /path/to/repo" required>
-    <button type="submit">Deploy</button>
-  </form>
-  <div class="error" id="error" hidden></div>
+  <aside class="sidebar">
+    <nav class="sidebar-nav">
+      <span class="section-label">Apps</span>
+      <div id="sidebar-apps"></div>
+    </nav>
+    <div class="sidebar-stats">
+      <div class="stat-row"><span>APPS</span><span class="v" id="stat-total">0</span></div>
+      <div class="stat-row"><span>RUNNING</span><span class="v" id="stat-running">0</span></div>
+      <div class="stat-row"><span>DOCS</span><a href="https://hostess.cmdward.xyz" target="_blank" rel="noopener">hostess ↗</a></div>
+    </div>
+  </aside>
 
-  <div id="apps"></div>
-  <p id="empty" hidden>No apps deployed yet.</p>
+  <main>
+    <header class="top">
+      <h1><span class="mark"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>Self-Host Wizard</h1>
+      <p class="tagline">Paste a repo URL or local path with an <code style="color:var(--s-text-0)">app.yaml</code> at its root to build, deploy, and manage it here.</p>
+      <div class="badges">
+        <span class="badge">Loopback only — not reachable off this box</span>
+        <span class="badge"><a href="https://hostess.cmdward.xyz" target="_blank" rel="noopener">Install docs ↗</a></span>
+      </div>
+    </header>
 
-  <dialog id="logs-dialog">
-    <h3 id="logs-title"></h3>
-    <pre id="logs"></pre>
-    <button onclick="document.getElementById('logs-dialog').close()">Close</button>
-  </dialog>
+    <div class="card deploy-card">
+      <form id="deploy-form" class="deploy-row">
+        <input type="text" id="source-input" placeholder="https://github.com/you/your-app or /path/to/repo" required autocomplete="off">
+        <button type="submit" class="deploy-btn" id="deploy-btn">Deploy</button>
+      </form>
+      <div class="deploy-error" id="deploy-error" hidden></div>
+      <div class="deploy-log" id="deploy-log" hidden></div>
+    </div>
+
+    <h2>Deployed</h2>
+    <div class="grid" id="apps-grid"></div>
+    <p class="empty" id="empty-state" hidden>No apps deployed yet — paste a repo above to get started.</p>
+
+    <footer class="page-foot">
+      <a href="https://github.com/jessekward-prog/selfhost-wizard" target="_blank" rel="noopener">jessekward-prog/selfhost-wizard</a> — personal project, no telemetry, nothing leaves your machine.
+    </footer>
+  </main>
+</div>
 
 <script>
-const appsEl = document.getElementById('apps');
-const emptyEl = document.getElementById('empty');
-const errorEl = document.getElementById('error');
+const grid = document.getElementById('apps-grid');
+const sidebarApps = document.getElementById('sidebar-apps');
+const emptyState = document.getElementById('empty-state');
+const deployForm = document.getElementById('deploy-form');
+const sourceInput = document.getElementById('source-input');
+const deployBtn = document.getElementById('deploy-btn');
+const deployError = document.getElementById('deploy-error');
+const deployLog = document.getElementById('deploy-log');
 
-function showError(msg) {
-  errorEl.textContent = msg;
-  errorEl.hidden = !msg;
-}
+function showError(msg) { deployError.textContent = msg; deployError.hidden = !msg; }
 
 async function api(path, opts) {
   const res = await fetch(path, opts);
-  const data = await (res.headers.get('content-type')?.includes('json') ? res.json() : res.text());
-  if (!res.ok) throw new Error(typeof data === 'string' ? data : data.error || 'Request failed');
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
 }
 
-async function refresh() {
-  const apps = await api('/api/apps');
-  emptyEl.hidden = apps.length > 0;
-  appsEl.innerHTML = apps.map(renderCard).join('');
+function statusClass(status) {
+  if (status === 'running') return 'running';
+  if (status === 'exited' || status === 'created') return status;
+  return 'absent';
 }
 
-function renderCard(a) {
-  return `
-    <div class="card">
-      <div class="card-head">
-        <span class="name">${a.name}</span>
-        <span class="status ${a.status}">${a.status}</span>
+function iconSvg(name) {
+  const icons = {
+    redeploy: '<path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="1"/>',
+    start: '<polygon points="6 4 20 12 6 20 6 4"/>',
+    trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+    open: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
+  };
+  return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icons[name]}</svg>`;
+}
+
+function appCard(app) {
+  const sc = statusClass(app.status);
+  const url = `http://localhost:${app.port}`;
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.innerHTML = `
+    <div class="app-card-head">
+      <p class="app-title">${app.name}</p>
+      <span class="status-pill ${sc}">${app.status}</span>
+    </div>
+    <div class="app-body">
+      <div class="meta-row"><span class="k">url</span><a href="${url}" target="_blank" rel="noopener">${url}</a></div>
+      <div class="meta-row"><span class="k">image</span><span>${app.image}</span></div>
+      <div class="meta-row" title="${app.repoSource}"><span class="k">source</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${app.repoSource}</span></div>
+      ${app.postgres ? '<span class="chip">postgres</span>' : ''}
+    </div>
+    <button class="reveal-toggle" data-act="logs">
+      <span class="chev">▸</span><span>show logs</span>
+    </button>
+    <div class="reveal-panel"><div class="log-box" data-role="logbox">loading…</div></div>
+    <div class="app-foot">
+      <div style="display:flex;gap:2px;">
+        <button class="icon-btn" data-act="redeploy" title="Redeploy">${iconSvg('redeploy')}<span>redeploy</span></button>
+        <button class="icon-btn" data-act="${sc === 'running' ? 'stop' : 'start'}" title="${sc === 'running' ? 'Stop' : 'Start'}">${iconSvg(sc === 'running' ? 'stop' : 'start')}<span>${sc === 'running' ? 'stop' : 'start'}</span></button>
       </div>
-      <div class="meta">
-        http://localhost:${a.port} &middot; ${a.postgres ? 'postgres' : 'no db'} &middot; source: ${a.repoSource}
-      </div>
-      <div class="actions">
-        ${a.status === 'running'
-          ? `<button onclick="doAction('${a.name}','stop')">Stop</button>`
-          : `<button onclick="doAction('${a.name}','start')">Start</button>`}
-        <button onclick="doAction('${a.name}','redeploy')">Redeploy</button>
-        <button onclick="showLogs('${a.name}')">Logs</button>
-        <button onclick="removeApp('${a.name}')">Remove</button>
-      </div>
-    </div>`;
+      <button class="icon-btn danger" data-act="delete" title="Delete">${iconSvg('trash')}<span>delete</span></button>
+    </div>
+  `;
+
+  el.querySelector('[data-act="redeploy"]').addEventListener('click', async (e) => {
+    const btn = e.currentTarget; btn.disabled = true;
+    try { await api(`/api/apps/${app.name}/redeploy`, { method: 'POST' }); } catch (err) { alert(err.message); }
+    load();
+  });
+  el.querySelector(`[data-act="${sc === 'running' ? 'stop' : 'start'}"]`).addEventListener('click', async (e) => {
+    const act = e.currentTarget.dataset.act; e.currentTarget.disabled = true;
+    try { await api(`/api/apps/${app.name}/${act}`, { method: 'POST' }); } catch (err) { alert(err.message); }
+    load();
+  });
+
+  const delBtn = el.querySelector('[data-act="delete"]');
+  let confirming = false;
+  delBtn.addEventListener('click', async () => {
+    if (!confirming) {
+      confirming = true;
+      delBtn.classList.add('confirm');
+      delBtn.innerHTML = '<span>confirm delete</span>';
+      return;
+    }
+    delBtn.disabled = true;
+    try { await api(`/api/apps/${app.name}`, { method: 'DELETE' }); } catch (err) { alert(err.message); }
+    load();
+  });
+
+  const revealBtn = el.querySelector('.reveal-toggle');
+  const revealPanel = el.querySelector('.reveal-panel');
+  const logBox = el.querySelector('[data-role="logbox"]');
+  let logsLoaded = false;
+  revealBtn.addEventListener('click', async () => {
+    const opening = !revealBtn.classList.contains('open');
+    revealBtn.classList.toggle('open');
+    revealPanel.classList.toggle('open');
+    revealBtn.querySelector('span:last-child').textContent = opening ? 'hide logs' : 'show logs';
+    if (opening && !logsLoaded) {
+      logsLoaded = true;
+      try {
+        const res = await fetch(`/api/apps/${app.name}/logs`);
+        logBox.textContent = (await res.text()) || '(no logs yet)';
+      } catch {
+        logBox.textContent = 'failed to load logs';
+      }
+    }
+  });
+
+  return el;
 }
 
-async function doAction(name, action) {
-  showError('');
-  try {
-    await api(`/api/apps/${name}/${action}`, { method: 'POST' });
-    await refresh();
-  } catch (err) {
-    showError(err.message);
-  }
-}
+async function load() {
+  let apps = [];
+  try { apps = await api('/api/apps'); } catch (err) { showError(err.message); return; }
 
-async function removeApp(name) {
-  if (!confirm(`Remove "${name}"? This deletes its container and cloned repo.`)) return;
-  showError('');
-  try {
-    await api(`/api/apps/${name}`, { method: 'DELETE' });
-    await refresh();
-  } catch (err) {
-    showError(err.message);
-  }
-}
+  grid.innerHTML = '';
+  sidebarApps.innerHTML = '';
+  emptyState.hidden = apps.length > 0;
 
-async function showLogs(name) {
-  document.getElementById('logs-title').textContent = `Logs: ${name}`;
-  document.getElementById('logs').textContent = 'Loading...';
-  document.getElementById('logs-dialog').showModal();
-  try {
-    document.getElementById('logs').textContent = await api(`/api/apps/${name}/logs`);
-  } catch (err) {
-    document.getElementById('logs').textContent = err.message;
-  }
-}
+  document.getElementById('stat-total').textContent = apps.length;
+  document.getElementById('stat-running').textContent = apps.filter(a => a.status === 'running').length;
 
-document.getElementById('deploy-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const source = document.getElementById('source').value.trim();
-  showError('');
-  const btn = e.target.querySelector('button');
-  btn.disabled = true;
-  btn.textContent = 'Deploying...';
-  try {
-    await api('/api/apps', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ source }),
+  apps.forEach(app => {
+    grid.appendChild(appCard(app));
+    const row = document.createElement('button');
+    row.className = 'row';
+    row.innerHTML = `<span class="status-dot ${statusClass(app.status)}"></span><span class="truncate flex-1" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${app.name}</span>`;
+    row.addEventListener('click', () => {
+      const card = [...grid.children][apps.indexOf(app)];
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
-    document.getElementById('source').value = '';
-    await refresh();
+    sidebarApps.appendChild(row);
+  });
+}
+
+deployForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  showError('');
+  deployLog.hidden = true;
+  deployBtn.disabled = true;
+  deployBtn.textContent = 'Deploying…';
+  try {
+    await api('/api/apps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: sourceInput.value.trim() }) });
+    sourceInput.value = '';
+    await load();
   } catch (err) {
     showError(err.message);
   } finally {
-    btn.disabled = false;
-    btn.textContent = 'Deploy';
+    deployBtn.disabled = false;
+    deployBtn.textContent = 'Deploy';
   }
 });
 
-refresh();
-setInterval(refresh, 5000);
+load();
 </script>
 </body>
 </html>
