@@ -74,18 +74,12 @@
     display: flex; flex-direction: column; overflow-y: auto;
   }
 
-  /* Same vignette + scanline pair as chat-cmd's .fx-vignette/.fx-scanline,
-     scoped to the sidebar instead of the full viewport. Vignette under,
-     scanline (multiply-blended) on top — matches chat-cmd's own z-order. */
-  .sidebar-vignette, .sidebar-scanline {
-    position: absolute; inset: 0; pointer-events: none; z-index: 0;
-  }
-  .sidebar-vignette {
-    background: radial-gradient(ellipse at center, transparent 62%, rgba(0,0,0,0.3) 100%);
-  }
+  /* CRT scanline, same trick as chat-cmd's .fx-scanline — scoped to the
+     sidebar instead of the full viewport. */
   .sidebar-scanline {
+    position: absolute; inset: 0; pointer-events: none; z-index: 0;
     mix-blend-mode: multiply;
-    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.13) 0px, rgba(0,0,0,0.13) 1px, transparent 1px, transparent 3px);
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.32) 0px, rgba(0,0,0,0.32) 2px, transparent 2px, transparent 6px);
   }
 
   nav.sidebar-nav { flex: 1; padding: 20px 8px; overflow-y: auto; }
@@ -262,7 +256,6 @@
 <div class="shell">
 
   <aside class="sidebar">
-    <div class="sidebar-vignette"></div>
     <div class="sidebar-scanline"></div>
     <div class="sidebar-content">
     <nav class="sidebar-nav">

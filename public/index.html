@@ -43,9 +43,7 @@
   /* Same vignette + scanline pair as chat-cmd's .fx-vignette/.fx-scanline,
      scoped to the sidebar instead of the full viewport. Vignette under,
      scanline (multiply-blended) on top — matches chat-cmd's own z-order. */
-  .sidebar-vignette, .sidebar-scanline { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
-  .sidebar-vignette { background: radial-gradient(ellipse at center, transparent 62%, rgba(0,0,0,0.3) 100%); }
-  .sidebar-scanline { mix-blend-mode: multiply; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.13) 0px, rgba(0,0,0,0.13) 1px, transparent 1px, transparent 3px); }
+  .sidebar-scanline { position: absolute; inset: 0; pointer-events: none; z-index: 0; mix-blend-mode: multiply; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.32) 0px, rgba(0,0,0,0.32) 2px, transparent 2px, transparent 6px); }
   nav.sidebar-nav { flex: 1; padding: 20px 8px; overflow-y: auto; }
   .section-label { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--s-text-3); padding: 0 12px; margin: 20px 0 6px; display: block; }
   .section-label:first-child { margin-top: 0; }
@@ -145,7 +143,6 @@
 <div class="shell">
 
   <aside class="sidebar">
-    <div class="sidebar-vignette"></div>
     <div class="sidebar-scanline"></div>
     <div class="sidebar-content">
     <nav class="sidebar-nav">
