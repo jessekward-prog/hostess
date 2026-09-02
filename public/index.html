@@ -86,6 +86,7 @@
   .myai-label { font-size: 9px; color: var(--s-text-3); letter-spacing: 0.1em; }
 
   .env-row { display: flex; flex-direction: column; gap: 3px; margin: 0 16px 8px; }
+  .env-row[hidden] { display: none; }
   .env-row:first-child { margin-top: 8px; }
   .env-label { font-size: 10px; color: var(--s-text-2); display: flex; align-items: center; gap: 5px; }
   .env-set-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--ok); display: inline-block; flex-shrink: 0; }
@@ -148,6 +149,7 @@
   .meta-row a { color: var(--s-text-1); text-decoration: none; word-break: break-all; }
   .meta-row a:hover { color: var(--s-accent); text-decoration: underline; }
   .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; border: 1px solid var(--s-border); border-radius: 999px; padding: 2px 8px; color: var(--s-text-2); margin-right: 4px; }
+  .chip[hidden] { display: none; }
   .chip.guard-low { border-color: rgba(63,179,127,0.35); color: var(--ok); }
   .chip.guard-medium { border-color: rgba(224,165,63,0.35); color: var(--warn); }
   .chip.guard-high { border-color: rgba(224,86,79,0.35); color: var(--danger); }
@@ -163,6 +165,7 @@
   .icon-btn:disabled { color: var(--s-text-3); background: none; cursor: default; }
 
   .reveal-toggle { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--s-accent); padding: 8px 16px 0; }
+  .reveal-toggle[hidden] { display: none; }
   .reveal-toggle .chev { font-size: 10px; transition: transform 0.18s; display: inline-block; }
   .reveal-toggle.open .chev { transform: rotate(90deg); }
   .reveal-panel { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.22s cubic-bezier(0.32,0.72,0,1), opacity 0.18s; }
@@ -320,6 +323,7 @@ function appCard(app) {
       <div class="meta-row" title="${app.repoSource}"><span class="k">source</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${app.repoSource}</span></div>
       ${app.postgres ? '<span class="chip">postgres</span>' : ''}
       ${guardChip(app.guard)}
+      <span class="chip" data-role="ailink-chip" hidden></span>
     </div>
     <button class="reveal-toggle" data-act="logs">
       <span class="chev">▸</span><span>show logs</span>
@@ -331,13 +335,14 @@ function appCard(app) {
     </button>
     <div class="reveal-panel">
       ${envKeys.map((k) => `
-        <div class="env-row">
+        <div class="env-row" data-env-row="${k}">
           <label class="env-label">${k}${envSet.has(k) ? '<span class="env-set-dot" title="set"></span>' : ''}</label>
           <input class="myai-input" type="password" data-env-key="${k}" placeholder="${envSet.has(k) ? 'set — leave blank to keep' : 'not set'}" autocomplete="off">
         </div>
       `).join('')}
       <button class="myai-save env-save" data-act="save-env">save &amp; redeploy</button>
     </div>` : ''}
+    <div data-role="ailink-section"></div>
     <div class="app-foot">
       <div style="display:flex;gap:2px;">
         <button class="icon-btn" data-act="redeploy" title="Redeploy">${iconSvg('redeploy')}<span>redeploy</span></button>
@@ -426,7 +431,118 @@ function appCard(app) {
     });
   }
 
+  loadAiLink(app.name, el);
+
   return el;
+}
+
+// Fleet-wide convention (Hostess's own guard, shelf-cmd, macro-cmd) for the four
+// vars a linked AI needs. Once "ai link" is actually talking to the app, editing
+// these here would require a redeploy AND wouldn't even stick — the app's own
+// settings store already overrides them — so they're hidden from the raw env
+// list rather than left sitting there as a second, stale way to change the same
+// thing. Not app-specific: any app following the same LM_STUDIO_* naming gets
+// this for free.
+const AI_LINK_MANAGED_ENV_KEYS = ['VISION_PROVIDER', 'LM_STUDIO_URL', 'LM_STUDIO_API_KEY', 'LM_STUDIO_MODEL'];
+
+function hideRedundantEnvRows(el) {
+  let anyVisible = false;
+  let unsetVisible = 0;
+  el.querySelectorAll('[data-env-row]').forEach((row) => {
+    if (AI_LINK_MANAGED_ENV_KEYS.includes(row.dataset.envRow)) {
+      row.hidden = true;
+    } else if (!row.hidden) {
+      anyVisible = true;
+      if (row.querySelector('[data-env-key]')?.placeholder === 'not set') unsetVisible++;
+    }
+  });
+  const envToggle = el.querySelector('[data-act="env"]');
+  if (!envToggle) return;
+  if (!anyVisible) {
+    envToggle.hidden = true;
+    envToggle.nextElementSibling.hidden = true;
+  } else {
+    envToggle.querySelector('span:last-child').textContent = `env${unsetVisible ? ` (${unsetVisible} unset)` : ''}`;
+  }
+}
+
+// Probes this app's own /api/lm through Hostess (see lib/ailink.js) and, if it's
+// wired for it (SYNC_SECRET set), shows a live model chip plus an editable
+// section that applies immediately through the app itself — no redeploy, same
+// as using that app's own in-page settings panel.
+async function loadAiLink(name, el) {
+  let data;
+  try { data = await api(`/api/apps/${name}/ailink`); } catch { return; }
+
+  const chip = el.querySelector('[data-role="ailink-chip"]');
+  if (data.linked) {
+    chip.textContent = `model: ${data.model || '?'}`;
+    chip.title = `via ${data.url}`;
+    chip.hidden = false;
+  }
+
+  if (data.linked) hideRedundantEnvRows(el);
+
+  const section = el.querySelector('[data-role="ailink-section"]');
+  if (!data.linked && !data.configured) { section.innerHTML = ''; return; }
+
+  const provider = data.provider || 'anthropic';
+  section.innerHTML = `
+    <button class="reveal-toggle" data-act="ailink">
+      <span class="chev">▸</span><span>ai link${data.linked ? '' : ' — unreachable'}</span>
+    </button>
+    <div class="reveal-panel">
+      <div class="myai-body">
+        <span class="myai-status">${data.linked
+          ? (data.url
+              ? `linked: ${data.url}` + (data.appError ? ` — app can't reach it: ${data.appError}` : '')
+              : 'linked — nothing configured in the app yet')
+          : `can't sync with the app: ${data.error || 'unknown error'}`}</span>
+        <input class="myai-input" data-ailink-field="url" placeholder="address, e.g. http://localhost:1234" value="${data.linked ? data.url : ''}">
+        <input class="myai-input" type="password" data-ailink-field="apiKey" placeholder="${data.apiKeySet ? 'set — leave blank to keep' : 'API key (only if needed)'}" autocomplete="off">
+        ${data.models && data.models.length ? `
+        <select class="myai-select" data-ailink-field="model">
+          ${data.models.map((id) => `<option value="${id}"${id === data.model ? ' selected' : ''}>${id}</option>`).join('')}
+        </select>` : ''}
+        ${data.provider ? `
+        <span class="myai-label">DEFAULT PROVIDER (for unattended/automated calls)</span>
+        <div class="myai-presets">
+          <button class="myai-preset${provider === 'anthropic' ? ' active' : ''}" data-ailink-provider="anthropic">Claude</button>
+          <button class="myai-preset${provider === 'local' ? ' active' : ''}" data-ailink-provider="local">Local</button>
+        </div>` : ''}
+        <button class="myai-save" data-act="save-ailink">save — applies immediately, no redeploy</button>
+      </div>
+    </div>
+  `;
+
+  const toggle = section.querySelector('[data-act="ailink"]');
+  const panel = toggle.nextElementSibling;
+  toggle.addEventListener('click', () => {
+    toggle.classList.toggle('open');
+    panel.classList.toggle('open');
+  });
+  let selectedProvider = null;
+  section.querySelectorAll('[data-ailink-provider]').forEach((b) => b.addEventListener('click', () => {
+    selectedProvider = b.dataset.ailinkProvider;
+    section.querySelectorAll('[data-ailink-provider]').forEach((x) => x.classList.toggle('active', x === b));
+  }));
+  section.querySelector('[data-act="save-ailink"]').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const body = {};
+    const urlVal = section.querySelector('[data-ailink-field="url"]').value.trim();
+    const keyVal = section.querySelector('[data-ailink-field="apiKey"]').value.trim();
+    const modelSel = section.querySelector('[data-ailink-field="model"]');
+    if (urlVal) body.url = urlVal;
+    if (keyVal) body.apiKey = keyVal;
+    if (modelSel && modelSel.value) body.model = modelSel.value;
+    if (selectedProvider) body.provider = selectedProvider;
+    if (!Object.keys(body).length) return;
+    btn.disabled = true;
+    try {
+      await api(`/api/apps/${name}/ailink`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    } catch (err) { alert(err.message); }
+    loadAiLink(name, el);
+  });
 }
 
 async function load() {

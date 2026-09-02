@@ -3,6 +3,7 @@ const express = require('express');
 const engine = require('./lib/engine');
 const guard = require('./lib/guard');
 const settings = require('./lib/settings');
+const ailink = require('./lib/ailink');
 
 const app = express();
 const PORT = 5300;
@@ -77,6 +78,20 @@ app.put('/api/apps/:name/env', async (req, res) => {
 app.post('/api/apps/:name/scan', async (req, res) => {
   try {
     res.json(await engine.scanApp(req.params.name));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Syncs against an app's own /api/lm (shelf-cmd's MY AI, macro-cmd's Local AI
+// panel) using SYNC_SECRET from this app's own env values — see lib/ailink.js.
+app.get('/api/apps/:name/ailink', async (req, res) => {
+  res.json(await ailink.probe(req.params.name));
+});
+
+app.put('/api/apps/:name/ailink', async (req, res) => {
+  try {
+    res.json(await ailink.update(req.params.name, req.body || {}));
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
