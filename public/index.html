@@ -339,7 +339,7 @@ function appCard(app) {
       ${envKeys.map((k) => `
         <div class="env-row" data-env-row="${k}">
           <label class="env-label">${k}${envSet.has(k) ? '<span class="env-set-dot" title="set"></span>' : ''}</label>
-          <input class="myai-input" type="password" data-env-key="${k}" placeholder="${envSet.has(k) ? 'set — leave blank to keep' : 'not set'}" autocomplete="off">
+          <input class="myai-input" type="password" data-env-key="${k}" placeholder="${envSet.has(k) ? 'set — paste a new value to replace' : 'not set'}" autocomplete="off">
         </div>
       `).join('')}
       <button class="myai-save env-save" data-act="save-env">save &amp; redeploy</button>
@@ -510,7 +510,7 @@ async function loadAiLink(name, el) {
             ? `linked: ${data.local.url}` + (data.local.error ? ` — app can't reach it: ${data.local.error}` : '')
             : 'nothing linked in the app yet'}</span>
           <input class="myai-input" data-ailink-field="url" placeholder="address, e.g. http://localhost:1234" value="${data.local.url || ''}">
-          <input class="myai-input" type="password" data-ailink-field="apiKey" placeholder="${data.local.apiKeySet ? 'set — leave blank to keep' : 'API key (only if needed)'}" autocomplete="off">
+          <input class="myai-input" type="password" data-ailink-field="apiKey" placeholder="${data.local.apiKeySet ? 'key set — paste a new one to replace' : 'API key (only if needed)'}" autocomplete="off">
           ${data.local.models && data.local.models.length ? `
           <select class="myai-select" data-ailink-field="model">
             ${data.local.models.map((id) => `<option value="${id}"${id === data.local.model ? ' selected' : ''}>${id}</option>`).join('')}
@@ -519,7 +519,7 @@ async function loadAiLink(name, el) {
         </div>
         <div class="ailink-block" data-role="ailink-claude-block">
           <span class="myai-status">${data.anthropic.apiKeySet ? `key set — model: ${data.anthropic.model}` : 'no API key set yet'}</span>
-          <input class="myai-input" type="password" data-ailink-field="anthropicApiKey" placeholder="${data.anthropic.apiKeySet ? 'set — leave blank to keep' : 'Claude API key'}" autocomplete="off">
+          <input class="myai-input" type="password" data-ailink-field="anthropicApiKey" placeholder="${data.anthropic.apiKeySet ? 'key set — paste a new one to replace' : 'paste your Claude API key'}" autocomplete="off">
           <button class="myai-save" data-act="save-ailink-anthropic">save — applies immediately, no redeploy</button>
         </div>
         `}
