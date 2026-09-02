@@ -479,9 +479,11 @@ async function loadAiLink(name, el) {
   let data;
   try { data = await api(`/api/apps/${name}/ailink`); } catch { return; }
 
+  const hasClaude = !!data.anthropic;
+
   const chip = el.querySelector('[data-role="ailink-chip"]');
   if (data.linked) {
-    const activeModel = data.provider === 'anthropic' ? data.anthropic.model : data.local.model;
+    const activeModel = data.provider === 'anthropic' ? data.anthropic?.model : data.local.model;
     chip.textContent = `model: ${activeModel || '?'}`;
     chip.title = data.provider === 'anthropic' ? 'via Claude' : `via ${data.local.url || 'local'}`;
     chip.hidden = false;
@@ -492,6 +494,9 @@ async function loadAiLink(name, el) {
   const section = el.querySelector('[data-role="ailink-section"]');
   if (!data.linked && !data.configured) { section.innerHTML = ''; return; }
 
+  // Single-provider apps (no `anthropic` block at all -- see ailink.js) skip the
+  // toggle entirely and just show their one provider's fields directly, rather
+  // than offering a Claude option that doesn't actually exist for that app.
   let viewing = data.linked ? (data.provider || 'local') : 'local';
 
   section.innerHTML = `
@@ -501,10 +506,11 @@ async function loadAiLink(name, el) {
     <div class="reveal-panel">
       <div class="myai-body">
         ${!data.linked ? `<span class="myai-status">can't sync with the app: ${data.error || 'unknown error'}</span>` : `
+        ${hasClaude ? `
         <div class="myai-presets" data-role="ailink-provider-row">
           <button class="myai-preset" data-ailink-provider="local">Local</button>
           <button class="myai-preset" data-ailink-provider="anthropic">Claude</button>
-        </div>
+        </div>` : ''}
         <div class="ailink-block" data-role="ailink-local-block">
           <span class="myai-status">${data.local.url
             ? `linked: ${data.local.url}` + (data.local.error ? ` — app can't reach it: ${data.local.error}` : '')
@@ -517,11 +523,12 @@ async function loadAiLink(name, el) {
           </select>` : ''}
           <button class="myai-save" data-act="save-ailink-local">save — applies immediately, no redeploy</button>
         </div>
+        ${hasClaude ? `
         <div class="ailink-block" data-role="ailink-claude-block">
           <span class="myai-status">${data.anthropic.apiKeySet ? `key set — model: ${data.anthropic.model}` : 'no API key set yet'}</span>
           <input class="myai-input" type="password" data-ailink-field="anthropicApiKey" placeholder="${data.anthropic.apiKeySet ? 'key set — paste a new one to replace' : 'paste your Claude API key'}" autocomplete="off">
           <button class="myai-save" data-act="save-ailink-anthropic">save — applies immediately, no redeploy</button>
-        </div>
+        </div>` : ''}
         `}
       </div>
     </div>
@@ -536,16 +543,29 @@ async function loadAiLink(name, el) {
 
   if (!data.linked) return;
 
-  function applyView() {
-    section.querySelector('[data-role="ailink-local-block"]').hidden = viewing !== 'local';
-    section.querySelector('[data-role="ailink-claude-block"]').hidden = viewing !== 'anthropic';
-    section.querySelectorAll('[data-ailink-provider]').forEach((b) => b.classList.toggle('active', b.dataset.ailinkProvider === viewing));
-  }
-  section.querySelectorAll('[data-ailink-provider]').forEach((b) => b.addEventListener('click', () => {
-    viewing = b.dataset.ailinkProvider;
+  if (hasClaude) {
+    function applyView() {
+      section.querySelector('[data-role="ailink-local-block"]').hidden = viewing !== 'local';
+      section.querySelector('[data-role="ailink-claude-block"]').hidden = viewing !== 'anthropic';
+      section.querySelectorAll('[data-ailink-provider]').forEach((b) => b.classList.toggle('active', b.dataset.ailinkProvider === viewing));
+    }
+    section.querySelectorAll('[data-ailink-provider]').forEach((b) => b.addEventListener('click', () => {
+      viewing = b.dataset.ailinkProvider;
+      applyView();
+    }));
     applyView();
-  }));
-  applyView();
+    section.querySelector('[data-act="save-ailink-anthropic"]').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      const body = { provider: 'anthropic' };
+      const keyVal = section.querySelector('[data-ailink-field="anthropicApiKey"]').value.trim();
+      if (keyVal) body.anthropicApiKey = keyVal;
+      btn.disabled = true;
+      try {
+        await api(`/api/apps/${name}/ailink`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      } catch (err) { alert(err.message); }
+      loadAiLink(name, el);
+    });
+  }
 
   section.querySelector('[data-act="save-ailink-local"]').addEventListener('click', async (e) => {
     const btn = e.currentTarget;
@@ -556,18 +576,6 @@ async function loadAiLink(name, el) {
     if (urlVal) body.url = urlVal;
     if (keyVal) body.apiKey = keyVal;
     if (modelSel && modelSel.value) body.model = modelSel.value;
-    btn.disabled = true;
-    try {
-      await api(`/api/apps/${name}/ailink`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-    } catch (err) { alert(err.message); }
-    loadAiLink(name, el);
-  });
-
-  section.querySelector('[data-act="save-ailink-anthropic"]').addEventListener('click', async (e) => {
-    const btn = e.currentTarget;
-    const body = { provider: 'anthropic' };
-    const keyVal = section.querySelector('[data-ailink-field="anthropicApiKey"]').value.trim();
-    if (keyVal) body.anthropicApiKey = keyVal;
     btn.disabled = true;
     try {
       await api(`/api/apps/${name}/ailink`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
