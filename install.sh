@@ -72,3 +72,5 @@ loginctl enable-linger "$USER" 2>/dev/null || true
 echo ""
 echo "hostess is running at http://localhost:5300"
 echo "Manage it with: systemctl --user {status,restart,stop} $SERVICE_NAME"
+sleep 1
+command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:5300" >/dev/null 2>&1 || true

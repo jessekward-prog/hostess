@@ -13,13 +13,14 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     Write-Host "Re-launching as Administrator..."
     $scriptPath = $MyInvocation.MyCommand.Path
     if ($scriptPath) {
-        Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
+        Start-Process powershell -Verb RunAs -ArgumentList "-NoExit -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
     } else {
         # running via `iex` (no file on disk) — re-download and run elevated
         $tmp = Join-Path $env:TEMP "hostess-install.ps1"
         Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.ps1" -OutFile $tmp
-        Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$tmp`""
+        Start-Process powershell -Verb RunAs -ArgumentList "-NoExit -NoProfile -ExecutionPolicy Bypass -File `"$tmp`""
     }
+    Write-Host "Continuing in the new elevated window — check your taskbar for the UAC prompt / PowerShell icon."
     exit
 }
 
@@ -111,3 +112,5 @@ Start-ScheduledTask -TaskName $TaskName
 Write-Host ""
 Write-Host "hostess is running at http://localhost:5300"
 Write-Host "Manage it with: Start-ScheduledTask/Stop-ScheduledTask -TaskName $TaskName"
+Start-Sleep -Seconds 1
+Start-Process "http://localhost:5300"

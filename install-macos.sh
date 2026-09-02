@@ -92,3 +92,5 @@ echo ""
 echo "hostess is running at http://localhost:5300"
 echo "Manage it with: launchctl {unload,load -w} $PLIST_PATH"
 echo "Logs: /tmp/hostess.log"
+sleep 1
+open "http://localhost:5300" 2>/dev/null || true
