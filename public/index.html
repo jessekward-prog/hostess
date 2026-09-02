@@ -66,6 +66,8 @@
   .myai-panel { max-height: 0; overflow: hidden; opacity: 0; transition: max-height 0.22s cubic-bezier(0.32,0.72,0,1), opacity 0.18s; }
   .myai-panel.open { max-height: 640px; opacity: 1; }
   .myai-body { padding: 4px 12px 12px; display: flex; flex-direction: column; gap: 7px; }
+  .ailink-block { display: flex; flex-direction: column; gap: 7px; }
+  .ailink-block[hidden] { display: none; }
   .myai-hint { font-size: 9.5px; color: var(--s-text-3); line-height: 1.5; }
   .myai-status { font-size: 9.5px; color: var(--s-text-3); line-height: 1.5; }
   .myai-presets { display: flex; gap: 4px; flex-wrap: wrap; }
@@ -503,7 +505,7 @@ async function loadAiLink(name, el) {
           <button class="myai-preset" data-ailink-provider="local">Local</button>
           <button class="myai-preset" data-ailink-provider="anthropic">Claude</button>
         </div>
-        <div data-role="ailink-local-block">
+        <div class="ailink-block" data-role="ailink-local-block">
           <span class="myai-status">${data.local.url
             ? `linked: ${data.local.url}` + (data.local.error ? ` — app can't reach it: ${data.local.error}` : '')
             : 'nothing linked in the app yet'}</span>
@@ -515,7 +517,7 @@ async function loadAiLink(name, el) {
           </select>` : ''}
           <button class="myai-save" data-act="save-ailink-local">save — applies immediately, no redeploy</button>
         </div>
-        <div data-role="ailink-claude-block">
+        <div class="ailink-block" data-role="ailink-claude-block">
           <span class="myai-status">${data.anthropic.apiKeySet ? `key set — model: ${data.anthropic.model}` : 'no API key set yet'}</span>
           <input class="myai-input" type="password" data-ailink-field="anthropicApiKey" placeholder="${data.anthropic.apiKeySet ? 'set — leave blank to keep' : 'Claude API key'}" autocomplete="off">
           <button class="myai-save" data-act="save-ailink-anthropic">save — applies immediately, no redeploy</button>
