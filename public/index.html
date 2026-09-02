@@ -85,6 +85,12 @@
   .myai-select { width: 100%; background: var(--s-bg); border: 1px solid var(--s-border); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: var(--s-text-1); outline: none; font-family: inherit; }
   .myai-label { font-size: 9px; color: var(--s-text-3); letter-spacing: 0.1em; }
 
+  .env-row { display: flex; flex-direction: column; gap: 3px; margin: 0 16px 8px; }
+  .env-row:first-child { margin-top: 8px; }
+  .env-label { font-size: 10px; color: var(--s-text-2); display: flex; align-items: center; gap: 5px; }
+  .env-set-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--ok); display: inline-block; flex-shrink: 0; }
+  .env-save { margin: 4px 16px 10px; }
+
   .sidebar-stats { padding: 12px 16px; border-top: 1px solid var(--s-border); }
   .stat-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 10px; letter-spacing: 0.14em; color: var(--s-text-3); margin-top: 4px; }
   .stat-row:first-child { margin-top: 0; }
@@ -298,6 +304,9 @@ function guardChip(g) {
 function appCard(app) {
   const sc = statusClass(app.status);
   const url = `http://localhost:${app.port}`;
+  const envKeys = app.envVars || [];
+  const envSet = new Set(app.envSet || []);
+  const envUnsetCount = envKeys.filter((k) => !envSet.has(k)).length;
   const el = document.createElement('div');
   el.className = 'card';
   el.innerHTML = `
@@ -316,6 +325,19 @@ function appCard(app) {
       <span class="chev">▸</span><span>show logs</span>
     </button>
     <div class="reveal-panel"><div class="log-box" data-role="logbox">loading…</div></div>
+    ${envKeys.length ? `
+    <button class="reveal-toggle" data-act="env">
+      <span class="chev">▸</span><span>env${envUnsetCount ? ` (${envUnsetCount} unset)` : ''}</span>
+    </button>
+    <div class="reveal-panel">
+      ${envKeys.map((k) => `
+        <div class="env-row">
+          <label class="env-label">${k}${envSet.has(k) ? '<span class="env-set-dot" title="set"></span>' : ''}</label>
+          <input class="myai-input" type="password" data-env-key="${k}" placeholder="${envSet.has(k) ? 'set — leave blank to keep' : 'not set'}" autocomplete="off">
+        </div>
+      `).join('')}
+      <button class="myai-save env-save" data-act="save-env">save &amp; redeploy</button>
+    </div>` : ''}
     <div class="app-foot">
       <div style="display:flex;gap:2px;">
         <button class="icon-btn" data-act="redeploy" title="Redeploy">${iconSvg('redeploy')}<span>redeploy</span></button>
@@ -363,8 +385,8 @@ function appCard(app) {
     load();
   });
 
-  const revealBtn = el.querySelector('.reveal-toggle');
-  const revealPanel = el.querySelector('.reveal-panel');
+  const revealBtn = el.querySelector('[data-act="logs"]');
+  const revealPanel = revealBtn.nextElementSibling;
   const logBox = el.querySelector('[data-role="logbox"]');
   let logsLoaded = false;
   revealBtn.addEventListener('click', async () => {
@@ -382,6 +404,27 @@ function appCard(app) {
       }
     }
   });
+
+  const envToggle = el.querySelector('[data-act="env"]');
+  if (envToggle) {
+    const envPanel = envToggle.nextElementSibling;
+    envToggle.addEventListener('click', () => {
+      envToggle.classList.toggle('open');
+      envPanel.classList.toggle('open');
+    });
+    el.querySelector('[data-act="save-env"]').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      const values = {};
+      el.querySelectorAll('[data-env-key]').forEach((inp) => { if (inp.value) values[inp.dataset.envKey] = inp.value; });
+      if (!Object.keys(values).length) return;
+      btn.disabled = true;
+      try {
+        await api(`/api/apps/${app.name}/env`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values }) });
+        await api(`/api/apps/${app.name}/redeploy`, { method: 'POST' });
+      } catch (err) { alert(err.message); }
+      load();
+    });
+  }
 
   return el;
 }

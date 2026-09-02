@@ -64,6 +64,16 @@ app.delete('/api/apps/:name', async (req, res) => {
   }
 });
 
+app.put('/api/apps/:name/env', async (req, res) => {
+  const { values } = req.body || {};
+  if (!values || typeof values !== 'object') return res.status(400).json({ error: 'Missing "values" object' });
+  try {
+    res.json(await engine.setEnvValues(req.params.name, values));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/apps/:name/scan', async (req, res) => {
   try {
     res.json(await engine.scanApp(req.params.name));

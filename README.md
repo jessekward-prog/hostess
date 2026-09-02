@@ -51,8 +51,8 @@ Any repo you point it at needs two files at its root:
 name: my-app          # lowercase letters/numbers/hyphens, 2-50 chars
 port: 3000             # port your app listens on *inside* the container
 postgres: false        # true to get a DATABASE_URL env var wired to a shared Postgres
-env:                   # optional — documents required var names; not yet injected at deploy
-  - SOME_KEY            # time (see Known limitations) — give the app its own way to set these
+env:                   # optional — names Hostess will prompt for on the app card ("env" panel)
+  - SOME_KEY
 ```
 
 **`Dockerfile`** — anything that builds and listens on `port`.
@@ -90,14 +90,11 @@ Postgres — its existing database and role, so `DATABASE_URL` doesn't rotate on
   (reason shown in the dashboard/CLI); `low`/`medium` just get logged and shown as a
   `guard: <risk>` chip on the app card (hover for details). No model connected, or the LLM's
   unreachable mid-scan → scan is skipped and the deploy proceeds unscanned — see `lib/guard.js`.
-
-## Known limitations
-
-- **`app.yaml`'s `env` list isn't injected yet.** It's parsed and stored, but nothing collects
-  values for it or passes them to the container — the only env variable actually set today is
-  `DATABASE_URL` (when `postgres: true`). Until a deploy-time prompt exists, give your app its
-  own way to set config post-deploy (an admin UI backed by its own DB, for example) rather than
-  relying on `env:` to deliver secrets.
+- **Env values:** any name listed under `app.yaml`'s `env:` gets its own reveal panel on the app
+  card ("env", next to "show logs") — one password-style input per name, a green dot once it's
+  set. Save writes it into `registry.json` and redeploys so the container actually gets it via
+  `docker run -e`. Values are never sent back to the browser once saved (the panel only shows
+  whether a name is set, not its value) — `PUT /api/apps/:name/env` to set programmatically.
 
 ## Requirements
 
