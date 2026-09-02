@@ -15,12 +15,12 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     if ($scriptPath) {
         Start-Process powershell -Verb RunAs -ArgumentList "-NoExit -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
     } else {
-        # running via `iex` (no file on disk) — re-download and run elevated
+        # running via `iex` (no file on disk), re-download and run elevated
         $tmp = Join-Path $env:TEMP "hostess-install.ps1"
         Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.ps1" -OutFile $tmp
         Start-Process powershell -Verb RunAs -ArgumentList "-NoExit -NoProfile -ExecutionPolicy Bypass -File `"$tmp`""
     }
-    Write-Host "Continuing in the new elevated window — check your taskbar for the UAC prompt / PowerShell icon."
+    Write-Host "Continuing in the new elevated window, check your taskbar for the UAC prompt / PowerShell icon."
     exit
 }
 
@@ -57,7 +57,7 @@ $wslStatus = wsl --status 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Enabling WSL2 (required by Docker Desktop)..."
     wsl --install --no-distribution
-    Write-Warning "WSL2 was just installed — reboot Windows, then re-run this script to finish setup."
+    Write-Warning "WSL2 was just installed, reboot Windows, then re-run this script to finish setup."
     exit 0
 }
 
