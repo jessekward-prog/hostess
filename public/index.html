@@ -5,6 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hostess</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><rect width=%2224%22 height=%2224%22 rx=%224%22 fill=%22%23000%22/><rect x=%224%22 y=%224%22 width=%2216%22 height=%2216%22 rx=%222%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%222%22/></svg>">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hostess">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="description" content="Deploy and manage self-hosted apps on this machine">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <style>
   /* shelf-cmd "CMD" theme tokens — see hostess.cmdward.xyz / Shelf-Style-UI-Rules
      for the source. Grayscale-first; color reserved for status/interactive state. */
@@ -241,6 +251,8 @@
       <div class="badges">
         <span class="badge">Loopback only — not reachable off this box</span>
         <span class="badge"><a href="https://hostess.cmdward.xyz" target="_blank" rel="noopener">Install docs ↗</a></span>
+        <button id="installBtn" class="badge" type="button" style="display:none;">Install as App</button>
+        <span id="installHint" class="badge" style="display:none;">tap Share, then "Add to Home Screen"</span>
       </div>
     </header>
 
@@ -796,5 +808,6 @@ function mountWaveBackground(container, accentRgb) {
 }
 mountWaveBackground(document.querySelector('aside.sidebar'), '232,132,10'); // chat-cmd's default phosphor amber
 </script>
+<script src="/pwa-install.js" defer></script>
 </body>
 </html>
