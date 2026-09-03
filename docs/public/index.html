@@ -590,6 +590,12 @@ function selectOS(os) {
   document.getElementById('panel-' + os).classList.add('active');
 }
 
+(function detectOS() {
+  const ua = navigator.userAgent;
+  const os = /Windows/.test(ua) ? 'windows' : /Mac OS X|Macintosh/.test(ua) ? 'macos' : 'linux';
+  if (os !== 'linux') selectOS(os);
+})();
+
 function toggleReveal(btn) {
   btn.classList.toggle('open');
   const panel = btn.nextElementSibling;
