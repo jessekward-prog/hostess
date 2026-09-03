@@ -60,8 +60,13 @@ app.get('/api/tailscale/status', async (req, res) => {
   res.json({ ...state, hubServed: served.includes(443), installCommand: tailscale.installCommand(state.platform) });
 });
 
+async function withEnableQr(result) {
+  if (result.reason === 'tailnet-disabled') result.qr = await qrcode.toDataURL(result.enableUrl);
+  return result;
+}
+
 app.post('/api/tailscale/serve-hub', async (req, res) => {
-  res.json(await tailscale.serve(PORT, 443));
+  res.json(await withEnableQr(await tailscale.serve(PORT, 443)));
 });
 
 app.post('/api/tailscale/unserve-hub', async (req, res) => {
@@ -72,7 +77,7 @@ app.post('/api/tailscale/unserve-hub', async (req, res) => {
 app.post('/api/apps/:name/tailscale-serve', async (req, res) => {
   const record = registry.get(req.params.name);
   if (!record) return res.status(404).json({ error: 'No such app' });
-  res.json(await tailscale.serve(record.port, record.port));
+  res.json(await withEnableQr(await tailscale.serve(record.port, record.port)));
 });
 
 app.post('/api/apps/:name/tailscale-unserve', async (req, res) => {
