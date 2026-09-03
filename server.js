@@ -17,6 +17,8 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.post('/api/auth/verify', (req, res) => {
+  const lock = auth.lockStatus();
+  if (lock.locked) return res.status(429).json({ error: `Too many wrong PINs — try again in ${Math.ceil(lock.retryAfterMs / 1000)}s` });
   const { pin } = req.body || {};
   if (auth.verifyPin(req, res, String(pin || ''))) return res.json({ ok: true });
   res.status(401).json({ error: 'wrong pin' });

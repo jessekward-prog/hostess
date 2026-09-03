@@ -47,7 +47,29 @@
     width: 240px; flex-shrink: 0; background: var(--s-surface); border-right: 1px solid var(--s-border);
     position: sticky; top: 0; height: 100vh; overflow: hidden;
   }
-  @media (max-width: 1023px) { aside.sidebar { display: none; } }
+  /* Below 1024px the sidebar becomes an off-canvas drawer instead of disappearing —
+     app list + MY AI are otherwise unreachable on phone. Toggled via #menuBtn. */
+  @media (max-width: 1023px) {
+    aside.sidebar {
+      position: fixed; inset: 0 auto 0 0; width: 84vw; max-width: 300px; height: 100dvh;
+      z-index: 60; transform: translateX(-100%); transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
+      box-shadow: 2px 0 24px rgba(0,0,0,0.5);
+    }
+    aside.sidebar.open { transform: translateX(0); }
+  }
+  .sidebar-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 55;
+    opacity: 0; transition: opacity 0.28s;
+  }
+  @media (max-width: 1023px) {
+    .sidebar-backdrop.open { display: block; opacity: 1; }
+  }
+  .menu-btn {
+    display: none; align-items: center; justify-content: center; width: 34px; height: 34px;
+    border: 1px solid var(--s-border); border-radius: 8px; color: var(--s-text-1); flex-shrink: 0;
+  }
+  .menu-btn:hover { color: var(--s-text-0); border-color: var(--s-text-2); }
+  @media (max-width: 1023px) { .menu-btn { display: inline-flex; } }
   /* Canvas painted by mountWaveBackground() sits behind this. */
   .sidebar-content { position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; overflow-y: auto; }
   /* Same vignette + scanline pair as chat-cmd's .fx-vignette/.fx-scanline,
@@ -245,9 +267,15 @@
     </div>
   </aside>
 
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
   <main>
     <header class="top">
-      <h1><span class="mark"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>Hostess</h1>
+      <h1>
+        <button class="menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <span class="mark"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>Hostess</h1>
       <p class="tagline">Paste a repo URL or local path with an <code style="color:var(--s-text-0)">app.yaml</code> at its root to build, deploy, and manage it here.</p>
       <div class="badges">
         <span class="badge" id="loopback-badge">Loopback only — not reachable off this box</span>
@@ -792,15 +820,24 @@ const onlineBtn = document.getElementById('onlineBtn');
 const onlinePanel = document.getElementById('online-panel');
 const loopbackBadge = document.getElementById('loopback-badge');
 
+let lastHubUrl = null;
+
 function renderOnline(status) {
   if (status && status.url) {
     onlineBtn.textContent = 'Stop Online';
     onlinePanel.hidden = false;
-    document.getElementById('online-url').textContent = status.url;
-    document.getElementById('online-url').href = status.url;
+    if (status.url !== lastHubUrl) {
+      // Free Quick Tunnels can silently drop and get auto-reopened server-side
+      // with a new URL — re-check periodically (below) and only touch the DOM
+      // (which would interrupt someone mid-scan) when it actually changed.
+      lastHubUrl = status.url;
+      document.getElementById('online-url').textContent = status.url;
+      document.getElementById('online-url').href = status.url;
+      if (status.qr) document.getElementById('online-qr').src = status.qr;
+    }
     if (status.pin) document.getElementById('online-pin').textContent = status.pin;
-    if (status.qr) document.getElementById('online-qr').src = status.qr;
   } else {
+    lastHubUrl = null;
     onlineBtn.textContent = 'Go Online';
     onlinePanel.hidden = true;
   }
@@ -822,7 +859,9 @@ if (isLocalView()) {
     try { await api('/api/tunnel/stop', { method: 'POST' }); } catch (err) { alert(err.message); }
     renderOnline(null);
   });
-  api('/api/tunnel/status').then((s) => { if (s.hub) renderOnline(s.hub); }).catch(() => {});
+  const pollTunnelStatus = () => api('/api/tunnel/status').then((s) => renderOnline(s.hub)).catch(() => {});
+  pollTunnelStatus();
+  setInterval(pollTunnelStatus, 15000);
 } else {
   onlineBtn.style.display = 'none';
   loopbackBadge.textContent = 'Accessed via Hostess quick tunnel';
@@ -999,6 +1038,29 @@ function mountWaveBackground(container, accentRgb) {
   draw();
 }
 mountWaveBackground(document.querySelector('aside.sidebar'), '232,132,10'); // chat-cmd's default phosphor amber
+
+// Mobile off-canvas sidebar — drawer below 1024px (see aside.sidebar CSS).
+{
+  const sidebarEl = document.querySelector('aside.sidebar');
+  const menuBtn = document.getElementById('menuBtn');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  const openDrawer = () => {
+    sidebarEl.classList.add('open');
+    backdrop.classList.add('open');
+    menuBtn.setAttribute('aria-expanded', 'true');
+  };
+  const closeDrawer = () => {
+    sidebarEl.classList.remove('open');
+    backdrop.classList.remove('open');
+    menuBtn.setAttribute('aria-expanded', 'false');
+  };
+  menuBtn.addEventListener('click', () => sidebarEl.classList.contains('open') ? closeDrawer() : openDrawer());
+  backdrop.addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+  // Tapping an app row scrolls its card into view — close the drawer so it's visible.
+  sidebarApps.addEventListener('click', (e) => { if (e.target.closest('.row')) closeDrawer(); });
+  window.matchMedia('(min-width: 1024px)').addEventListener('change', (e) => { if (e.matches) closeDrawer(); });
+}
 </script>
 <script src="/pwa-install.js" defer></script>
 </body>
