@@ -4,6 +4,7 @@ const engine = require('./lib/engine');
 const guard = require('./lib/guard');
 const settings = require('./lib/settings');
 const ailink = require('./lib/ailink');
+const autoupdate = require('./lib/autoupdate');
 
 const app = express();
 const PORT = 5300;
@@ -136,4 +137,5 @@ app.put('/api/lm', (req, res) => {
 
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`hostess dashboard: http://localhost:${PORT}`);
+  autoupdate.start(console.log);
 });
