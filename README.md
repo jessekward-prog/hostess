@@ -58,6 +58,11 @@ env:                   # optional — names Hostess will prompt for on the app c
 
 **`Dockerfile`** — anything that builds and listens on `port`.
 
+**Recommended, not required:** make browser-facing apps PWA-installable (`manifest.json` + `sw.js` +
+an install button) so they get a real OS app-list entry instead of staying a browser tab that's
+easy to lose track of once it's just one of a dozen `localhost:XXXX` deploys. Templates for this
+live at `~/.claude/templates/{manifest.json,sw.js,pwa-install.js}.template`.
+
 Then either paste the repo URL / local path into the dashboard form, or from the CLI:
 
 ```
