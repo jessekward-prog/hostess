@@ -54,6 +54,11 @@ postgres: false        # true to get a DATABASE_URL env var wired to a shared Po
 autoUpdate: false       # true to auto-redeploy whenever the source repo gets a new commit
 env:                   # optional — names Hostess will prompt for on the app card ("env" panel)
   - SOME_KEY
+dataDir: /app/uploads  # optional — absolute container path to persist across redeploys.
+                       # A named Docker volume (selfhost-<name>-data) is mounted there so local
+                       # file storage survives redeploys; without it the container's writable
+                       # layer is discarded on every `docker rm`/recreate. Omit if the app keeps
+                       # no local state (e.g. everything lives in Postgres).
 ```
 
 **`Dockerfile`** — anything that builds and listens on `port`.
