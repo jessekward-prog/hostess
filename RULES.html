@@ -1,0 +1,425 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hostess Compliance Rules</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><rect width=%2224%22 height=%2224%22 rx=%224%22 fill=%22%23000%22/><rect x=%224%22 y=%224%22 width=%2216%22 height=%2216%22 rx=%222%22 fill=%22none%22 stroke=%22%23fff%22 stroke-width=%222%22/></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000; --surface: #111111; --surface-2: #1e1e1e; --border: #2c2c2c; --border-soft: #232323;
+    --accent: #ffffff; --accent-faint: rgba(255,255,255,0.06);
+    --text-0: #ffffff; --text-1: #b3b3b3; --text-2: #767676; --text-3: #474747;
+    --ok: #3fb37f; --ok-bg: rgba(63,179,127,0.12);
+    --warn: #e0a53f; --warn-bg: rgba(224,165,63,0.12);
+    --req: #e0564f; --req-bg: rgba(224,86,79,0.12);
+    --mono: 'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace;
+    --sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { color-scheme: dark; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text-1); font-family: var(--sans);
+    -webkit-font-smoothing: antialiased; line-height: 1.6;
+  }
+  ::selection { background: var(--accent-faint); color: var(--text-0); }
+  a { color: var(--text-0); }
+  code, pre, .mono { font-family: var(--mono); }
+  h1, h2, h3 { font-family: var(--mono); color: var(--text-0); text-wrap: balance; letter-spacing: -0.01em; }
+  p { max-width: 68ch; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 5px; border: 2px solid var(--surface); }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
+
+  .shell { display: flex; min-height: 100vh; align-items: flex-start; }
+
+  aside {
+    width: 268px; flex-shrink: 0; background: var(--surface); border-right: 1px solid var(--border-soft);
+    position: sticky; top: 0; height: 100vh; overflow-y: auto; padding: 22px 0 24px;
+  }
+  @media (max-width: 900px) { aside { display: none; } }
+  .brand { display: flex; align-items: center; gap: 9px; padding: 0 20px 18px; border-bottom: 1px solid var(--border-soft); margin-bottom: 6px; }
+  .brand .mark { width: 24px; height: 24px; border-radius: 6px; border: 1.5px solid var(--text-0); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .brand strong { font-family: var(--mono); color: var(--text-0); font-size: 13.5px; letter-spacing: -0.01em; }
+  .brand span { display: block; font-size: 10px; color: var(--text-3); font-family: var(--mono); letter-spacing: 0.06em; }
+
+  nav { padding: 14px 12px; }
+  nav .label { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); padding: 0 8px; margin: 16px 0 5px; display: block; }
+  nav .label:first-child { margin-top: 0; }
+  nav a {
+    display: flex; align-items: baseline; gap: 8px; text-decoration: none; color: var(--text-2);
+    font-size: 12.5px; padding: 5px 8px; border-radius: 5px; transition: background 0.12s, color 0.12s;
+  }
+  nav a:hover { background: var(--surface-2); color: var(--text-0); }
+  nav a .n { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); flex-shrink: 0; width: 15px; }
+
+  main { flex: 1; min-width: 0; padding: 56px 60px 120px; max-width: 900px; }
+  @media (max-width: 900px) { main { padding: 32px 20px 80px; } }
+
+  header.top { margin-bottom: 44px; }
+  .eyebrow { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); margin-bottom: 10px; }
+  h1.title { font-size: 2rem; margin: 0 0 14px; line-height: 1.15; }
+  .lede { font-size: 15px; color: var(--text-1); max-width: 62ch; margin: 0; }
+  .lede code { color: var(--text-0); background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 0.92em; }
+
+  .scorecard {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px;
+    margin: 28px 0 0;
+  }
+  .score-tile {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
+  }
+  .score-tile .k { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; }
+  .score-tile .v { font-family: var(--mono); font-size: 13px; color: var(--text-0); line-height: 1.5; }
+
+  section { margin: 64px 0; scroll-margin-top: 32px; }
+  section:first-of-type { margin-top: 0; }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+  .sec-num { font-family: var(--mono); font-size: 13px; color: var(--text-3); }
+  h2 { font-size: 1.25rem; margin: 0; }
+  .sec-desc { color: var(--text-2); font-size: 13.5px; margin: 8px 0 22px; max-width: 62ch; }
+
+  .tag {
+    display: inline-flex; align-items: center; font-family: var(--mono); font-size: 10px; font-weight: 600;
+    letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 9px; border-radius: 999px; flex-shrink: 0;
+  }
+  .tag.req { background: var(--req-bg); color: var(--req); }
+  .tag.rec { background: var(--warn-bg); color: var(--warn); }
+  .tag.auto { background: var(--ok-bg); color: var(--ok); }
+
+  .rule {
+    border: 1px solid var(--border); border-radius: 10px; background: var(--surface);
+    padding: 16px 18px; margin-bottom: 12px;
+  }
+  .rule-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .rule-head h3 { font-size: 13.5px; margin: 0; flex: 1; }
+  .rule p { font-size: 13.5px; color: var(--text-1); margin: 0 0 8px; }
+  .rule p:last-child { margin-bottom: 0; }
+  .rule .why { font-size: 12.5px; color: var(--text-2); border-left: 2px solid var(--border); padding-left: 10px; margin-top: 10px; }
+  .rule .why b { color: var(--text-1); font-weight: 600; }
+
+  pre {
+    background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 13px 15px; overflow-x: auto; font-size: 12px; line-height: 1.65; color: var(--text-1); margin: 10px 0 0;
+  }
+  pre .c1 { color: var(--text-3); }
+  pre .k { color: var(--text-0); }
+  pre .s { color: var(--ok); }
+  code.field { color: var(--text-0); background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 10px; }
+  table th { text-align: left; font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); padding: 0 10px 8px 0; border-bottom: 1px solid var(--border); font-weight: 600; }
+  table td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border-soft); color: var(--text-1); vertical-align: top; }
+  table td:first-child, table th:first-child { font-family: var(--mono); color: var(--text-0); white-space: nowrap; }
+  .tbl-wrap { overflow-x: auto; }
+
+  .checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .checklist li {
+    display: flex; align-items: flex-start; gap: 11px; font-size: 13.5px; color: var(--text-1);
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 11px 14px;
+  }
+  .checklist li::before {
+    content: ''; width: 15px; height: 15px; border-radius: 4px; border: 1.5px solid var(--text-3);
+    flex-shrink: 0; margin-top: 2px;
+  }
+  .checklist a { color: var(--text-2); text-decoration: none; font-family: var(--mono); font-size: 12px; }
+  .checklist a:hover { color: var(--text-0); text-decoration: underline; }
+  .checklist .body { flex: 1; }
+  .checklist .body b { color: var(--text-0); }
+
+  .callout {
+    border: 1px solid var(--border); border-left: 3px solid var(--text-0); border-radius: 0 8px 8px 0;
+    background: var(--surface); padding: 14px 18px; font-size: 13px; color: var(--text-1); margin: 18px 0;
+  }
+  .callout b { color: var(--text-0); }
+
+  footer.page-foot {
+    margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--border-soft);
+    font-family: var(--mono); font-size: 11px; color: var(--text-3);
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <aside>
+    <div class="brand">
+      <span class="mark"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>
+      <div><strong>Hostess</strong><span>compliance rules</span></div>
+    </div>
+    <nav>
+      <span class="label">Checklist</span>
+      <a href="#checklist"><span class="n">·</span>Quick checklist</a>
+
+      <span class="label">Rules</span>
+      <a href="#manifest"><span class="n">01</span>app.yaml + Dockerfile</a>
+      <a href="#boot"><span class="n">02</span>Booting without every var</a>
+      <a href="#network"><span class="n">03</span>Networking</a>
+      <a href="#postgres"><span class="n">04</span>Postgres</a>
+      <a href="#ai"><span class="n">05</span>AI / local model link</a>
+      <a href="#guard"><span class="n">06</span>Security guard</a>
+      <a href="#hygiene"><span class="n">07</span>Repo hygiene</a>
+
+      <span class="label">Reference</span>
+      <a href="#lm-contract"><span class="n">→</span>/api/lm contract</a>
+      <a href="#env-names"><span class="n">→</span>Env var names</a>
+    </nav>
+  </aside>
+
+  <main>
+
+    <header class="top">
+      <div class="eyebrow">Pre-flight — read before creating or updating a repo</div>
+      <h1 class="title">Does this app comply with Hostess?</h1>
+      <p class="lede">
+        Everything here was pulled from Hostess's actual source and from real bugs it caught this
+        month — a Postgres SSL mismatch, a leaked <code>.env</code>, an AI setting that silently
+        stopped taking effect. Check a repo against this before shipping it, not after Hostess
+        rejects the deploy.
+      </p>
+
+      <div class="scorecard">
+        <div class="score-tile"><div class="k">Hard requirements</div><div class="v">§1–§3 — deploy fails without these</div></div>
+        <div class="score-tile"><div class="k">Strongly recommended</div><div class="v">§4–§6 — works without, better with</div></div>
+        <div class="score-tile"><div class="k">Auto-detected</div><div class="v">§5, §7 — zero manifest edits needed</div></div>
+      </div>
+    </header>
+
+    <section id="checklist">
+      <div class="sec-head"><span class="sec-num">§0</span><h2>Quick checklist</h2></div>
+      <p class="sec-desc">Run down this list before opening a PR or handing a repo to Hostess. Each item links to the full rule.</p>
+      <ul class="checklist">
+        <li><span class="body"><b>app.yaml</b> exists at repo root with a valid <code class="field">name</code> and <code class="field">port</code> — <a href="#manifest">§1</a></span></li>
+        <li><span class="body"><b>Dockerfile</b> exists at repo root, and the app inside it binds <code class="field">0.0.0.0</code>, not <code class="field">localhost</code> — <a href="#network">§3</a></span></li>
+        <li><span class="body">App boots and stays up with <b>only</b> the vars Hostess provides automatically — no hard crash on missing optional config — <a href="#boot">§2</a></span></li>
+        <li><span class="body">If <code class="field">postgres: true</code>, the DB pool honors <code class="field">sslmode=disable</code> in <code class="field">DATABASE_URL</code> — <a href="#postgres">§4</a></span></li>
+        <li><span class="body">AI-capable apps use the fleet's env var names (<code class="field">LM_STUDIO_URL</code> etc.) so Hostess finds them with no manifest edits — <a href="#env-names">reference</a></span></li>
+        <li><span class="body">Nothing in <code class="field">Dockerfile</code>, <code class="field">app.yaml</code>, or the entrypoint reads as privilege-escalation or a hardcoded secret to an LLM reviewer — <a href="#guard">§6</a></span></li>
+        <li><span class="body">Real <code class="field">.gitignore</code> covering <code class="field">node_modules/</code> and <code class="field">.env</code> — checked, not assumed — <a href="#hygiene">§7</a></span></li>
+      </ul>
+    </section>
+
+    <section id="manifest">
+      <div class="sec-head"><span class="sec-num">§1</span><h2>app.yaml + Dockerfile</h2></div>
+      <p class="sec-desc">The two files Hostess refuses to deploy without. <code class="field">manifest.js</code> validates both before a build ever starts.</p>
+
+      <div class="rule">
+        <div class="rule-head"><h3>app.yaml at repo root</h3><span class="tag req">Required</span></div>
+        <p>Four fields, three of them optional:</p>
+        <pre>name: my-app          <span class="c1"># ^[a-z0-9][a-z0-9-]{0,48}[a-z0-9]$ — 2-50 chars</span>
+port: 3000             <span class="c1"># container-internal port the app listens on</span>
+postgres: false         <span class="c1"># optional, default false — see §4</span>
+env:                   <span class="c1"># optional — see §5, mostly unnecessary now (auto-detected)</span>
+  - SOME_VAR</pre>
+        <p class="why"><b>Why <code class="field">port</code> trips people up:</b> it's the port your process binds to <i>inside the container</i>, not the host port you'll browse to — Hostess picks that automatically from 4000–4999 and remaps it for you.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Dockerfile at repo root</h3><span class="tag req">Required</span></div>
+        <p>Anything that builds and results in a process listening on <code class="field">port</code>. No other constraint on the build itself.</p>
+      </div>
+    </section>
+
+    <section id="boot">
+      <div class="sec-head"><span class="sec-num">§2</span><h2>Boot without every var set</h2></div>
+      <p class="sec-desc">First deploy only gets what <code class="field">postgres: true</code> provides automatically. Everything else — API keys, an AI link, optional integrations — gets filled in <i>after</i> the container is already running, from the dashboard's env panel. If your app hard-crashes without them, the operator can never reach the panel that would fix it.</p>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Treat missing optional config as "not configured," not fatal</h3><span class="tag req">Required</span></div>
+        <p>Gate the boot-time check to only what's truly load-bearing (a database URL, say). Anything optional should leave the feature disabled and the server running:</p>
+        <pre><span class="c1">// Wrong — traps you outside the panel that would fix it</span>
+if (!process.env.ANTHROPIC_API_KEY) process.exit(1);
+
+<span class="c1">// Right — server boots either way, the feature just reports its own state</span>
+const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic(<span class="k">{ apiKey: ... }</span>) : null;</pre>
+        <p class="why">Hit for real in macro-cmd: it exited immediately whenever <code class="field">ANTHROPIC_API_KEY</code> was unset, even when a local model was the intended provider — the fix that unblocked it was exactly this pattern.</p>
+      </div>
+    </section>
+
+    <section id="network">
+      <div class="sec-head"><span class="sec-num">§3</span><h2>Networking</h2></div>
+      <p class="sec-desc">Hostess maps <code class="field">127.0.0.1:&lt;hostPort&gt;</code> on the host to <code class="field">&lt;containerPort&gt;</code> inside the container — loopback only, never LAN or internet-reachable through Hostess itself.</p>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Bind 0.0.0.0 inside the container</h3><span class="tag req">Required</span></div>
+        <p>Binding to <code class="field">127.0.0.1</code> or <code class="field">localhost</code> <i>inside</i> the container makes the app unreachable from the host — the loopback restriction is applied by Hostess's own <code class="field">docker run -p</code>, one layer out. Your process should listen as broadly as its framework's default usually already does.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Don't assume public reachability</h3><span class="tag rec">Recommended</span></div>
+        <p>If a deployed app needs to be reachable beyond the host, that's a separate reverse-proxy/tunnel decision the operator makes — not something the app itself should assume or configure around.</p>
+      </div>
+    </section>
+
+    <section id="postgres">
+      <div class="sec-head"><span class="sec-num">§4</span><h2>Postgres</h2></div>
+      <p class="sec-desc">Set <code class="field">postgres: true</code> and Hostess provisions a database + role in its shared <code class="field">postgres:16-alpine</code> container, injecting both a connection string and discrete fields.</p>
+
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>Var</th><th>What it is</th></tr>
+          <tr><td>DATABASE_URL</td><td>Full connection string, <code class="field">?sslmode=disable</code> appended — see below</td></tr>
+          <tr><td>DB_HOST / DB_PORT / DB_NAME / DB_USER / DB_PASSWORD</td><td>The same connection, split — for apps that don't parse a URL</td></tr>
+        </table>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Honor sslmode=disable — don't force SSL from NODE_ENV alone</h3><span class="tag req">Required</span></div>
+        <p>The bundled Postgres doesn't speak TLS at all. A very common pattern silently breaks against it:</p>
+        <pre><span class="c1">// Breaks here: ignores the connection string, forces SSL whenever NODE_ENV=production</span>
+ssl: process.env.NODE_ENV === <span class="s">'production'</span> ? <span class="k">{ rejectUnauthorized: false }</span> : false
+
+<span class="c1">// Correct — the connection string's own sslmode wins</span>
+ssl: /sslmode=disable/i.test(process.env.DATABASE_URL || <span class="s">''</span>)
+  ? false
+  : process.env.NODE_ENV === <span class="s">'production'</span> ? <span class="k">{ rejectUnauthorized: false }</span> : false</pre>
+        <p class="why">Hit for real in macro-cmd — booted fine everywhere else, then failed exactly this way the first time it was deployed through Hostess. Now fixed at the source (Hostess appends <code class="field">sslmode=disable</code>) <i>and</i> the app should still check for it, since the same code often also runs against a real TLS-requiring Postgres elsewhere (Coolify, Railway).</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Redeploys reuse the same database</h3><span class="tag rec">Good to know</span></div>
+        <p>Same role, same password, same data — not a fresh instance each time. Don't write migrations or seed logic that assumes a clean slate on every deploy.</p>
+      </div>
+    </section>
+
+    <section id="ai">
+      <div class="sec-head"><span class="sec-num">§5</span><h2>AI / local model link</h2></div>
+      <p class="sec-desc">Two tiers. Tier 1 costs nothing — just use the right names. Tier 2 gets you a live model picker and Local/Claude toggle on the app's Hostess card, editable with no redeploy.</p>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Tier 1 — use the fleet's env var names</h3><span class="tag auto">Auto-detected</span></div>
+        <p>Every deploy scans the repo's own <code class="field">.js/.mjs/.cjs/.ts</code> files for these names and adds any it finds to the env panel — no <code class="field">app.yaml</code> edit required, ever:</p>
+        <div class="tbl-wrap">
+          <table>
+            <tr><th>Var</th><th>Purpose</th></tr>
+            <tr><td>LM_STUDIO_URL</td><td>Local model endpoint, e.g. <code class="field">http://100.x.x.x:1235</code></td></tr>
+            <tr><td>LM_STUDIO_API_KEY</td><td>Bearer key the local endpoint requires</td></tr>
+            <tr><td>LM_STUDIO_MODEL</td><td>Model id to request</td></tr>
+            <tr><td>ANTHROPIC_API_KEY</td><td>Claude, if the app supports it as a second provider</td></tr>
+            <tr><td>VISION_PROVIDER</td><td><code class="field">local</code> or <code class="field">anthropic</code> — which one unattended calls default to</td></tr>
+            <tr><td>SYNC_SECRET</td><td>Only needed for Tier 2 — see below</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Tier 2 — implement GET/PUT /api/lm</h3><span class="tag rec">Recommended for AI-capable apps</span></div>
+        <p>Full contract is in the reference section below. In short: report your current connection state, accept live updates to it, persist them somewhere that survives a restart, and gate the routes so a trusted machine (not just a logged-in person) can call them.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Never invent your own SYNC_SECRET</h3><span class="tag req">Required if using Tier 2</span></div>
+        <p>Declare it as an env var your app reads — Hostess auto-generates and injects a random value the first time it's deployed, the same way it already does for Postgres passwords. No one should ever type or paste one.</p>
+        <pre>const SYNC_SECRET = process.env.SYNC_SECRET || <span class="s">''</span>;
+
+function authOrSync(req, res, next) {
+  if (SYNC_SECRET && req.headers[<span class="s">'x-sync-secret'</span>] === SYNC_SECRET) return next();
+  return requireAuth(req, res, next); <span class="c1">// your normal user auth, as a fallback</span>
+}</pre>
+        <p class="why"><b>Collision safety:</b> generated fresh, locally, per install — <code class="field">crypto.randomBytes(16)</code>, 128 bits of entropy. Two installs never converge on the same value, and it's never committed (Hostess's <code class="field">registry.json</code> is gitignored).</p>
+      </div>
+    </section>
+
+    <section id="guard">
+      <div class="sec-head"><span class="sec-num">§6</span><h2>Security guard</h2></div>
+      <p class="sec-desc">Before every build, a local LLM reads <code class="field">Dockerfile</code>, <code class="field">app.yaml</code>, and the guessed entrypoint file. <code class="field">risk: high</code> blocks the deploy outright.</p>
+
+      <div class="rule">
+        <div class="rule-head"><h3>What gets flagged</h3><span class="tag rec">Know before you ship</span></div>
+        <p>Hardcoded secrets or credentials in source; curl-pipe-to-shell in the Dockerfile; requests for privileged mode, the Docker socket, or host networking; unauthenticated command-execution endpoints; obfuscated code; anything that scans the local network.</p>
+        <p class="why">Hostess's own <code class="field">docker run</code> never grants privileged/socket/host-network access regardless of what's asked for — so a Dockerfile requesting it reads purely as suspicious intent to the guard, with no functional upside.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Keep secrets in env vars, never literals</h3><span class="tag req">Required</span></div>
+        <p>A hardcoded API key or password in source is both a guard trigger and a real leak if the repo is ever made public.</p>
+      </div>
+    </section>
+
+    <section id="hygiene">
+      <div class="sec-head"><span class="sec-num">§7</span><h2>Repo hygiene</h2></div>
+      <p class="sec-desc">Not enforced by Hostess itself — caught by hand, repeatedly, across real repos this session.</p>
+
+      <div class="rule">
+        <div class="rule-head"><h3>A real .gitignore, checked not assumed</h3><span class="tag req">Required</span></div>
+        <p>At minimum:</p>
+        <pre>node_modules/
+.env
+dist/</pre>
+        <p class="why">Found a repo this session with <i>no</i> <code class="field">.gitignore</code> at all — real database credentials in <code class="field">.env</code> sitting one <code class="field">git add -A</code> away from a public commit.</p>
+      </div>
+    </section>
+
+    <section id="lm-contract">
+      <div class="sec-head"><span class="sec-num">Ref</span><h2>/api/lm contract</h2></div>
+      <p class="sec-desc">The shape Hostess's ai-link sync (and any app's own settings panel) reads and writes. Implemented today by macro-cmd (dual-provider) and gains-cmd (local only).</p>
+
+      <div class="rule">
+        <div class="rule-head"><h3>GET /api/lm</h3></div>
+        <pre>{
+  <span class="s">"provider"</span>: <span class="s">"local"</span>,                    <span class="c1">// which one unattended calls use</span>
+  <span class="s">"local"</span>: {
+    <span class="s">"url"</span>: <span class="s">"http://100.x.x.x:1235"</span>,
+    <span class="s">"model"</span>: <span class="s">"google/gemma-4-e2b"</span>,
+    <span class="s">"apiKeySet"</span>: true,
+    <span class="s">"models"</span>: [<span class="s">"..."</span>],           <span class="c1">// live list from the endpoint's /v1/models</span>
+    <span class="s">"error"</span>: null                 <span class="c1">// set if the endpoint's own connection failed</span>
+  },
+  <span class="s">"anthropic"</span>: {                     <span class="c1">// omit this whole key if Claude isn't an option at all —</span>
+    <span class="s">"apiKeySet"</span>: false,             <span class="c1">// don't report a permanently-false key for "not supported"</span>
+    <span class="s">"model"</span>: <span class="s">"claude-sonnet-4-6"</span>
+  },
+  <span class="s">"managedEnv"</span>: [<span class="s">"LM_STUDIO_URL"</span>, <span class="s">"LM_STUDIO_API_KEY"</span>, <span class="s">"LM_STUDIO_MODEL"</span>]
+}</pre>
+        <p class="why"><b>managedEnv</b> is what stops the raw env panel and ai-link from double-offering the same field — list every var this endpoint makes live-editable, and the caller hides those from its generic env list automatically. No hardcoded naming convention to keep in sync on the Hostess side.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>PUT /api/lm</h3></div>
+        <pre>{
+  <span class="s">"url"</span>: <span class="s">"..."</span>,              <span class="c1">// any subset — omitted fields are left unchanged</span>
+  <span class="s">"apiKey"</span>: <span class="s">"..."</span>,
+  <span class="s">"model"</span>: <span class="s">"..."</span>,
+  <span class="s">"provider"</span>: <span class="s">"local"</span> | <span class="s">"anthropic"</span>,
+  <span class="s">"anthropicApiKey"</span>: <span class="s">"..."</span>
+}</pre>
+        <p>Persist to a small key/value settings table (env vars are only the initial seed), reload the live in-process values immediately — no restart — and return the same shape as GET.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Auth</h3></div>
+        <p>Accept your app's normal user auth <i>or</i> the <code class="field">x-sync-secret</code> header — see §5's <code class="field">authOrSync</code> pattern. Never leave these routes fully unauthenticated; several apps in this fleet are publicly reachable, not just loopback-local.</p>
+      </div>
+    </section>
+
+    <section id="env-names">
+      <div class="sec-head"><span class="sec-num">Ref</span><h2>Env var naming, fleet-wide</h2></div>
+      <p class="sec-desc">Consistency here is what makes auto-detection and ai-link work with zero configuration. Reuse these names rather than inventing new ones for the same concept.</p>
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>Concept</th><th>Use this name</th><th>Not this</th></tr>
+          <tr><td>Local model address</td><td>LM_STUDIO_URL</td><td>LM_URL, LOCAL_AI_URL, OLLAMA_HOST</td></tr>
+          <tr><td>Local model key</td><td>LM_STUDIO_API_KEY</td><td>LM_KEY, LOCAL_API_KEY</td></tr>
+          <tr><td>Local model id</td><td>LM_STUDIO_MODEL</td><td>LM_MODEL, MODEL_NAME</td></tr>
+          <tr><td>Claude key</td><td>ANTHROPIC_API_KEY</td><td>CLAUDE_API_KEY, CLAUDE_KEY</td></tr>
+          <tr><td>Default provider</td><td>VISION_PROVIDER</td><td>AI_PROVIDER, MODE</td></tr>
+          <tr><td>Machine-auth secret</td><td>SYNC_SECRET</td><td>API_SECRET, WEBHOOK_KEY</td></tr>
+        </table>
+      </div>
+      <div class="callout">
+        <b>Extending this list:</b> if a new app needs a genuinely new concept, add the name here and to <code class="field">AI_ENV_VAR_RE</code> in Hostess's <code class="field">lib/manifest.js</code> — one regex, one place.
+      </div>
+    </section>
+
+    <footer class="page-foot">
+      jessekward-prog/hostess — reflects the codebase as of the AI-link work, 2026-09-03. Update this file when the contract changes, not just the code.
+    </footer>
+
+  </main>
+</div>
+</body>
+</html>
