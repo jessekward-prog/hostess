@@ -65,7 +65,46 @@
     position: sticky; top: 0; height: 100vh;
     overflow: hidden;
   }
-  @media (max-width: 1023px) { aside.sidebar { display: none; } }
+  @media (max-width: 1023px) {
+    aside.sidebar {
+      position: fixed; left: 0; top: 0; z-index: 40;
+      width: min(280px, 82vw);
+      transform: translateX(-100%);
+      transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
+      box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+    }
+    aside.sidebar.open { transform: translateX(0); }
+    .sidebar-content { padding-top: max(8px, env(safe-area-inset-top)); }
+    .sidebar-stats { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  }
+
+  .menu-btn {
+    display: none;
+    position: fixed; z-index: 20;
+    top: max(16px, env(safe-area-inset-top)); left: 16px;
+    width: 44px; height: 44px;
+    align-items: center; justify-content: center;
+    background: var(--s-surface); border: 1px solid var(--s-border);
+    border-radius: 8px; color: var(--s-text-0);
+  }
+  @media (max-width: 1023px) { .menu-btn { display: flex; } }
+
+  .drawer-close {
+    display: none; width: 44px; height: 44px; margin: 0 0 0 auto;
+    align-items: center; justify-content: center; flex-shrink: 0;
+    color: var(--s-text-2); font-size: 16px;
+  }
+  @media (max-width: 1023px) { .drawer-close { display: flex; } }
+
+  .sidebar-backdrop {
+    display: none; position: fixed; inset: 0; z-index: 30;
+    background: rgba(0,0,0,0.6); opacity: 0; pointer-events: none;
+    transition: opacity 0.24s;
+  }
+  @media (max-width: 1023px) {
+    .sidebar-backdrop { display: block; }
+    .sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
+  }
 
   /* Canvas painted by mountWaveBackground() sits behind this; content stays
      on its own stacking layer so the animation never eats a click. */
@@ -119,7 +158,7 @@
 
   /* ── Main content ── */
   main { flex: 1; min-width: 0; padding: 32px 32px 90px; max-width: 900px; }
-  @media (max-width: 1023px) { main { padding: 20px 16px 60px; } }
+  @media (max-width: 1023px) { main { padding: calc(max(16px, env(safe-area-inset-top)) + 56px) 16px 60px; } }
 
   header.top { margin-bottom: 26px; }
   h1 {
@@ -255,9 +294,15 @@
 <body>
 <div class="shell">
 
+  <button class="menu-btn" onclick="openMenu()" aria-label="Open menu" aria-expanded="false">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <div class="sidebar-backdrop" onclick="closeMenu()"></div>
+
   <aside class="sidebar">
     <div class="sidebar-scanline"></div>
     <div class="sidebar-content">
+    <button class="drawer-close" onclick="closeMenu()" aria-label="Close menu">✕</button>
     <nav class="sidebar-nav">
       <span class="section-label">Install</span>
       <button class="row active" data-os="linux" style="--os-accent:#3fb37f" onclick="selectOS('linux')">
@@ -628,6 +673,28 @@ node deploy.js /path/to/local/repo</div>
 </div>
 
 <script>
+function openMenu() {
+  document.querySelector('aside.sidebar').classList.add('open');
+  document.querySelector('.sidebar-backdrop').classList.add('open');
+  document.querySelector('.menu-btn').setAttribute('aria-expanded', 'true');
+  document.body.style.overflow = 'hidden';
+  history.pushState({ menuOpen: true }, '');
+}
+
+function closeMenu(skipHistory) {
+  document.querySelector('aside.sidebar').classList.remove('open');
+  document.querySelector('.sidebar-backdrop').classList.remove('open');
+  document.querySelector('.menu-btn').setAttribute('aria-expanded', 'false');
+  document.body.style.overflow = '';
+  if (!skipHistory && history.state && history.state.menuOpen) history.back();
+}
+
+window.addEventListener('popstate', () => closeMenu(true));
+
+document.querySelectorAll('aside.sidebar .row, aside.sidebar a').forEach(el => {
+  el.addEventListener('click', () => { if (matchMedia('(max-width: 1023px)').matches) closeMenu(); });
+});
+
 function selectOS(os) {
   document.querySelectorAll('.row[data-os]').forEach(el => el.classList.toggle('active', el.dataset.os === os));
   document.querySelectorAll('.pill[data-os]').forEach(el => el.classList.toggle('active', el.dataset.os === os));
