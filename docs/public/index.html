@@ -589,12 +589,14 @@ Stop-ScheduledTask  -TaskName hostess</div>
             <div class="code-block">name: my-app
 port: 3000
 postgres: false
+autoUpdate: false
 env: []</div>
             <ul class="manifest-list">
               <li><code>name</code> lowercase letters/numbers/hyphens, 2-50 chars</li>
               <li><code>port</code> what your app listens on inside the container</li>
               <li><code>postgres</code> true wires a DATABASE_URL + DB_* vars to a shared Postgres</li>
-              <li><code>env</code> documents required var names (see Known limitations)</li>
+              <li><code>autoUpdate</code> true redeploys automatically when the source repo gets a new commit (checked every ~10 min)</li>
+              <li><code>env</code> each name gets its own reveal panel on the app card — set a value there and it's wired in via <code>docker run -e</code> on redeploy, no manual env file editing</li>
             </ul>
           </div>
         </div>
@@ -615,7 +617,7 @@ node deploy.js /path/to/local/repo</div>
     <section id="limits-section">
       <h2>Known limitations</h2>
       <div class="note-box">
-        <code style="color:var(--s-text-0)">app.yaml</code>'s <code style="color:var(--s-text-0)">env</code> list isn't injected yet — it's parsed and stored, but nothing collects values for it or passes them to the container. The only env variable actually set today is <code style="color:var(--s-text-0)">DATABASE_URL</code> / <code style="color:var(--s-text-0)">DB_*</code> (when <code style="color:var(--s-text-0)">postgres: true</code>). Give your app its own way to set config post-deploy — an admin UI backed by its own DB, for example — rather than relying on <code style="color:var(--s-text-0)">env:</code> to deliver secrets.
+        The <b>Local/Claude AI toggle</b> on an app card only appears if that app implements its own <code style="color:var(--s-text-0)">GET/PUT /api/lm</code>, protected by a <code style="color:var(--s-text-0)">SYNC_SECRET</code> env var (contract documented in the repo README). Apps that don't implement it show no toggle at all — there's no generic fallback yet, so wiring AI into an app currently means building that endpoint into it, not just flipping a switch.
       </div>
     </section>
 
