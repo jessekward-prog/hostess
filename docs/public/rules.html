@@ -147,6 +147,59 @@
     margin-top: 80px; padding-top: 20px; border-top: 1px solid var(--border-soft);
     font-family: var(--mono); font-size: 11px; color: var(--text-3);
   }
+
+  /* ── AI compliance prompt: sidebar trigger + modal ── */
+  .ai-prompt-btn {
+    display: flex; align-items: center; justify-content: center; gap: 9px; width: calc(100% - 24px);
+    margin: 16px 12px 6px; padding: 14px 12px; border-radius: 10px; border: none; cursor: pointer;
+    background: var(--ok); color: #05170e; font-family: var(--mono); font-size: 12.5px; font-weight: 700;
+    letter-spacing: 0.01em; line-height: 1.3; text-align: center; transition: background 0.12s, transform 0.08s;
+  }
+  .ai-prompt-btn:hover { background: #56c996; }
+  .ai-prompt-btn:active { transform: scale(0.97); }
+  .ai-prompt-btn svg { flex-shrink: 0; }
+
+  .modal-backdrop {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 100;
+    align-items: flex-start; justify-content: center; padding: 6vh 24px; overflow-y: auto;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    width: 100%; max-width: 800px; padding: 28px 30px 32px; margin-bottom: 6vh;
+  }
+  .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 4px; }
+  .modal-head h2 { font-size: 1.2rem; margin: 0; }
+  .modal-close {
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--text-2);
+    width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .modal-close:hover { color: var(--text-0); border-color: var(--text-2); }
+  .modal-sub { font-size: 13px; color: var(--text-2); margin: 0 0 20px; max-width: 62ch; }
+
+  .copy-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .copy-bar .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+  .copy-btn {
+    font-family: var(--mono); font-size: 11.5px; font-weight: 700; padding: 8px 16px; border-radius: 7px;
+    background: var(--ok); color: #05170e; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
+    transition: background 0.12s;
+  }
+  .copy-btn:hover { background: #56c996; }
+  .copy-btn.copied { background: var(--text-0); }
+
+  .prompt-box {
+    display: block; width: 100%; height: 380px; background: var(--surface-2); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 18px; font-family: var(--mono); font-size: 11.5px; line-height: 1.7;
+    color: var(--text-1); resize: vertical; white-space: pre-wrap;
+  }
+  .prompt-box:focus { outline: 1px solid var(--text-2); outline-offset: -1px; }
+
+  .tutorial-block { margin-top: 20px; padding: 16px 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+  .tutorial-block h4 { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin: 0 0 13px; }
+  .tool-row { display: flex; gap: 14px; margin-bottom: 10px; font-size: 12.5px; color: var(--text-1); line-height: 1.55; }
+  .tool-row:last-child { margin-bottom: 0; }
+  .tool-row b { color: var(--text-0); font-family: var(--mono); font-size: 12px; min-width: 148px; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -161,6 +214,10 @@
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
       Install &amp; overview
     </a>
+    <button class="ai-prompt-btn" id="aiPromptBtn" type="button">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg>
+      Compliance Prompt for AI
+    </button>
     <nav>
       <span class="label">Checklist</span>
       <a href="#checklist"><span class="n">·</span>Quick checklist</a>
@@ -431,5 +488,109 @@ dist/</pre>
 
   </main>
 </div>
+
+<div class="modal-backdrop" id="promptBackdrop">
+  <div class="modal">
+    <div class="modal-head">
+      <h2>Compliance Prompt for AI</h2>
+      <button class="modal-close" id="promptCloseBtn" type="button" aria-label="Close">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <p class="modal-sub">Paste this into an AI coding tool with your repo open. It checks the repo against every rule on this page and fixes what doesn't comply.</p>
+
+    <div class="copy-bar">
+      <span class="lbl">Ready-to-paste prompt</span>
+      <button class="copy-btn" id="copyPromptBtn" type="button">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        <span id="copyPromptLabel">Copy all</span>
+      </button>
+    </div>
+    <textarea class="prompt-box" id="promptText" readonly spellcheck="false">You're bringing this repository into compliance with a self-hosted PaaS called Hostess. Check every item below against the current code and fix whatever doesn't comply — don't change anything that's already fine. When you're done, summarize what you changed and what was already compliant.
+
+1. app.yaml must exist at the repo root with:
+   - name: lowercase letters/numbers/hyphens only, 2-50 characters
+   - port: an integer 1-65535 -- the port the app listens on INSIDE the container, not a host port
+   - postgres: true or false (optional, default false)
+   - env: an array of env var names the app reads (optional -- most AI-related ones are auto-detected, see #5)
+   Create this file if it's missing, using the app's real values.
+
+2. Dockerfile must exist at the repo root and build an image whose process ends up listening on the port from app.yaml. Inside the container, the app must bind 0.0.0.0 (or whatever its framework binds by default) -- never 127.0.0.1 or localhost, which would make it unreachable from the host once a port is mapped to it.
+
+3. The app must boot and stay running with only the environment variables provided automatically (a Postgres connection, if postgres: true). Anything optional -- an API key, an integration, an AI provider -- must NOT cause a hard crash or process.exit() if it's unset. Find any boot-time checks that exit on missing optional config and make them leave that feature disabled instead, so the server still starts and can be configured afterward.
+
+4. If the app uses Postgres, make sure its SSL config respects sslmode=disable in the connection string, rather than forcing SSL purely from NODE_ENV:
+   ssl: /sslmode=disable/i.test(process.env.DATABASE_URL || '')
+     ? false
+     : process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+   Also don't assume a fresh/empty database on every deploy or restart.
+
+5. If the app calls a vision or chat AI model, use these exact environment variable names (rename anything that currently uses different names for the same thing):
+   LM_STUDIO_URL, LM_STUDIO_API_KEY, LM_STUDIO_MODEL, ANTHROPIC_API_KEY, VISION_PROVIDER (local or anthropic)
+
+6. Never request privileged mode, Docker socket access, or host networking anywhere in the Dockerfile, scripts, or docs -- these are never granted regardless of what's asked for, and requesting them just reads as suspicious intent to an automated pre-build security scan.
+
+7. Keep all secrets in environment variables -- never hardcode a real API key, password, or token as a literal in source, the Dockerfile, or app.yaml.
+
+8. Make sure a real .gitignore exists and covers at minimum: node_modules/, .env, and any build output directory. If it's missing entirely, create one. If .env or node_modules/ are already tracked in git, flag that clearly rather than silently rewriting history.
+
+Optional -- only if the app already has its own admin/settings API and a live AI-model picker on its dashboard card is wanted: implement GET/PUT /api/lm returning {provider, local: {url, model, apiKeySet, models, error?}, anthropic?: {apiKeySet, model}, managedEnv: [...]} (omit "anthropic" entirely if there's no second provider), gated by either normal user auth or an x-sync-secret header matching process.env.SYNC_SECRET (add SYNC_SECRET as an env var the app reads -- don't invent a value, it gets auto-generated).
+
+Full reference with explanations for all of the above: https://hostess.cmdward.xyz/rules.html</textarea>
+
+    <div class="tutorial-block">
+      <h4>How to use this</h4>
+      <div class="tool-row"><b>Claude Code (or any CLI agent)</b><span>Open a terminal in the repo, start the tool, paste this as your first message.</span></div>
+      <div class="tool-row"><b>Cursor</b><span>Open the repo, open the AI chat panel (Cmd/Ctrl+L), paste it in.</span></div>
+      <div class="tool-row"><b>VS Code (Copilot / Claude ext.)</b><span>Open the Chat panel in <i>Agent</i> mode, not "Ask" — Ask mode can describe changes but can't make them.</span></div>
+      <div class="tool-row"><b>Other AI coding tools, etc.</b><span>Same idea — paste into whatever chat or agent interface it has, with the repo open.</span></div>
+      <div class="tool-row"><b>Either way</b><span>Review the diff it produces before committing, the same as any AI-made change.</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const promptBtn = document.getElementById('aiPromptBtn');
+  const promptBackdrop = document.getElementById('promptBackdrop');
+  const promptCloseBtn = document.getElementById('promptCloseBtn');
+  const copyPromptBtn = document.getElementById('copyPromptBtn');
+  const copyPromptLabel = document.getElementById('copyPromptLabel');
+  const promptText = document.getElementById('promptText');
+
+  function openPrompt() { promptBackdrop.classList.add('open'); }
+  function closePrompt() { promptBackdrop.classList.remove('open'); }
+
+  promptBtn.addEventListener('click', openPrompt);
+  promptCloseBtn.addEventListener('click', closePrompt);
+  promptBackdrop.addEventListener('click', (e) => { if (e.target === promptBackdrop) closePrompt(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePrompt(); });
+
+  // navigator.clipboard.writeText() can hang indefinitely rather than reject
+  // when the browser wants to prompt for permission and can't (some embedded/
+  // sandboxed contexts) -- race it against a short timeout so the button
+  // always resolves to the reliable execCommand fallback instead of hanging.
+  copyPromptBtn.addEventListener('click', () => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      copyPromptLabel.textContent = 'Copied!';
+      copyPromptBtn.classList.add('copied');
+      setTimeout(() => { copyPromptLabel.textContent = 'Copy all'; copyPromptBtn.classList.remove('copied'); }, 1600);
+    };
+    const fallback = () => {
+      if (settled) return;
+      promptText.select();
+      try { document.execCommand('copy'); } catch {}
+      finish();
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(promptText.value).then(finish).catch(fallback);
+      setTimeout(fallback, 800);
+    } else {
+      fallback();
+    }
+  });
+</script>
 </body>
 </html>
