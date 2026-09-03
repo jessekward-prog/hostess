@@ -339,6 +339,20 @@
 
         <div class="card">
           <div class="card-head">
+            <p class="card-title">What to expect</p>
+            <p class="card-desc">Mostly unattended — this is everything it'll ask of you.</p>
+          </div>
+          <div class="card-body">
+            <div class="steps">
+              <div class="step"><p class="step-label"><span class="step-num">1</span>Terminal asks for your <b>sudo password</b> once, for the apt/Docker installs.</p></div>
+              <div class="step"><p class="step-label"><span class="step-num">2</span>First time only: log out and back in so your new <b>docker</b> group membership takes effect, then re-run the command.</p></div>
+              <div class="step"><p class="step-label"><span class="step-num">3</span><b>Done</b> when it prints the dashboard URL and opens it in your browser.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
             <p class="card-title">What it sets up</p>
             <p class="card-desc">Installs Docker, Node.js 18+, and git if missing (adds you to the <code style="color:var(--s-text-0)">docker</code> group — log out/in after). Clones to <code style="color:var(--s-text-0)">~/hostess</code> and registers a systemd user service so the dashboard survives reboot and logout.</p>
           </div>
@@ -416,6 +430,20 @@ systemctl --user stop    hostess</div>
 
         <div class="card">
           <div class="card-head">
+            <p class="card-title">What to expect</p>
+            <p class="card-desc">This is everything it'll ask of you.</p>
+          </div>
+          <div class="card-body">
+            <div class="steps">
+              <div class="step"><p class="step-label"><span class="step-num">1</span>Terminal asks for your <b>Mac login password</b> once, for Homebrew/installs.</p></div>
+              <div class="step"><p class="step-label"><span class="step-num">2</span>Docker Desktop's first launch shows a <b>permissions dialog</b> — approve it. No account/sign-in needed.</p></div>
+              <div class="step"><p class="step-label"><span class="step-num">3</span><b>Done</b> when it prints the dashboard URL and opens it in your browser.</p></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
             <p class="card-title">What it sets up</p>
             <p class="card-desc">Installs Homebrew if missing, then git/node/Docker Desktop. Docker's first run needs you to click through its permissions dialog. Clones to <code style="color:var(--s-text-0)">~/hostess</code> and registers a launchd agent so the dashboard survives reboot and logout.</p>
           </div>
@@ -483,6 +511,21 @@ launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.hostess.plist</div>
               <span>Copy</span>
             </button>
             <a class="link-out" href="https://github.com/jessekward-prog/hostess/blob/main/install.ps1" target="_blank" rel="noopener">view source ↗</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <p class="card-title">What to expect</p>
+            <p class="card-desc">This is everything it'll ask of you — leave the new window open, it's doing the work.</p>
+          </div>
+          <div class="card-body">
+            <div class="steps">
+              <div class="step"><p class="step-label"><span class="step-num">1</span>A <b>UAC prompt</b> appears — click Yes. A new elevated PowerShell window opens; that's the real install running, not a second copy.</p></div>
+              <div class="step"><p class="step-label"><span class="step-num">2</span>Docker Desktop's first launch shows a <b>license dialog</b> — click Accept. It may also offer to sign in to Docker Hub — skip that, it's optional.</p></div>
+              <div class="step"><p class="step-label"><span class="step-num">3</span>If it says <b>WSL2 needs a reboot</b>, restart and paste the same command again — it picks up where it left off.</p></div>
+              <div class="step"><p class="step-label"><span class="step-num">4</span><b>Done</b> when your browser opens itself to the dashboard.</p></div>
+            </div>
           </div>
         </div>
 

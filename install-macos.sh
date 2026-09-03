@@ -40,10 +40,17 @@ if ! docker info >/dev/null 2>&1; then
   echo "Starting Docker Desktop..."
   open -a Docker
   echo -n "Waiting for Docker to be ready (first run needs you to approve its permissions dialog)..."
-  until docker info >/dev/null 2>&1; do
+  attempts=0
+  until docker info >/dev/null 2>&1 || [ "$attempts" -ge 100 ]; do
     echo -n "."
     sleep 3
+    attempts=$((attempts + 1))
   done
+  if ! docker info >/dev/null 2>&1; then
+    echo ""
+    echo "Docker still isn't responding after 5 minutes. Open Docker Desktop, approve its permissions dialog, wait for the whale icon in the menu bar to say 'running', then re-run this script." >&2
+    exit 1
+  fi
   echo " ready."
 fi
 
