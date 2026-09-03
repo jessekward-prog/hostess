@@ -379,6 +379,11 @@ ssl: /sslmode=disable/i.test(process.env.DATABASE_URL || <span class="s">''</spa
       </div>
 
       <div class="rule">
+        <div class="rule-head"><h3>Already deployed? Redeploy after adding it</h3><span class="tag req">Required</span></div>
+        <p>Hostess builds the image once, at deploy time. Adding <code class="field">/api/lm</code> to an app that's already running here doesn't touch the live container — the card will show ai-link as <b>unreachable</b> (a 404 probe) until you hit <b>redeploy</b> to rebuild from the new commit. Not a bug, just easy to forget mid-change.</p>
+      </div>
+
+      <div class="rule">
         <div class="rule-head"><h3>Never invent your own SYNC_SECRET</h3><span class="tag req">Required if using Tier 2</span></div>
         <p>Declare it as an env var your app reads — Hostess auto-generates and injects a random value the first time it's deployed, the same way it already does for Postgres passwords. No one should ever type or paste one.</p>
         <pre>const SYNC_SECRET = process.env.SYNC_SECRET || <span class="s">''</span>;
