@@ -67,11 +67,18 @@ if (-not $dockerRunning) {
     Write-Host "Starting Docker Desktop..."
     Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"
     Write-Host -NoNewline "Waiting for Docker to be ready (first run needs you to click through its setup)..."
+    $attempts = 0
     do {
         Start-Sleep -Seconds 3
         Write-Host -NoNewline "."
         try { docker info *>$null; $dockerRunning = $true } catch {}
-    } until ($dockerRunning)
+        $attempts++
+    } until ($dockerRunning -or $attempts -ge 100)
+    if (-not $dockerRunning) {
+        Write-Host ""
+        Write-Error "Docker still isn't responding after 5 minutes. Open Docker Desktop, finish its first-run setup (accept the license, skip sign-in if asked), wait for the whale icon in the tray to say 'running', then re-run this script."
+        exit 1
+    }
     Write-Host " ready."
 }
 
