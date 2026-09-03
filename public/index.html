@@ -52,6 +52,7 @@
   [data-ts-phase]:not([hidden]) { display: flex; flex-direction: column; gap: 8px; }
   #ts-enable-fix:not([hidden]) { display: flex; flex-direction: column; gap: 8px; }
   #ts-enable-fix-link-row:not([hidden]) { display: flex; gap: 12px; align-items: center; }
+  #ts-done-row { display: flex; gap: 16px; align-items: center; }
 
   .shell { display: flex; min-height: 100vh; align-items: flex-start; }
 
@@ -339,9 +340,14 @@
 
         <div data-ts-phase="done" hidden>
           <div style="font-size:12.5px; color:var(--s-text-1);">Permanent link (works from any of your devices already on this tailnet):</div>
-          <a id="ts-hub-url" href="#" target="_blank" rel="noopener" style="font-size:13px; word-break:break-all;"></a>
-          <div class="myai-hint">On your phone: install the Tailscale app and sign in with the same account, then this link (and each app's "open on this phone" link) will just work — no PIN, no scanning required.</div>
-          <div id="ts-peer-hint" style="font-size:11px; color:var(--s-text-2);"></div>
+          <div id="ts-done-row">
+            <img id="ts-hub-qr" width="112" height="112" style="border-radius:6px; background:#fff; padding:6px; flex-shrink:0;">
+            <div style="display:flex; flex-direction:column; gap:6px; min-width:0;">
+              <a id="ts-hub-url" href="#" target="_blank" rel="noopener" style="font-size:13px; word-break:break-all;"></a>
+              <div class="myai-hint">On your phone: install the Tailscale app and sign in with the same account (or scan this QR once signed in), then this link — and each app's "open on this phone" link — just works. No PIN.</div>
+              <div id="ts-peer-hint" style="font-size:11px; color:var(--s-text-2);"></div>
+            </div>
+          </div>
         </div>
       </div>
     </header>
@@ -965,6 +971,7 @@ if (isLocalView()) {
   function renderTsDone(state) {
     document.getElementById('ts-hub-url').textContent = `https://${state.hostname}`;
     document.getElementById('ts-hub-url').href = `https://${state.hostname}`;
+    if (state.hubQr) document.getElementById('ts-hub-qr').src = state.hubQr;
     const online = state.peers.filter((p) => p.online).map((p) => p.name);
     document.getElementById('ts-peer-hint').textContent = online.length
       ? `Currently online on your tailnet: ${online.join(', ')}`
