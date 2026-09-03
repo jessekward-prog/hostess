@@ -438,20 +438,18 @@ function appCard(app) {
   return el;
 }
 
-// Fleet-wide convention (Hostess's own guard, shelf-cmd, macro-cmd) for the four
-// vars a linked AI needs. Once "ai link" is actually talking to the app, editing
-// these here would require a redeploy AND wouldn't even stick — the app's own
-// settings store already overrides them — so they're hidden from the raw env
-// list rather than left sitting there as a second, stale way to change the same
-// thing. Not app-specific: any app following the same LM_STUDIO_* naming gets
-// this for free.
-const AI_LINK_MANAGED_ENV_KEYS = ['VISION_PROVIDER', 'LM_STUDIO_URL', 'LM_STUDIO_API_KEY', 'LM_STUDIO_MODEL'];
-
-function hideRedundantEnvRows(el) {
+// Once "ai link" is actually talking to an app, editing its env vars in the
+// raw list below would require a redeploy AND wouldn't even stick — the app's
+// own settings store already overrides them on next boot — so whichever ones
+// it just told us it manages (data.managedEnv, from its own /api/lm response)
+// get hidden from that list rather than left sitting there as a second, stale
+// way to change the same thing. Driven by what the app declares, not a
+// hardcoded guess at its naming convention -- see ailink.js.
+function hideRedundantEnvRows(el, managedKeys) {
   let anyVisible = false;
   let unsetVisible = 0;
   el.querySelectorAll('[data-env-row]').forEach((row) => {
-    if (AI_LINK_MANAGED_ENV_KEYS.includes(row.dataset.envRow)) {
+    if (managedKeys.includes(row.dataset.envRow)) {
       row.hidden = true;
     } else if (!row.hidden) {
       anyVisible = true;
@@ -489,7 +487,7 @@ async function loadAiLink(name, el) {
     chip.hidden = false;
   }
 
-  if (data.linked) hideRedundantEnvRows(el);
+  if (data.linked) hideRedundantEnvRows(el, data.managedEnv);
 
   const section = el.querySelector('[data-role="ailink-section"]');
   if (!data.linked && !data.configured) { section.innerHTML = ''; return; }
