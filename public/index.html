@@ -40,6 +40,17 @@
     ::-webkit-scrollbar-thumb { background: var(--s-border); border: 3px solid var(--s-surface); border-radius: 5px; }
   }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
+  /* [hidden] ties in specificity with any class/inline rule that also sets
+     display (e.g. .icon-btn's display:inline-flex), and author rules win
+     that tie over the UA default — so [hidden] silently does nothing unless
+     forced. This is the one global fix; elements needing a non-default
+     "shown" display (flex, not block) still get a companion :not([hidden])
+     rule below to restore it. */
+  [hidden] { display: none !important; }
+  #online-panel:not([hidden]) { display: flex; gap: 16px; align-items: center; }
+  #ts-panel:not([hidden]) { display: flex; flex-direction: column; gap: 14px; }
+  [data-ts-phase]:not([hidden]) { display: flex; flex-direction: column; gap: 8px; }
+  #ts-enable-fix:not([hidden]) { display: flex; flex-direction: column; gap: 8px; }
 
   .shell { display: flex; min-height: 100vh; align-items: flex-start; }
 
@@ -280,17 +291,53 @@
       <div class="badges">
         <span class="badge" id="loopback-badge">Loopback only — not reachable off this box</span>
         <button id="onlineBtn" class="badge" type="button" style="cursor:pointer;">Go Online</button>
+        <button id="tsBtn" class="badge" type="button" style="cursor:pointer;">Private Link (Tailscale)</button>
         <span class="badge"><a href="https://hostess.cmdward.xyz" target="_blank" rel="noopener">Install docs ↗</a></span>
         <button id="installBtn" class="badge" type="button" style="display:none;">Install as App</button>
         <span id="installHint" class="badge" style="display:none;">tap Share, then "Add to Home Screen"</span>
       </div>
-      <div class="card" id="online-panel" hidden style="margin-top:12px; display:flex; gap:16px; align-items:center;">
+      <div class="card" id="online-panel" hidden style="margin-top:12px;">
         <img id="online-qr" width="112" height="112" style="border-radius:6px; background:#fff; padding:6px;">
         <div style="display:flex; flex-direction:column; gap:6px; min-width:0;">
           <div style="font-size:11px; color:var(--s-text-3); letter-spacing:0.08em; text-transform:uppercase;">Scan on your phone — one link, every app</div>
           <a id="online-url" href="#" target="_blank" rel="noopener" style="font-size:13px; word-break:break-all;"></a>
           <div style="font-size:11px; color:var(--s-text-2);">PIN <span id="online-pin" style="color:var(--s-text-0);"></span> — only needed if the link is opened without the QR</div>
           <button id="stopOnlineBtn" class="myai-save" type="button" style="align-self:flex-start; background:transparent; color:var(--s-text-1); border:1px solid var(--s-border);">Stop Online</button>
+        </div>
+      </div>
+
+      <div class="card" id="ts-panel" hidden style="margin-top:12px;">
+        <div style="font-size:11px; color:var(--s-text-3); letter-spacing:0.08em; text-transform:uppercase;">Private link via Tailscale — permanent, only reachable by your own devices</div>
+
+        <div data-ts-phase="install" hidden>
+          <div style="font-size:12.5px; color:var(--s-text-1);">1. Install Tailscale on this machine (free, ~30s):</div>
+          <div id="ts-install-cmd" class="myai-input" style="cursor:pointer; font-size:11px;" title="click to copy"></div>
+          <div id="ts-install-link" style="font-size:11px;" hidden>macOS/Windows install from an app — no terminal command: <a href="https://tailscale.com/download" target="_blank" rel="noopener">tailscale.com/download</a></div>
+          <div class="myai-hint">Checking automatically — this updates itself once it's installed.</div>
+        </div>
+
+        <div data-ts-phase="login" hidden>
+          <div style="font-size:12.5px; color:var(--s-text-1);">2. Log in (creates a free account on first run):</div>
+          <div class="myai-input" style="cursor:pointer; font-size:11px;" title="click to copy">sudo tailscale up</div>
+          <div class="myai-hint">Run that in a terminal on this machine — it'll print a link to open in a browser. Checking automatically.</div>
+        </div>
+
+        <div data-ts-phase="enable" hidden>
+          <div style="font-size:12.5px; color:var(--s-text-1);">3. Turn on the private link:</div>
+          <button id="tsEnableBtn" class="myai-save" type="button" style="align-self:flex-start;">Enable private link</button>
+          <div id="ts-enable-fix" hidden>
+            <div id="ts-enable-fix-text" style="font-size:11.5px; color:var(--warn);"></div>
+            <div id="ts-enable-fix-cmd" class="myai-input" style="cursor:pointer; font-size:11px;" title="click to copy" hidden></div>
+            <a id="ts-enable-fix-link" href="#" target="_blank" rel="noopener" style="font-size:12px; word-break:break-all;" hidden></a>
+            <button id="tsRetryBtn" class="myai-save" type="button" style="align-self:flex-start; background:transparent; color:var(--s-text-1); border:1px solid var(--s-border);">Retry</button>
+          </div>
+        </div>
+
+        <div data-ts-phase="done" hidden>
+          <div style="font-size:12.5px; color:var(--s-text-1);">Permanent link (works from any of your devices already on this tailnet):</div>
+          <a id="ts-hub-url" href="#" target="_blank" rel="noopener" style="font-size:13px; word-break:break-all;"></a>
+          <div class="myai-hint">On your phone: install the Tailscale app and sign in with the same account, then this link (and each app's "open on this phone" link) will just work — no PIN, no scanning required.</div>
+          <div id="ts-peer-hint" style="font-size:11px; color:var(--s-text-2);"></div>
         </div>
       </div>
     </header>
@@ -509,6 +556,7 @@ function appCard(app) {
         <button class="icon-btn" data-act="redeploy" title="Redeploy">${iconSvg('redeploy')}<span>redeploy</span></button>
         <button class="icon-btn" data-act="${sc === 'running' ? 'stop' : 'start'}" title="${sc === 'running' ? 'Stop' : 'Start'}">${iconSvg(sc === 'running' ? 'stop' : 'start')}<span>${sc === 'running' ? 'stop' : 'start'}</span></button>
         <button class="icon-btn" data-act="scan" title="security scan">${iconSvg('shield')}</button>
+        ${local ? `<button class="icon-btn" data-act="ts-open" title="Private link (Tailscale)" hidden>${iconSvg('open')}<span>private</span></button>` : ''}
       </div>
       <button class="icon-btn danger" data-act="delete" title="Delete">${iconSvg('trash')}<span>delete</span></button>
     </div>
@@ -527,6 +575,22 @@ function appCard(app) {
       } catch (err) {
         exposeLink.textContent = 'open on this phone';
         alert(err.message);
+      }
+    });
+  }
+
+  const tsOpenBtn = el.querySelector('[data-act="ts-open"]');
+  if (tsOpenBtn) {
+    tsOpenBtn.hidden = !(window.tsHubServed && window.tsHubServed());
+    tsOpenBtn.addEventListener('click', async () => {
+      tsOpenBtn.disabled = true;
+      try {
+        await api(`/api/apps/${app.name}/tailscale-serve`, { method: 'POST' });
+        window.open(`https://${window.tsHostname()}:${app.port}`, '_blank');
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        tsOpenBtn.disabled = false;
       }
     });
   }
@@ -862,8 +926,109 @@ if (isLocalView()) {
   const pollTunnelStatus = () => api('/api/tunnel/status').then((s) => renderOnline(s.hub)).catch(() => {});
   pollTunnelStatus();
   setInterval(pollTunnelStatus, 15000);
+
+  // ── Tailscale wizard — permanent, private link; walks a fresh install
+  // through install → login → enable, surfacing each real command's own
+  // error text (operator grant / per-tailnet Serve toggle) rather than
+  // trying to pre-detect either gate.
+  const tsBtn = document.getElementById('tsBtn');
+  const tsPanel = document.getElementById('ts-panel');
+  const tsPhases = [...tsPanel.querySelectorAll('[data-ts-phase]')];
+  let tsPollTimer = null;
+  let tsHubServed = false;
+  let tsHostname = null;
+  window.tsHubServed = () => tsHubServed;
+  window.tsHostname = () => tsHostname;
+
+  function renderAppCards() {
+    grid.querySelectorAll('[data-act="ts-open"]').forEach((btn) => { btn.hidden = !tsHubServed; });
+  }
+
+  function copyable(el) {
+    el.addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(el.textContent); } catch { return; }
+      const prev = el.textContent;
+      el.textContent = 'copied!';
+      setTimeout(() => { el.textContent = prev; }, 900);
+    });
+  }
+  document.querySelectorAll('#ts-panel [title="click to copy"]').forEach(copyable);
+
+  function showTsPhase(name) {
+    tsPhases.forEach((el) => { el.hidden = el.dataset.tsPhase !== name; });
+  }
+
+  function renderTsDone(state) {
+    document.getElementById('ts-hub-url').textContent = `https://${state.hostname}`;
+    document.getElementById('ts-hub-url').href = `https://${state.hostname}`;
+    const online = state.peers.filter((p) => p.online).map((p) => p.name);
+    document.getElementById('ts-peer-hint').textContent = online.length
+      ? `Currently online on your tailnet: ${online.join(', ')}`
+      : 'No other devices online on your tailnet right now.';
+  }
+
+  async function refreshTailscale() {
+    let state;
+    try { state = await api('/api/tailscale/status'); } catch { return; }
+    tsHubServed = !!state.hubServed;
+    tsHostname = state.hostname || null;
+    tsBtn.textContent = tsHubServed ? 'Private Link ✓' : 'Private Link (Tailscale)';
+    renderAppCards(); // reflect tsHubServed on each card's tailscale button
+
+    if (tsPanel.hidden) return; // don't churn the DOM while the panel's closed
+    if (!state.installed) {
+      showTsPhase('install');
+      const cmd = document.getElementById('ts-install-cmd');
+      const link = document.getElementById('ts-install-link');
+      if (state.installCommand) { cmd.textContent = state.installCommand; cmd.hidden = false; link.hidden = true; }
+      else { cmd.hidden = true; link.hidden = false; }
+    } else if (!state.loggedIn) {
+      showTsPhase('login');
+    } else if (!tsHubServed) {
+      showTsPhase('enable');
+    } else {
+      showTsPhase('done');
+      renderTsDone(state);
+    }
+  }
+
+  async function attemptEnable() {
+    const fix = document.getElementById('ts-enable-fix');
+    const fixText = document.getElementById('ts-enable-fix-text');
+    const fixCmd = document.getElementById('ts-enable-fix-cmd');
+    const fixLink = document.getElementById('ts-enable-fix-link');
+    fix.hidden = true; fixCmd.hidden = true; fixLink.hidden = true;
+    let result;
+    try { result = await api('/api/tailscale/serve-hub', { method: 'POST' }); } catch (err) { alert(err.message); return; }
+    if (result.ok) { await refreshTailscale(); return; }
+    fix.hidden = false;
+    if (result.reason === 'operator') {
+      fixText.textContent = 'This machine needs a one-time permission grant to manage its own private links:';
+      fixCmd.textContent = result.fixCommand;
+      fixCmd.hidden = false;
+      copyable(fixCmd);
+    } else if (result.reason === 'tailnet-disabled') {
+      fixText.textContent = 'Private links need turning on once for your Tailscale account — click, then Retry:';
+      fixLink.textContent = result.enableUrl;
+      fixLink.href = result.enableUrl;
+      fixLink.hidden = false;
+    } else {
+      fixText.textContent = result.message || 'Something went wrong — try again.';
+    }
+  }
+
+  tsBtn.addEventListener('click', () => {
+    tsPanel.hidden = !tsPanel.hidden;
+    if (!tsPanel.hidden) refreshTailscale();
+  });
+  document.getElementById('tsEnableBtn').addEventListener('click', attemptEnable);
+  document.getElementById('tsRetryBtn').addEventListener('click', attemptEnable);
+
+  refreshTailscale();
+  tsPollTimer = setInterval(refreshTailscale, 4000);
 } else {
   onlineBtn.style.display = 'none';
+  tsBtn.style.display = 'none';
   loopbackBadge.textContent = 'Accessed via Hostess quick tunnel';
 }
 

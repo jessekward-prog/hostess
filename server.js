@@ -9,6 +9,7 @@ const autoupdate = require('./lib/autoupdate');
 const auth = require('./lib/auth');
 const tunnel = require('./lib/tunnel');
 const registry = require('./lib/registry');
+const tailscale = require('./lib/tailscale');
 
 const app = express();
 const PORT = 5300;
@@ -51,6 +52,34 @@ app.get('/api/tunnel/status', async (req, res) => {
     status.hub.qr = await qrcode.toDataURL(`${status.hub.url}/?pin=${auth.getPin()}`);
   }
   res.json(status);
+});
+
+app.get('/api/tailscale/status', async (req, res) => {
+  const state = await tailscale.detect();
+  const served = state.loggedIn ? await tailscale.servedPorts() : [];
+  res.json({ ...state, hubServed: served.includes(443), installCommand: tailscale.installCommand(state.platform) });
+});
+
+app.post('/api/tailscale/serve-hub', async (req, res) => {
+  res.json(await tailscale.serve(PORT, 443));
+});
+
+app.post('/api/tailscale/unserve-hub', async (req, res) => {
+  await tailscale.unserve(443);
+  res.json({ ok: true });
+});
+
+app.post('/api/apps/:name/tailscale-serve', async (req, res) => {
+  const record = registry.get(req.params.name);
+  if (!record) return res.status(404).json({ error: 'No such app' });
+  res.json(await tailscale.serve(record.port, record.port));
+});
+
+app.post('/api/apps/:name/tailscale-unserve', async (req, res) => {
+  const record = registry.get(req.params.name);
+  if (!record) return res.status(404).json({ error: 'No such app' });
+  await tailscale.unserve(record.port);
+  res.json({ ok: true });
 });
 
 app.post('/api/apps/:name/expose', async (req, res) => {
