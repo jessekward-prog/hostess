@@ -249,10 +249,20 @@
       <h1><span class="mark"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>Hostess</h1>
       <p class="tagline">Paste a repo URL or local path with an <code style="color:var(--s-text-0)">app.yaml</code> at its root to build, deploy, and manage it here.</p>
       <div class="badges">
-        <span class="badge">Loopback only — not reachable off this box</span>
+        <span class="badge" id="loopback-badge">Loopback only — not reachable off this box</span>
+        <button id="onlineBtn" class="badge" type="button" style="cursor:pointer;">Go Online</button>
         <span class="badge"><a href="https://hostess.cmdward.xyz" target="_blank" rel="noopener">Install docs ↗</a></span>
         <button id="installBtn" class="badge" type="button" style="display:none;">Install as App</button>
         <span id="installHint" class="badge" style="display:none;">tap Share, then "Add to Home Screen"</span>
+      </div>
+      <div class="card" id="online-panel" hidden style="margin-top:12px; display:flex; gap:16px; align-items:center;">
+        <img id="online-qr" width="112" height="112" style="border-radius:6px; background:#fff; padding:6px;">
+        <div style="display:flex; flex-direction:column; gap:6px; min-width:0;">
+          <div style="font-size:11px; color:var(--s-text-3); letter-spacing:0.08em; text-transform:uppercase;">Scan on your phone — one link, every app</div>
+          <a id="online-url" href="#" target="_blank" rel="noopener" style="font-size:13px; word-break:break-all;"></a>
+          <div style="font-size:11px; color:var(--s-text-2);">PIN <span id="online-pin" style="color:var(--s-text-0);"></span> — only needed if the link is opened without the QR</div>
+          <button id="stopOnlineBtn" class="myai-save" type="button" style="align-self:flex-start; background:transparent; color:var(--s-text-1); border:1px solid var(--s-border);">Stop Online</button>
+        </div>
       </div>
     </header>
 
@@ -287,11 +297,54 @@ const deployLog = document.getElementById('deploy-log');
 
 function showError(msg) { deployError.textContent = msg; deployError.hidden = !msg; }
 
+function isLocalView() {
+  return location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+}
+
 async function api(path, opts) {
   const res = await fetch(path, opts);
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && data.needsPin) throw Object.assign(new Error('pin required'), { needsPin: true });
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
+}
+
+// ── PIN gate (only ever hit when viewing through a quick tunnel) ──────────
+function showPinPrompt() {
+  if (document.getElementById('pin-overlay')) return;
+  const overlay = document.createElement('div');
+  overlay.id = 'pin-overlay';
+  overlay.style.cssText = 'position:fixed; inset:0; background:var(--s-bg); z-index:999; display:flex; align-items:center; justify-content:center;';
+  overlay.innerHTML = `
+    <form style="display:flex; flex-direction:column; gap:10px; width:220px;">
+      <div style="font-size:12px; color:var(--s-text-1);">Enter the PIN shown on the Hostess dashboard</div>
+      <input class="myai-input" id="pin-input" inputmode="numeric" autocomplete="off" placeholder="6-digit PIN" autofocus>
+      <div id="pin-error" style="font-size:11px; color:#ff6666; display:none;"></div>
+      <button class="myai-save" type="submit">Unlock</button>
+    </form>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const pinErr = overlay.querySelector('#pin-error');
+    try {
+      await api('/api/auth/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: overlay.querySelector('#pin-input').value.trim() }) });
+      overlay.remove();
+      load();
+    } catch (err) {
+      pinErr.textContent = err.message;
+      pinErr.style.display = 'block';
+    }
+  });
+}
+
+async function tryAutoPin() {
+  const params = new URLSearchParams(location.search);
+  const pin = params.get('pin');
+  if (!pin) return;
+  history.replaceState(null, '', location.pathname);
+  try {
+    await api('/api/auth/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
+  } catch { /* fall through to manual PIN prompt */ }
 }
 
 function statusClass(status) {
@@ -320,7 +373,8 @@ function guardChip(g) {
 
 function appCard(app) {
   const sc = statusClass(app.status);
-  const url = `http://localhost:${app.port}`;
+  const local = isLocalView();
+  const url = local ? `http://localhost:${app.port}` : '#';
   const envKeys = app.envVars || [];
   const envSet = new Set(app.envSet || []);
   const envUnsetCount = envKeys.filter((k) => !envSet.has(k)).length;
@@ -332,7 +386,7 @@ function appCard(app) {
       <span class="status-pill ${sc}">${app.status}</span>
     </div>
     <div class="app-body">
-      <div class="meta-row"><span class="k">url</span><a href="${url}" target="_blank" rel="noopener">${url}</a></div>
+      <div class="meta-row"><span class="k">url</span><a href="${url}" ${local ? 'target="_blank" rel="noopener"' : 'data-act="expose"'}>${local ? url : 'open on this phone'}</a></div>
       <div class="meta-row"><span class="k">image</span><span>${app.image}</span></div>
       <div class="meta-row" title="${app.repoSource}"><span class="k">source</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${app.repoSource}</span></div>
       ${app.postgres ? '<span class="chip">postgres</span>' : ''}
@@ -366,6 +420,22 @@ function appCard(app) {
       <button class="icon-btn danger" data-act="delete" title="Delete">${iconSvg('trash')}<span>delete</span></button>
     </div>
   `;
+
+  const exposeLink = el.querySelector('[data-act="expose"]');
+  if (exposeLink) {
+    exposeLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      exposeLink.textContent = 'opening…';
+      try {
+        const { url } = await api(`/api/apps/${app.name}/expose`, { method: 'POST' });
+        window.open(url, '_blank');
+        exposeLink.textContent = 'open on this phone';
+      } catch (err) {
+        exposeLink.textContent = 'open on this phone';
+        alert(err.message);
+      }
+    });
+  }
 
   el.querySelector('[data-act="redeploy"]').addEventListener('click', async (e) => {
     const btn = e.currentTarget; btn.disabled = true;
@@ -596,7 +666,11 @@ async function loadAiLink(name, el) {
 
 async function load() {
   let apps = [];
-  try { apps = await api('/api/apps'); } catch (err) { showError(err.message); return; }
+  try { apps = await api('/api/apps'); } catch (err) {
+    if (err.needsPin) return showPinPrompt();
+    showError(err.message);
+    return;
+  }
 
   grid.innerHTML = '';
   sidebarApps.innerHTML = '';
@@ -636,7 +710,49 @@ deployForm.addEventListener('submit', async (e) => {
   }
 });
 
-load();
+// ── Go Online — one Quick Tunnel to this dashboard, apps expose their own
+// tunnels on demand from appCard()'s "open on this phone" link.
+const onlineBtn = document.getElementById('onlineBtn');
+const onlinePanel = document.getElementById('online-panel');
+const loopbackBadge = document.getElementById('loopback-badge');
+
+function renderOnline(status) {
+  if (status && status.url) {
+    onlineBtn.textContent = 'Stop Online';
+    onlinePanel.hidden = false;
+    document.getElementById('online-url').textContent = status.url;
+    document.getElementById('online-url').href = status.url;
+    if (status.pin) document.getElementById('online-pin').textContent = status.pin;
+    if (status.qr) document.getElementById('online-qr').src = status.qr;
+  } else {
+    onlineBtn.textContent = 'Go Online';
+    onlinePanel.hidden = true;
+  }
+}
+
+if (isLocalView()) {
+  onlineBtn.addEventListener('click', async () => {
+    onlineBtn.disabled = true;
+    try {
+      const status = await api('/api/tunnel/start', { method: 'POST' });
+      renderOnline(status);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      onlineBtn.disabled = false;
+    }
+  });
+  document.getElementById('stopOnlineBtn').addEventListener('click', async () => {
+    try { await api('/api/tunnel/stop', { method: 'POST' }); } catch (err) { alert(err.message); }
+    renderOnline(null);
+  });
+  api('/api/tunnel/status').then((s) => { if (s.hub) renderOnline(s.hub); }).catch(() => {});
+} else {
+  onlineBtn.style.display = 'none';
+  loopbackBadge.textContent = 'Accessed via Hostess quick tunnel';
+}
+
+tryAutoPin().then(load);
 
 // ── MY AI panel — same "input your server info" pattern as shelf-cmd's
 // MyAiPanel.jsx, ported to vanilla JS/inline-expand since this dashboard has

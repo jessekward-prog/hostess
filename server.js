@@ -1,16 +1,67 @@
 const path = require('path');
 const express = require('express');
+const qrcode = require('qrcode');
 const engine = require('./lib/engine');
 const guard = require('./lib/guard');
 const settings = require('./lib/settings');
 const ailink = require('./lib/ailink');
 const autoupdate = require('./lib/autoupdate');
+const auth = require('./lib/auth');
+const tunnel = require('./lib/tunnel');
+const registry = require('./lib/registry');
 
 const app = express();
 const PORT = 5300;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
+
+app.post('/api/auth/verify', (req, res) => {
+  const { pin } = req.body || {};
+  if (auth.verifyPin(req, res, String(pin || ''))) return res.json({ ok: true });
+  res.status(401).json({ error: 'wrong pin' });
+});
+
+app.use('/api', auth.middleware);
+
+app.post('/api/tunnel/start', async (req, res) => {
+  try {
+    const hub = await tunnel.start(tunnel.HUB_KEY, PORT);
+    const pin = auth.rotatePin();
+    const url = `${hub.url}/?pin=${pin}`;
+    const qr = await qrcode.toDataURL(url);
+    res.json({ url: hub.url, pin, qr, startedAt: hub.startedAt });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/tunnel/stop', (req, res) => {
+  tunnel.stopAll();
+  auth.clearPin();
+  res.json({ ok: true });
+});
+
+app.get('/api/tunnel/status', async (req, res) => {
+  const status = tunnel.status();
+  if (status.hub) {
+    status.hub.pin = auth.getPin();
+    status.hub.qr = await qrcode.toDataURL(`${status.hub.url}/?pin=${auth.getPin()}`);
+  }
+  res.json(status);
+});
+
+app.post('/api/apps/:name/expose', async (req, res) => {
+  if (!tunnel.hubActive()) return res.status(400).json({ error: 'Go Online first' });
+  const record = registry.get(req.params.name);
+  if (!record) return res.status(404).json({ error: 'No such app' });
+  try {
+    const { url } = await tunnel.start(req.params.name, record.port);
+    res.json({ url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 app.get('/api/apps', async (req, res) => {
   try {
@@ -139,3 +190,6 @@ app.listen(PORT, '127.0.0.1', () => {
   console.log(`hostess dashboard: http://localhost:${PORT}`);
   autoupdate.start(console.log);
 });
+
+process.on('SIGTERM', () => { tunnel.stopAll(); process.exit(0); });
+process.on('SIGINT', () => { tunnel.stopAll(); process.exit(0); });
