@@ -173,6 +173,15 @@
   .deploy-row input:focus { border-color: var(--s-accent); }
   .deploy-row input::placeholder { color: var(--s-text-3); }
   .deploy-btn { background: var(--s-accent); color: var(--s-bg); border-radius: 8px; padding: 9px 18px; font-size: 12.5px; font-weight: 600; }
+  .open-app-btn {
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+    width: calc(100% - 32px); margin: 10px 16px 2px; background: var(--s-accent); color: var(--s-bg);
+    border-radius: 8px; padding: 11px 14px; font-size: 13px; font-weight: 700;
+    letter-spacing: 0.01em; transition: opacity 0.12s, transform 0.08s;
+  }
+  .open-app-btn:hover { opacity: 0.88; }
+  .open-app-btn:active { transform: scale(0.98); }
+  .open-app-btn:disabled { background: var(--s-surface-2); color: var(--s-text-3); cursor: default; }
   .deploy-btn:hover { background: var(--s-text-1); }
   .deploy-btn:disabled { background: var(--s-border); color: var(--s-text-3); cursor: default; }
   .deploy-error {
@@ -540,8 +549,12 @@ function appCard(app) {
       <p class="app-title">${app.name}</p>
       <span class="status-pill ${sc}">${app.status}</span>
     </div>
+    ${sc === 'running'
+      ? (local
+        ? `<a class="open-app-btn" href="${url}" target="_blank" rel="noopener">${iconSvg('open')}<span>Open App</span></a>`
+        : `<button class="open-app-btn" type="button" data-act="${tailnet ? 'ts-expose' : 'expose'}">${iconSvg('open')}<span>Open App</span></button>`)
+      : `<button class="open-app-btn" type="button" disabled>${iconSvg('open')}<span>App not running</span></button>`}
     <div class="app-body">
-      <div class="meta-row"><span class="k">url</span><a href="${url}" ${local ? 'target="_blank" rel="noopener"' : `data-act="${tailnet ? 'ts-expose' : 'expose'}"`}>${local ? url : 'open on this phone'}</a></div>
       <div class="meta-row"><span class="k">image</span><span>${app.image}</span></div>
       <div class="meta-row" title="${app.repoSource}"><span class="k">source</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${app.repoSource}</span></div>
       ${app.postgres ? '<span class="chip">postgres</span>' : ''}
@@ -580,16 +593,19 @@ function appCard(app) {
 
   const exposeLink = el.querySelector('[data-act="expose"]');
   if (exposeLink) {
+    const label = exposeLink.querySelector('span');
     exposeLink.addEventListener('click', async (e) => {
       e.preventDefault();
-      exposeLink.textContent = 'opening…';
+      exposeLink.disabled = true;
+      label.textContent = 'opening…';
       try {
         const { url } = await api(`/api/apps/${app.name}/expose`, { method: 'POST' });
         window.open(url, '_blank');
-        exposeLink.textContent = 'open on this phone';
       } catch (err) {
-        exposeLink.textContent = 'open on this phone';
         alert(err.message);
+      } finally {
+        exposeLink.disabled = false;
+        label.textContent = 'Open App';
       }
     });
   }
@@ -600,16 +616,19 @@ function appCard(app) {
   // running and would fail here).
   const tsExposeLink = el.querySelector('[data-act="ts-expose"]');
   if (tsExposeLink) {
+    const label = tsExposeLink.querySelector('span');
     tsExposeLink.addEventListener('click', async (e) => {
       e.preventDefault();
-      tsExposeLink.textContent = 'opening…';
+      tsExposeLink.disabled = true;
+      label.textContent = 'opening…';
       try {
         await api(`/api/apps/${app.name}/tailscale-serve`, { method: 'POST' });
         window.open(`https://${location.hostname}:${app.port}`, '_blank');
       } catch (err) {
         alert(err.message);
       } finally {
-        tsExposeLink.textContent = 'open on this phone';
+        tsExposeLink.disabled = false;
+        label.textContent = 'Open App';
       }
     });
   }
