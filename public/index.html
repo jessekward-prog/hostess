@@ -24,6 +24,7 @@
     --s-accent: #ffffff; --s-accent-faint: rgba(255,255,255,0.07); --s-accent-glow: rgba(255,255,255,0.18);
     --s-text-0: #ffffff; --s-text-1: #b0b0b0; --s-text-2: #666666; --s-text-3: #444444;
     --ok: #3fb37f; --warn: #e0a53f; --danger: #e0564f; --danger-strong: rgba(180,40,0,0.9);
+    --crt-green: #3dff7a; --crt-green-rgb: 61,255,122;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body { height: 100%; margin: 0; padding: 0; }
@@ -146,23 +147,57 @@
   .sidebar-stats a { color: var(--s-text-2); text-decoration: none; }
   .sidebar-stats a:hover { color: var(--s-accent); text-decoration: underline; }
 
-  main { flex: 1; min-width: 0; padding: 32px 32px 90px; max-width: 1000px; }
+  main { flex: 1; min-width: 0; padding: 32px 32px 90px; max-width: 1000px; margin: 0 auto; }
   @media (max-width: 1023px) { main { padding: 20px 16px 60px; } }
 
   header.top { margin-bottom: 26px; }
+  .header-row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 28px; }
+  .header-left { flex: 1 1 280px; min-width: 220px; }
   h1 { font-size: 1.3rem; margin: 0 0 8px; letter-spacing: -0.01em; color: var(--s-text-0); display: flex; align-items: center; gap: 9px; }
   h1 .mark { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; border: 1.5px solid var(--s-text-0); }
-  .tagline { color: var(--s-text-2); font-size: 0.85rem; max-width: 60ch; margin: 0 0 14px; line-height: 1.6; }
-  .badges { display: flex; gap: 8px; flex-wrap: wrap; font-size: 0.72rem; }
-  .badge { border: 1px solid var(--s-border); border-radius: 999px; padding: 4px 11px; color: var(--s-text-2); }
-  .badge a { color: var(--s-text-0); text-decoration: none; }
-  .badge a:hover { text-decoration: underline; }
+  @keyframes cursor-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+  .caret-blink { animation: cursor-blink 1s step-end infinite; }
+  .tagline { color: var(--s-text-2); font-size: 0.85rem; max-width: 60ch; margin: 0; line-height: 1.6; }
+
+  /* Hecate — three-faced statue mascot, dithered CRT-style. Composited once
+     from three source photos (lib/describe.js-adjacent asset, see mountHecate
+     below) then re-dithered on a Bayer matrix every tick for a halftone shimmer. */
+  .header-mascot { flex: 0 1 190px; max-width: 190px; min-width: 120px; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+  .hecate-canvas-wrap { position: relative; line-height: 0; max-width: 100%; }
+  .hecate-canvas-wrap canvas { display: block; width: 190px; max-width: 100%; height: auto; image-rendering: auto; pointer-events: none; filter: drop-shadow(0 0 14px rgba(235,235,235,0.22)); }
+  .hecate-scanlines { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.34) 0px, rgba(0,0,0,0.34) 1px, transparent 1px, transparent 3px); }
+  .hecate-sweep { position: absolute; left: 0; right: 0; height: 14px; top: 0; pointer-events: none; background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%); }
+  .hecate-plaque { display: flex; align-items: center; gap: 7px; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--s-text-3); }
+  .hecate-dot { width: 5px; height: 5px; border-radius: 50%; background: rgb(235,235,235); flex-shrink: 0; }
+  .hecate-slash { color: #2b2b2b; }
+  .hecate-caption { display: inline-flex; align-items: center; gap: 3px; }
+  .hecate-inf { font-size: 1.6em; line-height: 1; display: inline-block; }
+
+  .conn-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 0.72rem; flex: 1 1 280px; max-width: 335px; }
+  .conn-status { display: flex; align-items: center; gap: 7px; color: var(--s-text-3); }
+  .conn-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--s-text-3); flex-shrink: 0; }
+  .conn-status-dot.on { background: var(--ok); }
+  .conn-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .conn-btn {
+    display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--s-border); border-radius: 999px;
+    padding: 5px 12px; color: var(--s-text-1); background: transparent; transition: border-color 0.12s, color 0.12s;
+  }
+  .conn-btn:hover { border-color: var(--s-text-1); color: var(--s-text-0); }
+  .conn-btn.on { border-color: rgba(63,179,127,0.4); color: var(--ok); }
+  .conn-hint { color: var(--s-text-3); }
 
   h2 { font-size: 0.9rem; color: var(--s-text-0); margin: 0 0 12px; }
 
   .card { position: relative; border-radius: 12px; overflow: hidden; background: var(--s-surface); border: 1px solid var(--s-border); transition: border-color 0.18s; }
   .card-content { position: relative; z-index: 1; }
   .card:hover { border-color: var(--s-text-3); }
+
+  /* App cards in the grid stretch to the tallest card in their row (grid
+     default) — without this, the redeploy/stop/delete row lands wherever
+     each card's own collapsible toggles happen to end, instead of always at
+     the card's bottom edge. */
+  .grid .card { display: flex; flex-direction: column; height: 100%; }
+  .grid .card .card-content { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 
   .deploy-card { padding: 16px; margin-bottom: 28px; }
   .deploy-row { display: flex; gap: 8px; }
@@ -174,14 +209,22 @@
   .deploy-row input::placeholder { color: var(--s-text-3); }
   .deploy-btn { background: var(--s-accent); color: var(--s-bg); border-radius: 8px; padding: 9px 18px; font-size: 12.5px; font-weight: 600; }
   .open-app-btn {
-    display: flex; align-items: center; justify-content: center; gap: 7px;
-    width: calc(100% - 32px); margin: 10px 16px 2px; background: var(--s-accent); color: var(--s-bg);
-    border-radius: 8px; padding: 11px 14px; font-size: 13px; font-weight: 700;
-    letter-spacing: 0.01em; transition: opacity 0.12s, transform 0.08s;
+    position: relative; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    width: calc(100% - 32px); margin: 10px 16px 2px;
+    background: rgba(var(--crt-green-rgb), 0.1); color: var(--crt-green);
+    border: 1.5px solid var(--crt-green); border-radius: 8px; padding: 10.5px 14px; font-size: 13px; font-weight: 700;
+    letter-spacing: 0.01em; transition: background 0.12s, transform 0.08s;
   }
-  .open-app-btn:hover { opacity: 0.88; }
+  .open-app-btn::after {
+    content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; mix-blend-mode: multiply;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.35) 0px, rgba(0,0,0,0.35) 1px, transparent 1px, transparent 3px);
+  }
+  .open-app-btn-label { position: relative; z-index: 1; display: flex; align-items: center; gap: 7px; }
+  .open-app-btn:hover { background: rgba(var(--crt-green-rgb), 0.18); }
   .open-app-btn:active { transform: scale(0.98); }
-  .open-app-btn:disabled { background: var(--s-surface-2); color: var(--s-text-3); cursor: default; }
+  .open-app-btn:disabled { background: var(--s-surface-2); color: var(--s-text-3); border-color: var(--s-border); cursor: default; }
+  .open-app-btn:disabled::after { content: none; }
   .deploy-btn:hover { background: var(--s-text-1); }
   .deploy-btn:disabled { background: var(--s-border); color: var(--s-text-3); cursor: default; }
   .deploy-error {
@@ -193,12 +236,28 @@
   .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
   .empty { color: var(--s-text-3); font-size: 13px; padding: 30px 0; text-align: center; }
 
-  .app-card-head { padding: 15px 16px 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-  .app-title { font-size: 13.5px; font-weight: 600; color: var(--s-text-0); margin: 0; display: flex; align-items: center; gap: 7px; word-break: break-all; }
+  .app-card-head { padding: 15px 16px 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .app-title-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .app-logo { width: 22px; height: 22px; border-radius: 5px; object-fit: cover; flex-shrink: 0; background: var(--s-surface-2); }
+  .app-logo-fallback {
+    width: 22px; height: 22px; border-radius: 5px; background: var(--s-surface-2); color: var(--s-text-2);
+    font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .app-title { font-size: 13.5px; font-weight: 600; color: var(--s-text-0); margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .status-pill { font-size: 10px; letter-spacing: 0.06em; padding: 2px 8px; border-radius: 999px; flex-shrink: 0; white-space: nowrap; text-transform: uppercase; }
   .status-pill.running { background: rgba(63,179,127,0.15); color: var(--ok); }
   .status-pill.exited, .status-pill.created { background: rgba(224,165,63,0.15); color: var(--warn); }
   .status-pill.absent, .status-pill.unknown { background: rgba(224,86,79,0.15); color: var(--danger); }
+
+  /* Fixed 2-line box, present whether or not an app has a description, so
+     the Open App button below it lands at the same y on every card in a row
+     regardless of description length (grid rows stretch cards to equal
+     height, but content still flows from the top — a taller description
+     pushes everything after it down unless this slot's height is constant). */
+  .app-desc {
+    font-size: 11.5px; color: var(--s-text-2); line-height: 1.5; margin: 8px 16px 0;
+    height: calc(1.5em * 2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
 
   .app-body { padding: 10px 16px 0; }
   .meta-row { display: flex; gap: 6px; font-size: 11.5px; color: var(--s-text-2); margin-bottom: 5px; align-items: baseline; }
@@ -212,6 +271,7 @@
   .chip.guard-high { border-color: rgba(224,86,79,0.35); color: var(--danger); }
   .chip.guard-unknown, .chip.guard-skipped { border-style: dashed; }
 
+  .card-spacer { flex: 1; }
   .app-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; margin-top: 12px; border-top: 1px solid var(--s-surface-2); }
   .icon-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 6px; font-size: 11px; color: var(--s-text-3); transition: color 0.12s, background 0.12s; }
   .icon-btn:hover { color: var(--s-accent); background: var(--s-surface-2); }
@@ -219,7 +279,8 @@
   .icon-btn.danger:hover { color: var(--danger); }
   .icon-btn.confirm { background: var(--danger-strong); color: #fff; padding: 5px 10px; }
   .icon-btn.confirm:hover { color: #fff; background: var(--danger-strong); }
-  .icon-btn:disabled { color: var(--s-text-3); background: none; cursor: default; }
+  .icon-btn:disabled { color: var(--s-text-3); opacity: 0.4; background: none; cursor: default; }
+  .icon-btn:disabled:hover { color: var(--s-text-3); background: none; }
 
   .reveal-toggle { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--s-accent); padding: 8px 16px 0; }
   .reveal-toggle[hidden] { display: none; }
@@ -314,19 +375,39 @@
 
   <main>
     <header class="top">
-      <h1>
-        <button class="menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-        </button>
-        <span class="mark"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>Hostess</h1>
-      <p class="tagline">Paste a repo URL or local path with an <code style="color:var(--s-text-0)">app.yaml</code> at its root to build, deploy, and manage it here.</p>
-      <div class="badges">
-        <span class="badge" id="loopback-badge">Loopback only — not reachable off this box</span>
-        <button id="onlineBtn" class="badge" type="button" style="cursor:pointer;">Go Online</button>
-        <button id="tsBtn" class="badge" type="button" style="cursor:pointer;">Private Link (Tailscale)</button>
-        <span class="badge"><a href="https://hostess.cmdward.xyz" target="_blank" rel="noopener">Install docs ↗</a></span>
-        <button id="installBtn" class="badge" type="button" style="display:none;">Install as App</button>
-        <span id="installHint" class="badge" style="display:none;">tap Share, then "Add to Home Screen"</span>
+      <div class="header-row">
+        <div class="header-left">
+          <h1>
+            <button class="menu-btn" id="menuBtn" type="button" aria-label="Open menu" aria-expanded="false">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+            </button>
+            <span class="mark"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span><span id="brand-text">Hostess</span><span class="caret-blink">_</span></h1>
+          <p class="tagline">Paste a repo URL or local path with an <code style="color:var(--s-text-0)">app.yaml</code> at its root to build, deploy, and manage it here.</p>
+        </div>
+
+        <div class="header-mascot" id="hecate" title="Hecate — three faces, one doorway">
+          <div class="hecate-canvas-wrap">
+            <canvas id="hecateCanvas" width="340" height="250"></canvas>
+            <div class="hecate-scanlines"></div>
+            <div class="hecate-sweep" id="hecateSweep"></div>
+          </div>
+          <div class="hecate-plaque">
+            <span class="hecate-dot"></span>
+            <span>Hecate</span>
+            <span class="hecate-slash">/</span>
+            <span class="hecate-caption">watching <span class="hecate-inf">∞</span></span>
+          </div>
+        </div>
+
+        <div class="conn-bar">
+          <span class="conn-status" id="loopback-badge"><span class="conn-status-dot"></span>Loopback only — not reachable off this box</span>
+          <div class="conn-actions">
+            <button id="onlineBtn" class="conn-btn" type="button">Go Online</button>
+            <button id="tsBtn" class="conn-btn" type="button">Private Link</button>
+            <button id="installBtn" class="conn-btn" type="button" style="display:none;">Install as App</button>
+            <span id="installHint" class="conn-hint" style="display:none;">tap Share, then "Add to Home Screen"</span>
+          </div>
+        </div>
       </div>
       <div class="card" id="online-panel" hidden style="margin-top:12px;">
         <img id="online-qr" width="112" height="112" style="border-radius:6px; background:#fff; padding:6px;">
@@ -488,8 +569,23 @@ function iconSvg(name) {
     trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
     open: '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>',
     shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>',
+    scrape: '<path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/><path d="M4 17v2"/><path d="M5 18H3"/>',
   };
   return `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icons[name]}</svg>`;
+}
+
+// Set once per load() from /api/lm — same "is MY AI configured" check guard.js
+// uses server-side, so the scrape button's disabled state actually matches
+// whether a scrape call would succeed.
+let aiConfigured = false;
+async function refreshAiConfigured() {
+  try { const lm = await api('/api/lm'); aiConfigured = !!(lm.url && !lm.error); } catch { aiConfigured = false; }
+}
+function applyAiConfigured() {
+  document.querySelectorAll('[data-act="scrape"]').forEach((btn) => {
+    btn.disabled = !aiConfigured;
+    btn.title = aiConfigured ? 'Scrape logo + description' : 'Connect an AI model in MY AI to use this';
+  });
 }
 
 // Chunky dithered ripple ring — same Bayer-dot bitmap technique as reverb's
@@ -574,20 +670,31 @@ function appCard(app) {
   el.innerHTML = `
     <div class="card-content">
     <div class="app-card-head">
-      <p class="app-title">${app.name}</p>
+      <div class="app-title-row">
+        ${app.logo ? `<img class="app-logo" src="/api/apps/${app.name}/logo" alt="">` : `<span class="app-logo-fallback">${app.name[0].toUpperCase()}</span>`}
+        <p class="app-title">${app.name}</p>
+      </div>
       <span class="status-pill ${sc}">${app.status}</span>
     </div>
+    <p class="app-desc">${app.description || ''}</p>
     ${sc === 'running'
       ? (local
-        ? `<a class="open-app-btn" href="${url}" target="_blank" rel="noopener">${iconSvg('open')}<span>Open App</span></a>`
-        : `<button class="open-app-btn" type="button" data-act="${tailnet ? 'ts-expose' : 'expose'}">${iconSvg('open')}<span>Open App</span></button>`)
-      : `<button class="open-app-btn" type="button" disabled>${iconSvg('open')}<span>App not running</span></button>`}
+        ? `<a class="open-app-btn" href="${url}" target="_blank" rel="noopener"><span class="open-app-btn-label">${iconSvg('open')}<span>Open App</span></span></a>`
+        : `<button class="open-app-btn" type="button" data-act="${tailnet ? 'ts-expose' : 'expose'}"><span class="open-app-btn-label">${iconSvg('open')}<span>Open App</span></span></button>`)
+      : `<button class="open-app-btn" type="button" disabled><span class="open-app-btn-label">${iconSvg('open')}<span>App not running</span></span></button>`}
     <div class="app-body">
-      <div class="meta-row"><span class="k">image</span><span>${app.image}</span></div>
-      <div class="meta-row" title="${app.repoSource}"><span class="k">source</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${app.repoSource}</span></div>
       ${app.postgres ? '<span class="chip">postgres</span>' : ''}
       ${guardChip(app.guard)}
       <span class="chip" data-role="ailink-chip" hidden></span>
+    </div>
+    <button class="reveal-toggle" data-act="details">
+      <span class="chev">▸</span><span>image &amp; source</span>
+    </button>
+    <div class="reveal-panel">
+      <div class="app-body" style="padding-top:8px;">
+        <div class="meta-row"><span class="k">image</span><span>${app.image}</span></div>
+        <div class="meta-row" title="${app.repoSource}"><span class="k">source</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${app.repoSource}</span></div>
+      </div>
     </div>
     <button class="reveal-toggle" data-act="logs">
       <span class="chev">▸</span><span>show logs</span>
@@ -607,12 +714,14 @@ function appCard(app) {
       <button class="myai-save env-save" data-act="save-env">save &amp; redeploy</button>
     </div>` : ''}
     <div data-role="ailink-section"></div>
+    <div class="card-spacer"></div>
     <div class="app-foot">
       <div style="display:flex;gap:2px;">
-        <button class="icon-btn" data-act="redeploy" title="Redeploy">${iconSvg('redeploy')}<span>redeploy</span></button>
-        <button class="icon-btn" data-act="${sc === 'running' ? 'stop' : 'start'}" title="${sc === 'running' ? 'Stop' : 'Start'}">${iconSvg(sc === 'running' ? 'stop' : 'start')}<span>${sc === 'running' ? 'stop' : 'start'}</span></button>
+        <button class="icon-btn" data-act="redeploy" title="Redeploy">${iconSvg('redeploy')}</button>
+        <button class="icon-btn" data-act="${sc === 'running' ? 'stop' : 'start'}" title="${sc === 'running' ? 'Stop' : 'Start'}">${iconSvg(sc === 'running' ? 'stop' : 'start')}</button>
         <button class="icon-btn" data-act="scan" title="security scan">${iconSvg('shield')}</button>
-        ${local ? `<button class="icon-btn" data-act="ts-open" title="Private link (Tailscale)" hidden>${iconSvg('open')}<span>private</span></button>` : ''}
+        <button class="icon-btn" data-act="scrape" title="Scrape logo + description">${iconSvg('scrape')}</button>
+        ${local ? `<button class="icon-btn" data-act="ts-open" title="Private link (Tailscale)" hidden>${iconSvg('open')}</button>` : ''}
       </div>
       <button class="icon-btn danger" data-act="delete" title="Delete">${iconSvg('trash')}<span>delete</span></button>
     </div>
@@ -688,6 +797,20 @@ function appCard(app) {
     const act = e.currentTarget.dataset.act; e.currentTarget.disabled = true;
     const stopRipple = mountRippleField(el, act === 'stop' ? RIPPLE_COLOR.danger : RIPPLE_COLOR.ok);
     try { await api(`/api/apps/${app.name}/${act}`, { method: 'POST' }); } catch (err) { alert(err.message); }
+    stopRipple();
+    load();
+  });
+
+  const detailsToggle = el.querySelector('[data-act="details"]');
+  detailsToggle.addEventListener('click', () => {
+    detailsToggle.classList.toggle('open');
+    detailsToggle.nextElementSibling.classList.toggle('open');
+  });
+
+  el.querySelector('[data-act="scrape"]').addEventListener('click', async (e) => {
+    const btn = e.currentTarget; btn.disabled = true;
+    const stopRipple = mountRippleField(el, RIPPLE_COLOR.ok);
+    try { await api(`/api/apps/${app.name}/describe`, { method: 'POST' }); } catch (err) { alert(err.message); }
     stopRipple();
     load();
   });
@@ -923,6 +1046,8 @@ async function load() {
     return;
   }
 
+  await refreshAiConfigured();
+
   grid.innerHTML = '';
   sidebarApps.innerHTML = '';
   emptyState.hidden = apps.length > 0;
@@ -941,6 +1066,7 @@ async function load() {
     });
     sidebarApps.appendChild(row);
   });
+  applyAiConfigured();
 }
 
 deployForm.addEventListener('submit', async (e) => {
@@ -972,6 +1098,7 @@ let lastHubUrl = null;
 function renderOnline(status) {
   if (status && status.url) {
     onlineBtn.textContent = 'Stop Online';
+    onlineBtn.classList.add('on');
     onlinePanel.hidden = false;
     if (status.url !== lastHubUrl) {
       // Free Quick Tunnels can silently drop and get auto-reopened server-side
@@ -985,6 +1112,7 @@ function renderOnline(status) {
   } else {
     lastHubUrl = null;
     onlineBtn.textContent = 'Go Online';
+    onlineBtn.classList.remove('on');
     onlinePanel.hidden = true;
   }
 }
@@ -1055,7 +1183,8 @@ if (isLocalView()) {
     try { state = await api('/api/tailscale/status'); } catch { return; }
     tsHubServed = !!state.hubServed;
     tsHostname = state.hostname || null;
-    tsBtn.textContent = tsHubServed ? 'Private Link ✓' : 'Private Link (Tailscale)';
+    tsBtn.textContent = tsHubServed ? 'Private Link ✓' : 'Private Link';
+    tsBtn.classList.toggle('on', tsHubServed);
     renderAppCards(); // reflect tsHubServed on each card's tailscale button
 
     if (tsPanel.hidden) return; // don't churn the DOM while the panel's closed
@@ -1115,7 +1244,8 @@ if (isLocalView()) {
 } else {
   onlineBtn.style.display = 'none';
   tsBtn.style.display = 'none';
-  loopbackBadge.textContent = 'Accessed via Hostess quick tunnel';
+  loopbackBadge.querySelector('.conn-status-dot').classList.add('on');
+  loopbackBadge.lastChild.textContent = 'Accessed via Hostess quick tunnel';
 }
 
 checkAuth().then(load);
@@ -1212,6 +1342,8 @@ myaiSaveBtn.addEventListener('click', async () => {
     myaiSavedFlash.hidden = false;
     setTimeout(() => { myaiSavedFlash.hidden = true; }, 1500);
     await loadMyAi();
+    await refreshAiConfigured();
+    applyAiConfigured();
   } catch (err) {
     myaiStatus.textContent = `save failed: ${err.message}`;
   } finally {
@@ -1289,6 +1421,187 @@ function mountWaveBackground(container, accentRgb) {
   draw();
 }
 mountWaveBackground(document.querySelector('aside.sidebar'), '232,132,10'); // chat-cmd's default phosphor amber
+
+// Hecate — the header mascot. Composites three statue photos into one
+// continuous-tone bust (cached, built once), then re-dithers it on an 8x8
+// Bayer ordered matrix every tick so it reads as animated dot-halftone
+// rather than a static image. Ported from a Figma design canvas prototype.
+(function mountHecate() {
+  const host = document.getElementById('hecate');
+  const canvas = document.getElementById('hecateCanvas');
+  const sweep = document.getElementById('hecateSweep');
+  if (!host || !canvas) return;
+
+  const PROFILE_CROP = [40, 10, 480, 470];
+  const PROFILE_POLY = [[190,20],[120,65],[92,150],[78,275],[95,400],[160,438],[300,442],[420,430],[472,235],[455,115],[360,40]];
+  const BAYER8 = [
+    [0,32,8,40,2,34,10,42],[48,16,56,24,50,18,58,26],
+    [12,44,4,36,14,46,6,38],[60,28,52,20,62,30,54,22],
+    [3,35,11,43,1,33,9,41],[51,19,59,27,49,17,57,25],
+    [15,47,7,39,13,45,5,37],[63,31,55,23,61,29,53,21],
+  ];
+  const TINT = [235, 235, 235]; // bone
+  const DETAIL = 0.58;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  let hover = false;
+  let t = 0;
+
+  function feather(img, crop, w, filter, r, hold) {
+    const h = Math.round(w * crop[3] / crop[2]);
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const x = c.getContext('2d');
+    x.filter = filter;
+    x.drawImage(img, crop[0], crop[1], crop[2], crop[3], 0, 0, w, h);
+    x.filter = 'none';
+    const g = x.createRadialGradient(w * 0.5, h * 0.5, 1, w * 0.5, h * 0.5, Math.max(w, h) * r);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(hold, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,1)');
+    x.fillStyle = g;
+    x.fillRect(0, 0, w, h);
+    return c;
+  }
+
+  // The profile shot is hand-masked out of its background with PROFILE_POLY
+  // (no clean crop exists for it, unlike the front/three-quarter shots).
+  function profile(img, w) {
+    const cr = PROFILE_CROP;
+    const s = document.createElement('canvas');
+    s.width = cr[2]; s.height = cr[3];
+    const sx = s.getContext('2d');
+    sx.beginPath();
+    PROFILE_POLY.forEach((p, i) => {
+      const x = p[0] - cr[0], y = p[1] - cr[1];
+      i ? sx.lineTo(x, y) : sx.moveTo(x, y);
+    });
+    sx.closePath();
+    sx.clip();
+    sx.filter = 'grayscale(1) brightness(1.35) contrast(1.12)';
+    sx.drawImage(img, cr[0], cr[1], cr[2], cr[3], 0, 0, cr[2], cr[3]);
+    const h = Math.round(w * cr[3] / cr[2]);
+    const out = document.createElement('canvas');
+    out.width = w; out.height = h;
+    const x = out.getContext('2d');
+    x.drawImage(s, 0, 0, w, h);
+    const g = x.createLinearGradient(0, h * 0.7, 0, h);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,1)');
+    x.fillStyle = g;
+    x.fillRect(0, h * 0.7, w, h * 0.3);
+    return out;
+  }
+
+  function compose(imgs) {
+    const c = document.createElement('canvas');
+    c.width = W; c.height = H;
+    const x = c.getContext('2d', { willReadFrequently: true }); // re-read every tick in the dither loop below
+    x.fillStyle = '#000';
+    x.fillRect(0, 0, W, H);
+    const mid = feather(imgs.front, [95, 265, 320, 410], 154, 'grayscale(1) brightness(0.95) contrast(1.1)', 0.62, 0.74);
+    const right = feather(imgs.quarter, [50, 335, 350, 420], 128, 'grayscale(1) brightness(0.98) contrast(1.15)', 0.6, 0.72);
+    x.drawImage(profile(imgs.profile, 140), -12, 66);
+    x.drawImage(right, 224, 58);
+    x.drawImage(mid, (W - mid.width) / 2, -4);
+    const g = x.createLinearGradient(0, H - 58, 0, H);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,1)');
+    x.fillStyle = g;
+    x.fillRect(0, H - 58, W, 58);
+    return c;
+  }
+
+  function loadImage(src) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.src = src;
+    });
+  }
+
+  Promise.all([
+    loadImage('/mascot/hecate-front.png'),
+    loadImage('/mascot/hecate-3q.png'),
+    loadImage('/mascot/hecate-profile.png'),
+  ]).then(([front, quarter, profileImg]) => {
+    const base = compose({ front, quarter, profile: profileImg });
+    const w = base.width, h = base.height;
+    const baseCtx = base.getContext('2d');
+    const dot = document.createElement('canvas');
+    dot.width = w; dot.height = h;
+    const dctx = dot.getContext('2d');
+
+    function tick() {
+      t++;
+      const flicker = !reduceMotion && t % 47 === 0;
+      const gain = 1 + (flicker ? 0.35 : 0);
+      const bias = -0.3 + (hover ? 0.07 : 0) + (flicker ? 0.08 : 0);
+      const phase = reduceMotion ? 0 : (t % 2) * 2;
+      const d = baseCtx.getImageData(0, 0, w, h);
+      const p = d.data;
+      for (let y = 0; y < h; y++) {
+        for (let xx = 0; xx < w; xx++) {
+          const i = (y * w + xx) * 4;
+          let l = (0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]) / 255;
+          l = Math.min(1, Math.max(0, (l - 0.5) * gain + 0.5 + bias));
+          const thr = (BAYER8[(y + phase) & 7][(xx + phase) & 7] + 0.5) / 64;
+          const on = l > thr;
+          // "off" pixels carry tone as alpha so the background stays
+          // transparent instead of a flat black box behind the dots.
+          const soft = Math.round(255 * DETAIL * Math.max(0, l));
+          p[i] = TINT[0]; p[i + 1] = TINT[1]; p[i + 2] = TINT[2];
+          p[i + 3] = on ? 255 : soft;
+        }
+      }
+      dctx.clearRect(0, 0, w, h);
+      dctx.putImageData(d, 0, 0);
+      ctx.clearRect(0, 0, W, H);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(dot, 0, 0, W, H);
+      if (sweep && !reduceMotion) {
+        const sy = (t * 3) % (H + 28) - 14;
+        sweep.style.transform = `translateY(${sy}px)`;
+      }
+    }
+    tick();
+    if (!reduceMotion) setInterval(tick, 110);
+  });
+
+  // The canvas is pointer-events:none so it can never block a click; hover is
+  // proximity of the real cursor to the mascot's own bounding box instead.
+  window.addEventListener('mousemove', (e) => {
+    const r = host.getBoundingClientRect();
+    const dx = Math.max(r.left - e.clientX, 0, e.clientX - r.right);
+    const dy = Math.max(r.top - e.clientY, 0, e.clientY - r.bottom);
+    hover = Math.hypot(dx, dy) < 40;
+  });
+})();
+
+// Ported from chat-cmd's TypewriterName.jsx — same cadence (a random 20-30s
+// pause, then a 25ms/char retype), just against a plain span instead of React
+// state. The caret next to it blinks continuously via the .caret-blink CSS
+// animation regardless of whether a retype is in progress.
+(function retypeBrand() {
+  const el = document.getElementById('brand-text');
+  const text = el.textContent;
+  const CHAR_DELAY = 25, RETYPE_MIN = 20000, RETYPE_MAX = 30000;
+  function scheduleRetype() {
+    setTimeout(() => {
+      let i = 0;
+      el.textContent = '';
+      (function typeChar() {
+        i++;
+        el.textContent = text.slice(0, i);
+        if (i < text.length) setTimeout(typeChar, CHAR_DELAY);
+        else scheduleRetype();
+      })();
+    }, RETYPE_MIN + Math.random() * (RETYPE_MAX - RETYPE_MIN));
+  }
+  scheduleRetype();
+})();
 
 // Mobile off-canvas sidebar — drawer below 1024px (see aside.sidebar CSS).
 {

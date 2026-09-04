@@ -203,6 +203,22 @@ app.post('/api/apps/:name/scan', async (req, res) => {
   }
 });
 
+app.post('/api/apps/:name/describe', async (req, res) => {
+  try {
+    res.json(await engine.describeApp(req.params.name));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.get('/api/apps/:name/logo', (req, res) => {
+  const record = registry.get(req.params.name);
+  if (!record || !record.logo) return res.status(404).end();
+  res.sendFile(path.join(__dirname, 'apps', req.params.name, record.logo), (err) => {
+    if (err && !res.headersSent) res.status(404).end();
+  });
+});
+
 // Syncs against an app's own /api/lm (shelf-cmd's MY AI, macro-cmd's Local AI
 // panel) using SYNC_SECRET from this app's own env values — see lib/ailink.js.
 app.get('/api/apps/:name/ailink', async (req, res) => {
