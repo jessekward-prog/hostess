@@ -151,8 +151,12 @@
   @media (max-width: 1023px) { main { padding: 20px 16px 60px; } }
 
   header.top { margin-bottom: 26px; }
-  .header-row { display: flex; flex-wrap: wrap; align-items: stretch; justify-content: center; gap: 28px; }
-  .header-left { flex: 0 1 260px; min-width: 200px; max-width: 260px; }
+  /* Grid (not flex) so the outer columns can anchor to the row's edges while
+     the mascot stays exactly centered regardless of the two side columns'
+     differing widths. */
+  .header-row { display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch; gap: 28px; }
+  @media (max-width: 640px) { .header-row { grid-template-columns: 1fr; justify-items: center; text-align: center; } }
+  .header-left { justify-self: start; min-width: 200px; max-width: 260px; }
   h1 { font-size: 1.3rem; margin: 0 0 8px; letter-spacing: -0.01em; color: var(--s-text-0); display: flex; align-items: center; gap: 9px; }
   h1 .mark { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; border: 1.5px solid var(--s-text-0); }
   @keyframes cursor-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
@@ -162,7 +166,7 @@
   /* Hecate — three-faced statue mascot, dithered CRT-style. Composited once
      from three source photos (lib/describe.js-adjacent asset, see mountHecate
      below) then re-dithered on a Bayer matrix every tick for a halftone shimmer. */
-  .header-mascot { flex: 0 1 225px; max-width: 225px; min-width: 140px; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+  .header-mascot { justify-self: center; max-width: 225px; min-width: 140px; display: flex; flex-direction: column; align-items: center; gap: 7px; }
   .hecate-canvas-wrap { position: relative; line-height: 0; max-width: 100%; }
   .hecate-canvas-wrap canvas { display: block; width: 225px; max-width: 100%; height: auto; image-rendering: auto; pointer-events: none; filter: drop-shadow(0 0 14px rgba(235,235,235,0.22)); }
   .hecate-scanlines { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.34) 0px, rgba(0,0,0,0.34) 1px, transparent 1px, transparent 3px); }
@@ -173,7 +177,8 @@
   .hecate-caption { display: inline-flex; align-items: center; gap: 3px; }
   .hecate-inf { font-size: 1.6em; line-height: 1; display: inline-block; }
 
-  .conn-bar { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 10px; font-size: 0.72rem; flex: 0 0 150px; max-width: 150px; }
+  .conn-bar { justify-self: end; display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 10px; font-size: 0.72rem; max-width: 150px; }
+  @media (max-width: 640px) { .conn-bar, .conn-actions, .conn-status { align-items: center; text-align: center; } }
   .conn-status { display: flex; align-items: flex-start; gap: 7px; color: var(--s-text-3); text-align: right; }
   .conn-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--s-text-3); flex-shrink: 0; margin-top: 4px; }
   .conn-status-dot.on { background: var(--ok); }
