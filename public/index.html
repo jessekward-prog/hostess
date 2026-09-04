@@ -166,7 +166,7 @@
      from three source photos (lib/describe.js-adjacent asset, see mountHecate
      below) then re-dithered on a Bayer matrix every tick for a halftone shimmer. */
   .header-mascot { justify-self: center; max-width: 225px; min-width: 140px; display: flex; flex-direction: column; align-items: center; gap: 7px; }
-  .hecate-canvas-wrap { position: relative; line-height: 0; max-width: 100%; }
+  .hecate-canvas-wrap { position: relative; line-height: 0; max-width: 100%; overflow: hidden; }
   .hecate-canvas-wrap canvas { display: block; width: 225px; max-width: 100%; height: auto; image-rendering: auto; pointer-events: none; filter: drop-shadow(0 0 14px rgba(235,235,235,0.22)); }
   .hecate-scanlines { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.34) 0px, rgba(0,0,0,0.34) 1px, transparent 1px, transparent 3px); }
   .hecate-sweep { position: absolute; left: 0; right: 0; height: 14px; top: 0; pointer-events: none; background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%); }
