@@ -387,6 +387,10 @@ function isLocalView() {
   return location.hostname === 'localhost' || location.hostname === '127.0.0.1';
 }
 
+function isTailscaleView() {
+  return location.hostname.endsWith('.ts.net');
+}
+
 async function api(path, opts) {
   const res = await fetch(path, opts);
   const data = await res.json().catch(() => ({}));
@@ -523,6 +527,7 @@ function guardChip(g) {
 function appCard(app) {
   const sc = statusClass(app.status);
   const local = isLocalView();
+  const tailnet = isTailscaleView();
   const url = local ? `http://localhost:${app.port}` : '#';
   const envKeys = app.envVars || [];
   const envSet = new Set(app.envSet || []);
@@ -536,7 +541,7 @@ function appCard(app) {
       <span class="status-pill ${sc}">${app.status}</span>
     </div>
     <div class="app-body">
-      <div class="meta-row"><span class="k">url</span><a href="${url}" ${local ? 'target="_blank" rel="noopener"' : 'data-act="expose"'}>${local ? url : 'open on this phone'}</a></div>
+      <div class="meta-row"><span class="k">url</span><a href="${url}" ${local ? 'target="_blank" rel="noopener"' : `data-act="${tailnet ? 'ts-expose' : 'expose'}"`}>${local ? url : 'open on this phone'}</a></div>
       <div class="meta-row"><span class="k">image</span><span>${app.image}</span></div>
       <div class="meta-row" title="${app.repoSource}"><span class="k">source</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${app.repoSource}</span></div>
       ${app.postgres ? '<span class="chip">postgres</span>' : ''}
@@ -585,6 +590,26 @@ function appCard(app) {
       } catch (err) {
         exposeLink.textContent = 'open on this phone';
         alert(err.message);
+      }
+    });
+  }
+
+  // Viewing the dashboard via the permanent Tailscale link means this device
+  // is already on the tailnet — give it that app's own tailnet URL directly
+  // instead of the Cloudflare quick-tunnel flow (which needs Go Online
+  // running and would fail here).
+  const tsExposeLink = el.querySelector('[data-act="ts-expose"]');
+  if (tsExposeLink) {
+    tsExposeLink.addEventListener('click', async (e) => {
+      e.preventDefault();
+      tsExposeLink.textContent = 'opening…';
+      try {
+        await api(`/api/apps/${app.name}/tailscale-serve`, { method: 'POST' });
+        window.open(`https://${location.hostname}:${app.port}`, '_blank');
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        tsExposeLink.textContent = 'open on this phone';
       }
     });
   }
