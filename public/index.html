@@ -189,18 +189,14 @@
   .conn-btn.on { border-color: rgba(63,179,127,0.4); color: var(--ok); }
   .conn-hint { color: var(--s-text-3); }
 
-  /* Below 640px the three-column header stacks into one centered column —
-     override every column's edge-anchored justify-self/text-align from the
-     desktop layout above, or the title stays flush left and the connection
-     column stays flush right while everything inside them tries to center. */
+  /* Below 640px the three-column header stacks into one column. The title
+     and the connection buttons keep their normal (non-centered) alignment
+     from the rules above — only the mascot (already justify-self:center
+     unconditionally) is meant to center. The loopback line still needs to
+     wrap here, or its forced nowrap would overflow a narrow viewport. */
   @media (max-width: 640px) {
     .header-row { grid-template-columns: 1fr; row-gap: 20px; }
-    .header-left, .header-mascot, .conn-bar { justify-self: center; max-width: 100%; }
-    .header-left, .tagline { text-align: center; }
-    .header-left h1 { justify-content: center; }
-    .conn-bar { align-items: center; }
-    .conn-actions { align-items: center; }
-    .conn-status { white-space: normal; justify-content: center; text-align: center; }
+    .conn-status { white-space: normal; }
   }
 
   h2 { font-size: 0.9rem; color: var(--s-text-0); margin: 0 0 12px; }
