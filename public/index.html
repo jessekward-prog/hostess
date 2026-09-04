@@ -151,8 +151,8 @@
   @media (max-width: 1023px) { main { padding: 20px 16px 60px; } }
 
   header.top { margin-bottom: 26px; }
-  .header-row { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: center; gap: 28px; }
-  .header-left { flex: 1 1 280px; min-width: 220px; }
+  .header-row { display: flex; flex-wrap: wrap; align-items: stretch; justify-content: center; gap: 28px; }
+  .header-left { flex: 0 1 260px; min-width: 200px; max-width: 260px; }
   h1 { font-size: 1.3rem; margin: 0 0 8px; letter-spacing: -0.01em; color: var(--s-text-0); display: flex; align-items: center; gap: 9px; }
   h1 .mark { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 6px; border: 1.5px solid var(--s-text-0); }
   @keyframes cursor-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
@@ -162,9 +162,9 @@
   /* Hecate — three-faced statue mascot, dithered CRT-style. Composited once
      from three source photos (lib/describe.js-adjacent asset, see mountHecate
      below) then re-dithered on a Bayer matrix every tick for a halftone shimmer. */
-  .header-mascot { flex: 0 1 190px; max-width: 190px; min-width: 120px; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+  .header-mascot { flex: 0 1 225px; max-width: 225px; min-width: 140px; display: flex; flex-direction: column; align-items: center; gap: 7px; }
   .hecate-canvas-wrap { position: relative; line-height: 0; max-width: 100%; }
-  .hecate-canvas-wrap canvas { display: block; width: 190px; max-width: 100%; height: auto; image-rendering: auto; pointer-events: none; filter: drop-shadow(0 0 14px rgba(235,235,235,0.22)); }
+  .hecate-canvas-wrap canvas { display: block; width: 225px; max-width: 100%; height: auto; image-rendering: auto; pointer-events: none; filter: drop-shadow(0 0 14px rgba(235,235,235,0.22)); }
   .hecate-scanlines { position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply; background: repeating-linear-gradient(0deg, rgba(0,0,0,0.34) 0px, rgba(0,0,0,0.34) 1px, transparent 1px, transparent 3px); }
   .hecate-sweep { position: absolute; left: 0; right: 0; height: 14px; top: 0; pointer-events: none; background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0) 100%); }
   .hecate-plaque { display: flex; align-items: center; gap: 7px; font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--s-text-3); }
@@ -173,14 +173,14 @@
   .hecate-caption { display: inline-flex; align-items: center; gap: 3px; }
   .hecate-inf { font-size: 1.6em; line-height: 1; display: inline-block; }
 
-  .conn-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 0.72rem; flex: 1 1 280px; max-width: 335px; }
-  .conn-status { display: flex; align-items: center; gap: 7px; color: var(--s-text-3); }
-  .conn-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--s-text-3); flex-shrink: 0; }
+  .conn-bar { display: flex; flex-direction: column; align-items: flex-end; justify-content: space-between; gap: 10px; font-size: 0.72rem; flex: 0 0 150px; max-width: 150px; }
+  .conn-status { display: flex; align-items: flex-start; gap: 7px; color: var(--s-text-3); text-align: right; }
+  .conn-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--s-text-3); flex-shrink: 0; margin-top: 4px; }
   .conn-status-dot.on { background: var(--ok); }
-  .conn-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-left: auto; }
+  .conn-actions { display: flex; flex-direction: column; gap: 8px; }
   .conn-btn {
-    display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--s-border); border-radius: 999px;
-    padding: 5px 12px; color: var(--s-text-1); background: transparent; transition: border-color 0.12s, color 0.12s;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid var(--s-border); border-radius: 999px;
+    width: 138px; padding: 5px 12px; color: var(--s-text-1); background: transparent; transition: border-color 0.12s, color 0.12s;
   }
   .conn-btn:hover { border-color: var(--s-text-1); color: var(--s-text-0); }
   .conn-btn.on { border-color: rgba(63,179,127,0.4); color: var(--ok); }
@@ -400,13 +400,13 @@
         </div>
 
         <div class="conn-bar">
-          <span class="conn-status" id="loopback-badge"><span class="conn-status-dot"></span>Loopback only — not reachable off this box</span>
           <div class="conn-actions">
-            <button id="onlineBtn" class="conn-btn" type="button">Go Online</button>
             <button id="tsBtn" class="conn-btn" type="button">Private Link</button>
+            <button id="onlineBtn" class="conn-btn" type="button">Go Online</button>
             <button id="installBtn" class="conn-btn" type="button" style="display:none;">Install as App</button>
             <span id="installHint" class="conn-hint" style="display:none;">tap Share, then "Add to Home Screen"</span>
           </div>
+          <span class="conn-status" id="loopback-badge"><span class="conn-status-dot"></span>Loopback only — not reachable off this box</span>
         </div>
       </div>
       <div class="card" id="online-panel" hidden style="margin-top:12px;">
@@ -1371,12 +1371,12 @@ function mountWaveBackground(container, accentRgb) {
   container.prepend(canvas);
   const ctx = canvas.getContext('2d');
   const A = accentRgb.split(',').map(Number);
-  const steel = '120,90,180';
   const parts = Array.from({ length: 20 }, () => ({ x: Math.random(), y: Math.random(), r: 0.4 + Math.random() * 1.3, s: 0.02 + Math.random() * 0.05 }));
+  // Three shades of grey, one per band — same --s-text-1/2/3 tokens used elsewhere in the app.
   const bands = [
-    { amp: 40, len: 0.9, sp: 0.18, y: 0.5, a: 0.06, tint: true },
-    { amp: 65, len: 0.6, sp: 0.12, y: 0.6, a: 0.05, tint: true },
-    { amp: 85, len: 0.4, sp: 0.08, y: 0.7, a: 0.035, tint: false },
+    { amp: 40, len: 0.9, sp: 0.18, y: 0.5, a: 0.06, color: '176,176,176' },
+    { amp: 65, len: 0.6, sp: 0.12, y: 0.6, a: 0.05, color: '102,102,102' },
+    { amp: 85, len: 0.4, sp: 0.08, y: 0.7, a: 0.035, color: '68,68,68' },
   ];
   let t = 0;
 
@@ -1401,8 +1401,7 @@ function mountWaveBackground(container, accentRgb) {
         const y = H * b.y + Math.sin(p * 6.28 * b.len + t / b.sp) * b.amp + Math.sin(p * 15.7 * b.len - (t / b.sp) * 1.7) * b.amp * 0.3;
         x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
-      const c = b.tint ? `${A[0]},${A[1]},${A[2]}` : steel;
-      ctx.strokeStyle = `rgba(${c},${Math.min(b.a * 5, 0.9)})`; // style: outline
+      ctx.strokeStyle = `rgba(${b.color},${Math.min(b.a * 5, 0.9)})`; // style: outline
       ctx.lineWidth = 1.5;
       ctx.stroke();
     });
