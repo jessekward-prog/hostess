@@ -281,6 +281,27 @@
         </div>
       </div>
     </div>
+    <div class="myai-section">
+      <button class="myai-toggle" id="account-toggle">
+        <span class="chev">▸</span><span>Account</span>
+      </button>
+      <div class="myai-panel" id="account-panel">
+        <div class="myai-body">
+          <span class="myai-hint">Change your password. A fresh random passphrase is suggested below — click it to regenerate, or type your own.</span>
+          <input class="myai-input" id="account-current-password" type="password" autocomplete="current-password" placeholder="current password">
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input class="myai-input" id="account-new-password" type="text" autocomplete="new-password" placeholder="new password" style="flex:1;">
+            <button class="icon-btn" id="account-regen-btn" type="button" title="generate a new suggestion">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+            </button>
+          </div>
+          <button class="myai-save" id="account-save-btn">change password</button>
+          <span class="myai-saved-flash" id="account-saved-flash" hidden>changed</span>
+          <div id="account-error" style="font-size:11px; color:#ff6666; display:none;"></div>
+          <button class="myai-save" id="account-logout-btn" type="button" style="background:transparent; color:var(--s-text-1); border:1px solid var(--s-border);">log out</button>
+        </div>
+      </div>
+    </div>
     <div class="sidebar-stats">
       <div class="stat-row"><span>APPS</span><span class="v" id="stat-total">0</span></div>
       <div class="stat-row"><span>RUNNING</span><span class="v" id="stat-running">0</span></div>
@@ -312,7 +333,7 @@
         <div style="display:flex; flex-direction:column; gap:6px; min-width:0;">
           <div style="font-size:11px; color:var(--s-text-3); letter-spacing:0.08em; text-transform:uppercase;">Scan on your phone — one link, every app</div>
           <a id="online-url" href="#" target="_blank" rel="noopener" style="font-size:13px; word-break:break-all;"></a>
-          <div style="font-size:11px; color:var(--s-text-2);">PIN <span id="online-pin" style="color:var(--s-text-0);"></span> — only needed if the link is opened without the QR</div>
+          <div class="myai-hint">You'll be asked to log in with your Hostess account the first time — stays logged in after that.</div>
           <button id="stopOnlineBtn" class="myai-save" type="button" style="align-self:flex-start; background:transparent; color:var(--s-text-1); border:1px solid var(--s-border);">Stop Online</button>
         </div>
       </div>
@@ -353,7 +374,7 @@
             <img id="ts-hub-qr" width="112" height="112" style="border-radius:6px; background:#fff; padding:6px; flex-shrink:0;">
             <div style="display:flex; flex-direction:column; gap:6px; min-width:0;">
               <a id="ts-hub-url" href="#" target="_blank" rel="noopener" style="font-size:13px; word-break:break-all;"></a>
-              <div class="myai-hint">On your phone: install the Tailscale app and sign in with the same account (or scan this QR once signed in), then this link — and each app's "open on this phone" link — just works. No PIN.</div>
+              <div class="myai-hint">On your phone: install the Tailscale app and sign in with the same account (or scan this QR once signed in), then this link — and each app's "open on this phone" link — just works once you've logged into your Hostess account the first time.</div>
               <div id="ts-peer-hint" style="font-size:11px; color:var(--s-text-2);"></div>
             </div>
           </div>
@@ -403,47 +424,54 @@ function isTailscaleView() {
 async function api(path, opts) {
   const res = await fetch(path, opts);
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && data.needsPin) throw Object.assign(new Error('pin required'), { needsPin: true });
+  if (res.status === 401 && data.needsSetup) throw Object.assign(new Error('setup required'), { needsSetup: true });
+  if (res.status === 401 && data.needsLogin) throw Object.assign(new Error('login required'), { needsLogin: true });
   if (!res.ok) throw new Error(data.error || res.statusText);
   return data;
 }
 
-// ── PIN gate (only ever hit when viewing through a quick tunnel) ──────────
-function showPinPrompt() {
-  if (document.getElementById('pin-overlay')) return;
+// ── Account gate — every access path (local, Go Online tunnel, Tailscale)
+// goes through the same login, no more per-path PIN/trust special-casing.
+function showAuthOverlay(mode) {
+  if (document.getElementById('auth-overlay')) return;
+  const isSetup = mode === 'setup';
   const overlay = document.createElement('div');
-  overlay.id = 'pin-overlay';
-  overlay.style.cssText = 'position:fixed; inset:0; background:var(--s-bg); z-index:999; display:flex; align-items:center; justify-content:center;';
+  overlay.id = 'auth-overlay';
+  overlay.style.cssText = 'position:fixed; inset:0; background:var(--s-bg); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;';
   overlay.innerHTML = `
-    <form style="display:flex; flex-direction:column; gap:10px; width:220px;">
-      <div style="font-size:12px; color:var(--s-text-1);">Enter the PIN shown on the Hostess dashboard</div>
-      <input class="myai-input" id="pin-input" inputmode="numeric" autocomplete="off" placeholder="6-digit PIN" autofocus>
-      <div id="pin-error" style="font-size:11px; color:#ff6666; display:none;"></div>
-      <button class="myai-save" type="submit">Unlock</button>
+    <form style="display:flex; flex-direction:column; gap:10px; width:260px;">
+      <div style="font-size:14px; color:var(--s-text-0); font-weight:600;">${isSetup ? 'Create your Hostess account' : 'Log in to Hostess'}</div>
+      ${isSetup ? '<div class="myai-hint">First launch — this account protects the dashboard everywhere it\'s reachable from, including this machine.</div>' : ''}
+      <input class="myai-input" id="auth-username" autocomplete="username" placeholder="username" autofocus>
+      <input class="myai-input" id="auth-password" type="password" autocomplete="${isSetup ? 'new-password' : 'current-password'}" placeholder="${isSetup ? 'password (min. 8 characters)' : 'password'}">
+      <div id="auth-error" style="font-size:11px; color:#ff6666; display:none;"></div>
+      <button class="myai-save" type="submit">${isSetup ? 'Create account' : 'Log in'}</button>
     </form>`;
   document.body.appendChild(overlay);
   overlay.querySelector('form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const pinErr = overlay.querySelector('#pin-error');
+    const authErr = overlay.querySelector('#auth-error');
+    const username = overlay.querySelector('#auth-username').value.trim();
+    const password = overlay.querySelector('#auth-password').value;
     try {
-      await api('/api/auth/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: overlay.querySelector('#pin-input').value.trim() }) });
+      await api(isSetup ? '/api/auth/setup' : '/api/auth/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ username, password }),
+      });
       overlay.remove();
       load();
     } catch (err) {
-      pinErr.textContent = err.message;
-      pinErr.style.display = 'block';
+      authErr.textContent = err.message;
+      authErr.style.display = 'block';
     }
   });
 }
 
-async function tryAutoPin() {
-  const params = new URLSearchParams(location.search);
-  const pin = params.get('pin');
-  if (!pin) return;
-  history.replaceState(null, '', location.pathname);
+async function checkAuth() {
   try {
-    await api('/api/auth/verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin }) });
-  } catch { /* fall through to manual PIN prompt */ }
+    const { hasAccount, loggedIn } = await api('/api/auth/status');
+    if (!hasAccount) return showAuthOverlay('setup');
+    if (!loggedIn) return showAuthOverlay('login');
+  } catch { /* network hiccup — load() will surface it */ }
 }
 
 function statusClass(status) {
@@ -889,7 +917,8 @@ async function loadAiLink(name, el) {
 async function load() {
   let apps = [];
   try { apps = await api('/api/apps'); } catch (err) {
-    if (err.needsPin) return showPinPrompt();
+    if (err.needsSetup) return showAuthOverlay('setup');
+    if (err.needsLogin) return showAuthOverlay('login');
     showError(err.message);
     return;
   }
@@ -953,7 +982,6 @@ function renderOnline(status) {
       document.getElementById('online-url').href = status.url;
       if (status.qr) document.getElementById('online-qr').src = status.qr;
     }
-    if (status.pin) document.getElementById('online-pin').textContent = status.pin;
   } else {
     lastHubUrl = null;
     onlineBtn.textContent = 'Go Online';
@@ -1090,7 +1118,7 @@ if (isLocalView()) {
   loopbackBadge.textContent = 'Accessed via Hostess quick tunnel';
 }
 
-tryAutoPin().then(load);
+checkAuth().then(load);
 
 // ── MY AI panel — same "input your server info" pattern as shelf-cmd's
 // MyAiPanel.jsx, ported to vanilla JS/inline-expand since this dashboard has
@@ -1284,6 +1312,56 @@ mountWaveBackground(document.querySelector('aside.sidebar'), '232,132,10'); // c
   sidebarApps.addEventListener('click', (e) => { if (e.target.closest('.row')) closeDrawer(); });
   window.matchMedia('(min-width: 1024px)').addEventListener('change', (e) => { if (e.matches) closeDrawer(); });
 }
+
+// ── Account panel — change password, suggesting a fresh random passphrase.
+const accountToggle = document.getElementById('account-toggle');
+const accountPanel = document.getElementById('account-panel');
+const accountNewPassword = document.getElementById('account-new-password');
+
+async function suggestPassphrase() {
+  try {
+    const { passphrase } = await api('/api/auth/generate-passphrase');
+    accountNewPassword.value = passphrase;
+  } catch { /* leave field as-is */ }
+}
+
+accountToggle.addEventListener('click', () => {
+  const opening = !accountToggle.classList.contains('open');
+  accountToggle.classList.toggle('open');
+  accountPanel.classList.toggle('open');
+  if (opening && !accountNewPassword.value) suggestPassphrase();
+});
+
+document.getElementById('account-regen-btn').addEventListener('click', suggestPassphrase);
+
+document.getElementById('account-save-btn').addEventListener('click', async () => {
+  const saveBtn = document.getElementById('account-save-btn');
+  const flash = document.getElementById('account-saved-flash');
+  const errEl = document.getElementById('account-error');
+  const currentPassword = document.getElementById('account-current-password').value;
+  const newPassword = accountNewPassword.value;
+  errEl.style.display = 'none';
+  saveBtn.disabled = true;
+  try {
+    await api('/api/auth/change-password', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    document.getElementById('account-current-password').value = '';
+    flash.hidden = false;
+    setTimeout(() => { flash.hidden = true; }, 2500);
+    suggestPassphrase();
+  } catch (err) {
+    errEl.textContent = err.message;
+    errEl.style.display = 'block';
+  } finally {
+    saveBtn.disabled = false;
+  }
+});
+
+document.getElementById('account-logout-btn').addEventListener('click', async () => {
+  try { await api('/api/auth/logout', { method: 'POST' }); } catch { /* clearing the cookie still worked server-side */ }
+  location.reload();
+});
 </script>
 <script src="/pwa-install.js" defer></script>
 </body>

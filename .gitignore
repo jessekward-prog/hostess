@@ -3,4 +3,5 @@ apps/*
 !apps/.gitkeep
 registry.json
 settings.json
+auth.json
 test-fleet.js

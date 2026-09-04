@@ -17,23 +17,57 @@ const PORT = 5300;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.post('/api/auth/verify', (req, res) => {
-  const lock = auth.lockStatus();
-  if (lock.locked) return res.status(429).json({ error: `Too many wrong PINs — try again in ${Math.ceil(lock.retryAfterMs / 1000)}s` });
-  const { pin } = req.body || {};
-  if (auth.verifyPin(req, res, String(pin || ''))) return res.json({ ok: true });
-  res.status(401).json({ error: 'wrong pin' });
+app.get('/api/auth/status', (req, res) => {
+  res.json({ hasAccount: auth.hasAccount(), loggedIn: auth.isLoggedIn(req) });
+});
+
+app.post('/api/auth/setup', (req, res) => {
+  const { username, password } = req.body || {};
+  try {
+    auth.createAccount(String(username || '').trim(), String(password || ''));
+    auth.setSessionCookie(res);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { username, password } = req.body || {};
+  if (!auth.verifyLogin(String(username || '').trim(), String(password || ''))) {
+    return res.status(401).json({ error: 'Wrong username or password' });
+  }
+  auth.setSessionCookie(res);
+  res.json({ ok: true });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie(auth.COOKIE_NAME);
+  res.json({ ok: true });
 });
 
 app.use('/api', auth.middleware);
 
+app.get('/api/auth/generate-passphrase', (req, res) => {
+  res.json({ passphrase: auth.generatePassphrase() });
+});
+
+app.post('/api/auth/change-password', (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  try {
+    auth.changePassword(String(currentPassword || ''), String(newPassword || ''));
+    auth.setSessionCookie(res); // re-issue so this device stays logged in after the secret rotation
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.post('/api/tunnel/start', async (req, res) => {
   try {
     const hub = await tunnel.start(tunnel.HUB_KEY, PORT);
-    const pin = auth.rotatePin();
-    const url = `${hub.url}/?pin=${pin}`;
-    const qr = await qrcode.toDataURL(url);
-    res.json({ url: hub.url, pin, qr, startedAt: hub.startedAt });
+    const qr = await qrcode.toDataURL(hub.url);
+    res.json({ url: hub.url, qr, startedAt: hub.startedAt });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -41,16 +75,12 @@ app.post('/api/tunnel/start', async (req, res) => {
 
 app.post('/api/tunnel/stop', (req, res) => {
   tunnel.stopAll();
-  auth.clearPin();
   res.json({ ok: true });
 });
 
 app.get('/api/tunnel/status', async (req, res) => {
   const status = tunnel.status();
-  if (status.hub) {
-    status.hub.pin = auth.getPin();
-    status.hub.qr = await qrcode.toDataURL(`${status.hub.url}/?pin=${auth.getPin()}`);
-  }
+  if (status.hub) status.hub.qr = await qrcode.toDataURL(status.hub.url);
   res.json(status);
 });
 
