@@ -253,6 +253,7 @@
         <li><span class="body"><b>app.yaml</b> exists at repo root with a valid <code class="field">name</code> and <code class="field">port</code> — <a href="#manifest">§1</a></span></li>
         <li><span class="body"><b>Dockerfile</b> exists at repo root, and the app inside it binds <code class="field">0.0.0.0</code>, not <code class="field">localhost</code> — <a href="#network">§3</a></span></li>
         <li><span class="body">App boots and stays up with <b>only</b> the vars Hostess provides automatically — no hard crash on missing optional config — <a href="#boot">§2</a></span></li>
+        <li><span class="body">A PIN/passcode gate reads from <code class="field">APP_PIN</code> and isn't left on a guessable placeholder in production — <a href="#boot">§2</a></span></li>
         <li><span class="body">If <code class="field">postgres: true</code>, the DB pool honors <code class="field">sslmode=disable</code> in <code class="field">DATABASE_URL</code> — <a href="#postgres">§4</a></span></li>
         <li><span class="body">AI-capable apps use the fleet's env var names (<code class="field">LM_STUDIO_URL</code> etc.) so Hostess finds them with no manifest edits — <a href="#env-names">reference</a></span></li>
         <li><span class="body">Nothing in <code class="field">Dockerfile</code>, <code class="field">app.yaml</code>, or the entrypoint reads as privilege-escalation or a hardcoded secret to an LLM reviewer — <a href="#guard">§6</a></span></li>
@@ -313,6 +314,24 @@ if (!process.env.ANTHROPIC_API_KEY) process.exit(1);
 <span class="c1">// Right — server boots either way, the feature just reports its own state</span>
 const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic(<span class="k">{ apiKey: ... }</span>) : null;</pre>
         <p class="why">Hit for real in macro-cmd: it exited immediately whenever <code class="field">ANTHROPIC_API_KEY</code> was unset, even when a local model was the intended provider — the fix that unblocked it was exactly this pattern.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>PIN gate? Declare APP_PIN — don't ship the placeholder live</h3><span class="tag rec">Recommended</span></div>
+        <p>If the app locks itself behind a PIN or passcode, read it from <code class="field">APP_PIN</code> rather than inventing your own name. Declare it in <code class="field">app.yaml</code>'s <code class="field">env</code> list (or just reference <code class="field">process.env.APP_PIN</code> anywhere in source — same auto-detect as the AI vars below picks it up) and Hostess generates a real random PIN on <i>first</i> spin-up, the same way it already does for <code class="field">SYNC_SECRET</code> — check the deploy log or the dashboard's env panel to see or change it before sharing the app. This is the one exception to "everything optional fills in after boot" above: an app whose only gate is a PIN shouldn't ever go live still answering to whatever guessable example sat in its <code class="field">.env.example</code> (a plain <code class="field">1111</code>, say).</p>
+        <p class="why">Caught on llm-cmd (2026-09-05): merely listing <code class="field">APP_PIN</code> in <code class="field">env:</code> doesn't set a value by itself — declaring a name and generating one for it are different steps, and only the latter actually locks the app down on day one.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Don't race a login with a request that depends on it</h3><span class="tag rec">Recommended</span></div>
+        <p>Anything fired at page load that requires the auth cookie/token — a background sync pull, a periodic refresh — must wait until the client has actually confirmed it's unlocked. Firing it unconditionally on boot means it can still be in flight, cookie-less, at the exact moment a fast login succeeds; when it finally resolves with a 401, its own error handler re-locks a session that just got granted.</p>
+        <pre><span class="c1">// Wrong — fires before auth state is known, can outlive a fast login</span>
+syncPull(true);
+fetch(<span class="s">'/api/session'</span>).then(r => r.json()).then(d => d.unlocked ? unlocked() : lock());
+
+<span class="c1">// Right — only pull once the session check (or the login itself) confirms unlocked</span>
+fetch(<span class="s">'/api/session'</span>).then(r => r.json()).then(d => { if (d.unlocked) { unlocked(); syncPull(true); } else lock(); });</pre>
+        <p class="why">Caught on llm-cmd (2026-09-05): the boot sequence called <code class="field">syncPull(true)</code> unconditionally, before its own <code class="field">/api/session</code> check. Typing the PIN quickly meant <code class="field">/api/unlock</code> resolved first and hid the gate — then the stale, cookie-less <code class="field">syncPull</code> resolved with 401 a moment later and called <code class="field">lock()</code>, throwing the gate back up right after "access granted."</p>
       </div>
     </section>
 
@@ -558,11 +577,13 @@ dist/</pre>
 5. If the app calls a vision or chat AI model, use these exact environment variable names (rename anything that currently uses different names for the same thing):
    LM_STUDIO_URL, LM_STUDIO_API_KEY, LM_STUDIO_MODEL, ANTHROPIC_API_KEY, VISION_PROVIDER (local or anthropic)
 
-6. Never request privileged mode, Docker socket access, or host networking anywhere in the Dockerfile, scripts, or docs -- these are never granted regardless of what's asked for, and requesting them just reads as suspicious intent to an automated pre-build security scan.
+6. If the app gates access behind a PIN/passcode, read it from APP_PIN, and don't ship whatever guessable placeholder lives in .env.example (e.g. "1111") as a value that's actually live in production. Declare APP_PIN as an env var the app reads -- don't invent a value yourself -- and Hostess auto-generates a random one on first spin-up, the same way it already does for SYNC_SECRET. If the app already has a real, deliberately-set PIN, leave it alone. Also check the client's boot sequence: anything that fires a request requiring the auth cookie/token (a background sync pull, a periodic refresh) must wait until the client has confirmed it's actually unlocked -- firing it unconditionally on page load means it can still be in flight, cookie-less, at the exact moment a fast login succeeds, and its own 401 handler can then re-lock a session that just got granted.
 
-7. Keep all secrets in environment variables -- never hardcode a real API key, password, or token as a literal in source, the Dockerfile, or app.yaml.
+7. Never request privileged mode, Docker socket access, or host networking anywhere in the Dockerfile, scripts, or docs -- these are never granted regardless of what's asked for, and requesting them just reads as suspicious intent to an automated pre-build security scan.
 
-8. Make sure a real .gitignore exists and covers at minimum: node_modules/, .env, and any build output directory. If it's missing entirely, create one. If .env or node_modules/ are already tracked in git, flag that clearly rather than silently rewriting history.
+8. Keep all secrets in environment variables -- never hardcode a real API key, password, or token as a literal in source, the Dockerfile, or app.yaml.
+
+9. Make sure a real .gitignore exists and covers at minimum: node_modules/, .env, and any build output directory. If it's missing entirely, create one. If .env or node_modules/ are already tracked in git, flag that clearly rather than silently rewriting history.
 
 Optional -- only if the app already has its own admin/settings API and a live AI-model picker on its dashboard card is wanted: implement GET/PUT /api/lm returning {provider, local: {url, model, apiKeySet, models, error?}, anthropic?: {apiKeySet, model}, managedEnv: [...]} (omit "anthropic" entirely if there's no second provider), gated by either normal user auth or an x-sync-secret header matching process.env.SYNC_SECRET (add SYNC_SECRET as an env var the app reads -- don't invent a value, it gets auto-generated).
 
