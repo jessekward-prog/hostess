@@ -1215,8 +1215,9 @@ if (isLocalView()) {
   }
 
   function renderTsDone(state) {
-    document.getElementById('ts-hub-url').textContent = `https://${state.hostname}`;
-    document.getElementById('ts-hub-url').href = `https://${state.hostname}`;
+    const hubUrl = `https://${state.hostname}:${state.hubPort}`;
+    document.getElementById('ts-hub-url').textContent = hubUrl;
+    document.getElementById('ts-hub-url').href = hubUrl;
     if (state.hubQr) document.getElementById('ts-hub-qr').src = state.hubQr;
     const online = state.peers.filter((p) => p.online).map((p) => p.name);
     document.getElementById('ts-peer-hint').textContent = online.length

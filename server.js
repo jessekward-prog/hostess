@@ -90,7 +90,7 @@ app.get('/api/tailscale/status', async (req, res) => {
   const served = state.loggedIn ? await tailscale.servedPorts() : [];
   const hubServed = served.includes(PORT);
   const hubQr = hubServed ? await qrcode.toDataURL(`https://${state.hostname}:${PORT}`) : null;
-  res.json({ ...state, hubServed, hubQr, installCommand: tailscale.installCommand(state.platform) });
+  res.json({ ...state, hubServed, hubQr, hubPort: PORT, installCommand: tailscale.installCommand(state.platform) });
 });
 
 async function withEnableQr(result) {
