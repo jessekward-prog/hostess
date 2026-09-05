@@ -283,6 +283,11 @@
   .chip.guard-medium { border-color: rgba(224,165,63,0.35); color: var(--warn); }
   .chip.guard-high { border-color: rgba(224,86,79,0.35); color: var(--danger); }
   .chip.guard-unknown, .chip.guard-skipped { border-style: dashed; }
+  .gateway-toggle-row { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--s-text-2); margin: 6px 16px 0; cursor: pointer; }
+  .gateway-toggle-row input { accent-color: var(--s-accent); cursor: pointer; }
+  .gateway-url { display: block; font-size: 10.5px; color: var(--s-text-3); margin: 3px 16px 0; word-break: break-all; text-decoration: none; }
+  .gateway-url:hover { color: var(--s-accent); text-decoration: underline; }
+  .gateway-url[hidden] { display: none; }
 
   .card-spacer { flex: 1; }
   .app-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; margin-top: 12px; border-top: 1px solid var(--s-surface-2); }
@@ -700,6 +705,13 @@ function appCard(app) {
       ${guardChip(app.guard)}
       <span class="chip" data-role="ailink-chip" hidden></span>
     </div>
+    ${app.gatewayPort ? `
+    <label class="gateway-toggle-row">
+      <input type="checkbox" data-act="gateway-toggle" ${app.gatewayUrl ? 'checked' : ''}>
+      <span>Allow sharing features</span>
+    </label>
+    <a class="gateway-url" data-role="gateway-url" href="${app.gatewayUrl || '#'}" target="_blank" rel="noopener" ${app.gatewayUrl ? '' : 'hidden'}>${app.gatewayUrl || ''}</a>
+    ` : ''}
     <button class="reveal-toggle" data-act="details">
       <span class="chev">▸</span><span>image &amp; source</span>
     </button>
@@ -795,6 +807,28 @@ function appCard(app) {
         alert(err.message);
       } finally {
         tsOpenBtn.disabled = false;
+      }
+    });
+  }
+
+  const gatewayToggle = el.querySelector('[data-act="gateway-toggle"]');
+  if (gatewayToggle) {
+    gatewayToggle.addEventListener('change', async () => {
+      gatewayToggle.disabled = true;
+      const urlEl = el.querySelector('[data-role="gateway-url"]');
+      try {
+        if (gatewayToggle.checked) {
+          const { url } = await api(`/api/apps/${app.name}/gateway/enable`, { method: 'POST' });
+          urlEl.href = url; urlEl.textContent = url; urlEl.hidden = false;
+        } else {
+          await api(`/api/apps/${app.name}/gateway/disable`, { method: 'POST' });
+          urlEl.hidden = true;
+        }
+      } catch (err) {
+        alert(err.message);
+        gatewayToggle.checked = !gatewayToggle.checked;
+      } finally {
+        gatewayToggle.disabled = false;
       }
     });
   }

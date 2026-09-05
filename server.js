@@ -8,6 +8,7 @@ const ailink = require('./lib/ailink');
 const autoupdate = require('./lib/autoupdate');
 const auth = require('./lib/auth');
 const tunnel = require('./lib/tunnel');
+const gateway = require('./lib/gateway');
 const registry = require('./lib/registry');
 const tailscale = require('./lib/tailscale');
 
@@ -133,10 +134,31 @@ app.post('/api/apps/:name/expose', async (req, res) => {
 
 app.get('/api/apps', async (req, res) => {
   try {
-    res.json(await engine.listApps());
+    const apps = await engine.listApps();
+    for (const a of apps) {
+      if (a.gatewayPort) a.gatewayUrl = gateway.currentUrl(a.name);
+    }
+    res.json(apps);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// A narrow, single-purpose tunnel for apps that stay private (no Go Online,
+// or Tailscale-only) but still want a public download link for one shared
+// item. Only ever tunnels the port the app itself declared as publicGateway
+// in app.yaml — never the app's main port. See RULES.html §3.
+app.post('/api/apps/:name/gateway/enable', async (req, res) => {
+  try {
+    res.json(await gateway.enable(req.params.name));
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/apps/:name/gateway/disable', (req, res) => {
+  gateway.disable(req.params.name);
+  res.json({ ok: true });
 });
 
 app.post('/api/apps', async (req, res) => {

@@ -339,6 +339,16 @@ const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic(<span class="k">
         <div class="rule-head"><h3>Don't assume public reachability</h3><span class="tag rec">Recommended</span></div>
         <p>If a deployed app needs to be reachable beyond the host, that's a separate reverse-proxy/tunnel decision the operator makes — not something the app itself should assume or configure around.</p>
       </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Need a public link for one narrow thing? Declare it, don't self-tunnel</h3><span class="tag rec">Recommended</span></div>
+        <p>An app that stays private (no Go Online, Tailscale-only) but still needs to hand out a public download/share link should never bundle a tunneling binary or spawn its own outbound tunnel — that's exactly the capability the previous rule says the app doesn't get to assume for itself, and an AI security scan can't reliably tell a legitimate reason from a claimed one in a code comment. Declare a second, narrow port instead:</p>
+        <pre><span class="c1"># app.yaml</span>
+publicGateway:
+  port: 3001   <span class="c1"># a second internal listener, separate from the main port</span></pre>
+        <p>That port should carry <i>only</i> the specific public routes (e.g. a token-gated file download) — no login, no listing, no upload, nothing else the main app exposes. Hostess maps a second host port for it and owns the tunnel lifecycle entirely (per-app card gets an "Allow sharing features" toggle); the app itself never runs <code class="field">cloudflared</code> or anything like it. To learn its own current public URL, the app reads a file Hostess writes read-only into the container at <code class="field">/run/hostess-gateway/url</code> — empty or absent when the toggle is off — rather than querying any API. This keeps the actual capability (can this container reach the internet on its own initiative) entirely off the app and on the trusted platform, where a redeploy security scan can inspect it as static config instead of trusting what the code claims to do.</p>
+        <p class="why">Built for cmd-drive's per-file share links (2026-09-05): the app declares <code class="field">publicGateway.port</code>, Hostess's <code class="field">lib/gateway.js</code> + <code class="field">lib/tunnel.js</code> own the Quick Tunnel (including auto-reconnect if it drops — free tunnels have no uptime guarantee), and share-link generation reads the handoff file live at share-time rather than caching a URL. The same pattern generalizes to any app that currently hard-codes a public domain (a Coolify/Railway deployment, say) purely so one feature can hand out a link — this gives it a Hostess-native way to do the same thing without ever holding the tunnel capability itself.</p>
+      </div>
     </section>
 
     <section id="postgres">
@@ -507,7 +517,7 @@ dist/</pre>
     </section>
 
     <footer class="page-foot">
-      jessekward-prog/hostess — reflects the codebase as of the AI-link work, 2026-09-03. Update this file when the contract changes, not just the code.
+      jessekward-prog/hostess — reflects the codebase as of the public-gateway work, 2026-09-05. Update this file when the contract changes, not just the code.
     </footer>
 
   </main>
@@ -538,11 +548,14 @@ dist/</pre>
    - postgres: true or false (optional, default false)
    - env: an array of env var names the app reads (optional -- most AI-related ones are auto-detected, see #5)
    - dataDir: an absolute container path (optional) -- if the app writes persistent state to disk outside Postgres (uploads, SQLite, etc.), set this so Hostess mounts a volume there instead of losing it on redeploy
+   - publicGateway.port: an integer 1-65535, different from port (optional) -- declares a second, narrow internal port for public routes only (see #2b); most apps don't need this
    - description: a short blurb (optional, cosmetic) -- shown on the app's dashboard card
    - icon: a path to an existing image file in the repo (optional, cosmetic) -- shown on the app's dashboard card
    Create this file if it's missing, using the app's real values. If the app has a real icon/logo asset already in the repo and no description/icon set, add them -- cheap and improves the dashboard card.
 
 2. Dockerfile must exist at the repo root and build an image whose process ends up listening on the port from app.yaml. Inside the container, the app must bind 0.0.0.0 (or whatever its framework binds by default) -- never 127.0.0.1 or localhost, which would make it unreachable from the host once a port is mapped to it.
+
+2b. If the app needs to hand out a public download/share link for one specific thing while otherwise staying private (no Go Online, Tailscale-only), it must NOT bundle a tunneling binary (cloudflared, ngrok, etc.) or spawn its own outbound tunnel -- that decision belongs to Hostess, not the app, regardless of how narrow or well-intentioned the reason is. Instead: declare publicGateway.port in app.yaml, mount only the specific public routes (e.g. a token-gated file download -- no login, no listing, no upload, nothing else the main app exposes) on that port as a separate listener, and read the app's current public URL (if any) from /run/hostess-gateway/url at the moment it's needed -- empty or missing means not currently enabled, don't cache a URL from an earlier read. Hostess owns starting/stopping/reconnecting the actual tunnel via the app's dashboard card.
 
 3. The app must boot and stay running with only the environment variables provided automatically (a Postgres connection, if postgres: true). Anything optional -- an API key, an integration, an AI provider -- must NOT cause a hard crash or process.exit() if it's unset. Find any boot-time checks that exit on missing optional config and make them leave that feature disabled instead, so the server still starts and can be configured afterward.
 
