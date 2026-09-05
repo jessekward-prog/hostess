@@ -421,18 +421,19 @@ ssl: /sslmode=disable/i.test(process.env.DATABASE_URL || <span class="s">''</spa
 
       <div class="rule">
         <div class="rule-head"><h3>Tier 1 — use the fleet's env var names</h3><span class="tag auto">Auto-detected</span></div>
-        <p>Every deploy scans the repo's own <code class="field">.js/.mjs/.cjs/.ts</code> files for these names and adds any it finds to the env panel — no <code class="field">app.yaml</code> edit required, ever:</p>
+        <p>Every deploy scans the repo's own <code class="field">.js/.mjs/.cjs/.ts</code> files for these names and adds any it finds to the env panel — no <code class="field">app.yaml</code> edit required, ever. Three of them go further than just appearing in the panel empty: the fleet has exactly <i>one</i> LM Studio ("the library"), Hostess already holds its address for the security guard's own scans, and <code class="field">LM_STUDIO_URL</code>/<code class="field">LM_STUDIO_API_KEY</code>/<code class="field">LM_STUDIO_MODEL</code> get auto-injected with that real value on deploy — the same way <code class="field">postgres: true</code> auto-injects <code class="field">DATABASE_URL</code>, instead of retyping the same URL/key into every app by hand. A value already set in the app's own env panel always wins and is never overwritten.</p>
         <div class="tbl-wrap">
           <table>
-            <tr><th>Var</th><th>Purpose</th></tr>
-            <tr><td>LM_STUDIO_URL</td><td>Local model endpoint, e.g. <code class="field">http://100.x.x.x:1235</code></td></tr>
-            <tr><td>LM_STUDIO_API_KEY</td><td>Bearer key the local endpoint requires</td></tr>
-            <tr><td>LM_STUDIO_MODEL</td><td>Model id to request</td></tr>
-            <tr><td>ANTHROPIC_API_KEY</td><td>Claude, if the app supports it as a second provider</td></tr>
-            <tr><td>VISION_PROVIDER</td><td><code class="field">local</code> or <code class="field">anthropic</code> — which one unattended calls default to</td></tr>
-            <tr><td>SYNC_SECRET</td><td>Only needed for Tier 2 — see below</td></tr>
+            <tr><th>Var</th><th>Purpose</th><th>Injected?</th></tr>
+            <tr><td>LM_STUDIO_URL</td><td>Local model endpoint, e.g. <code class="field">http://100.x.x.x:1235</code></td><td>Yes, from the fleet's library config</td></tr>
+            <tr><td>LM_STUDIO_API_KEY</td><td>Bearer key the local endpoint requires</td><td>Yes, from the fleet's library config</td></tr>
+            <tr><td>LM_STUDIO_MODEL</td><td>Model id to request</td><td>Yes, from the fleet's library config</td></tr>
+            <tr><td>ANTHROPIC_API_KEY</td><td>Claude, if the app supports it as a second provider</td><td>No — no fleet-wide default, set per app</td></tr>
+            <tr><td>VISION_PROVIDER</td><td><code class="field">local</code> or <code class="field">anthropic</code> — which one unattended calls default to</td><td>No — per-app choice</td></tr>
+            <tr><td>SYNC_SECRET</td><td>Only needed for Tier 2 — see below</td><td>Generated, not injected — see below</td></tr>
           </table>
         </div>
+        <p class="why">Gap closed 2026-09-06 — llm-cmd deployed through Hostess with none of these set, so it silently ran against a stale default library address with no API key, and every chat/model call bounced off the library's own auth. The fix belongs at the platform level, not in every app's Dockerfile: apps just declare the names, Hostess owns knowing the one real value.</p>
       </div>
 
       <div class="rule">
@@ -600,6 +601,7 @@ dist/</pre>
 
 5. If the app calls a vision or chat AI model, use these exact environment variable names (rename anything that currently uses different names for the same thing):
    LM_STUDIO_URL, LM_STUDIO_API_KEY, LM_STUDIO_MODEL, ANTHROPIC_API_KEY, VISION_PROVIDER (local or anthropic)
+   Hostess auto-injects real values for LM_STUDIO_URL/LM_STUDIO_API_KEY/LM_STUDIO_MODEL from its own fleet-wide library config on deploy, the same way postgres:true auto-injects DATABASE_URL -- no action needed in the app itself beyond reading these three names, and no need to hardcode a real key as a "just in case" default the way a URL fallback is sometimes used for convenience.
 
 6. Every app must gate access behind a PIN -- this is required, not optional, and Hostess does not manufacture the value for you. On first launch, with no PIN set yet, show a "set your PIN" screen: enter a PIN, enter it again to confirm the two match, then persist it (hashed) and gate every route behind it from then on. APP_PIN is still the fleet-wide env var name -- an operator can set it from the dashboard's env panel to preseed a PIN and skip the first-launch screen, or to override one already set interactively. The PIN entry UI must accept both the keyboard's number row and the numpad, not just clicks on an on-screen keypad -- checking `/^[0-9]$/.test(e.key)` on keydown covers both in one check, since e.key normalizes numpad digits (Num Lock on) to the same characters as the top row.
 
