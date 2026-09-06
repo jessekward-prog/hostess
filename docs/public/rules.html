@@ -350,7 +350,6 @@ const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic(<span class="k">
         <div class="rule-head"><h3>A PIN gate is required — first launch asks you to set one</h3><span class="tag req">Required</span></div>
         <p>Every app deployed through Hostess must gate access behind a PIN. Hostess does not manufacture the value for you: with no PIN set yet, first launch must show a "set your PIN" screen — enter a PIN, enter it again to confirm the two match, then persist it (hashed, alongside whatever storage the app already has — a Postgres row if <code class="field">postgres: true</code>, otherwise a file under <code class="field">dataDir</code>) and gate every route behind it from then on. <b>If the app has no database, adding this gate is what makes <code class="field">dataDir</code> mandatory</b> — declare it in <code class="field">app.yaml</code> at the same time. A PIN written anywhere else in the container is destroyed by the next redeploy (<a href="#runtime">§8</a>), silently sending every user back to the first-launch setup screen.</p>
         <p><code class="field">APP_PIN</code> is still the fleet-wide env var name for it — declaring it in <code class="field">app.yaml</code>'s <code class="field">env</code> list (or just referencing <code class="field">process.env.APP_PIN</code> in source) surfaces it on the dashboard's env panel, so an operator can preseed a PIN there to skip the first-launch screen entirely, or override one that was set interactively.</p>
-        <p class="why">Changed 2026-09-06 — an earlier version of this rule had Hostess auto-generate a random PIN on first deploy. In practice that's worse than the "set it yourself" flow: the operator had to go dig the value out of a deploy log or an env panel field before they could log in at all, which is barely better than the guessable placeholder it replaced. Setting your own PIN the moment the app first asks is both simpler and how Hostess's own dashboard account system already works.</p>
       </div>
 
       <div class="rule">
@@ -367,7 +366,7 @@ const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic(<span class="k">
   else if (e.key === <span class="s">'Enter'</span>) submitPin();
 });</pre>
         <p><b>If the PIN field is a real <code class="field">&lt;input&gt;</code> rather than a custom keypad, do not <code class="field">preventDefault()</code> non-digit keys to force digits-only.</b> Validate on submit instead. Swallowing everything that isn't a digit turns a Num-Lock-off numpad into a field that accepts nothing and explains nothing — the user presses keys and the box stays empty.</p>
-        <p class="why">Measured, not assumed: pressing numpad 7, numpad 0 and top-row 7 in a browser with Num Lock off, the <code class="field">e.key</code> test alone matched 1 of 3. Adding the <code class="field">e.code</code> test matched all 3. An earlier version of this rule recommended the single <code class="field">e.key</code> check and would have shipped exactly that dead-numpad bug — found 2026-09-06 while building a test app against these rules.</p>
+        <p class="why">Measured, not assumed: with Num Lock off, pressing numpad 7, numpad 0 and top-row 7, the <code class="field">e.key</code> test alone matched 1 of 3. Adding the <code class="field">e.code</code> test matched all 3.</p>
       </div>
 
       <div class="rule">
@@ -463,63 +462,28 @@ ssl: /sslmode=disable/i.test(process.env.DATABASE_URL || <span class="s">''</spa
 
 
       <div class="rule">
-        <div class="rule-head"><h3>Never hardcode a model — and don't fall back to one either</h3><span class="tag req">Required</span></div>
-        <p><code class="field">LM_STUDIO_MODEL</code> is the operator's choice, and there are a dozen-plus models in the library to choose from. If it's unset, <b>omit <code class="field">model</code> from the request entirely</b> so the endpoint uses whatever is currently loaded — do not substitute a literal id as a "sensible default".</p>
-        <pre><span class="c1">// Right — no model means "whatever the endpoint has loaded"</span>
-body: JSON.stringify({ model: process.env.LM_STUDIO_MODEL || undefined, messages })
-
-<span class="c1">// Wrong — silently pins the app, and makes the operator's setting look broken</span>
-body: JSON.stringify({ model: process.env.LM_STUDIO_MODEL || <span class="s">'google/gemma-4-e2b'</span>, messages })</pre>
-      </div>
-
-
-      <div class="rule">
-        <div class="rule-head"><h3><code class="field">LM_STUDIO_MODEL</code> is a default, not a cage</h3><span class="tag rec">Strongly recommended</span></div>
-        <p>An app that only ever sends the injected model id is locked to whatever the operator picked fleet-wide, and changing it costs a redeploy. It doesn't have to be — <b>you already hold <code class="field">LM_STUDIO_URL</code> and <code class="field">LM_STUDIO_API_KEY</code>, which is everything needed to enumerate the library yourself</b> and send a different <code class="field">model</code> per request. Hostess adds nothing for this; treat the injected value as the preselected default.</p>
-        <pre><span class="c1">// LM Studio's richer list: state and quantization, not just ids</span>
-const res = await fetch(`${LM_STUDIO_URL}/api/v0/models`, {
-  headers: { authorization: `Bearer ${LM_STUDIO_API_KEY}` },
-});
-const models = (await res.json()).data
-  .filter(m => m.type === <span class="s">'llm'</span> || m.type === <span class="s">'vlm'</span>)
-  .map(m => ({ id: m.id, loaded: m.state === <span class="s">'loaded'</span>, quant: m.quantization }));
-
-<span class="c1">// then just send the chosen one; omit `model` to accept the endpoint's default</span>
-body: JSON.stringify({ model: chosen || undefined, messages })</pre>
-        <p class="why">Verified end to end on a test app: it listed all 13 chat models, marked which were resident, and switched to a 12B for one message with <b>no redeploy and no change on the Hostess side</b>. The plain <code class="field">/v1/models</code> works too if you only need ids.</p>
+        <div class="rule-head"><h3>The model is not fixed — never hardcode it</h3><span class="tag req">Required</span></div>
+        <p><code class="field">LM_STUDIO_MODEL</code> is the operator's current choice out of a dozen-plus in the library, changeable per app. If it's unset, <b>omit <code class="field">model</code> from the request</b> so the endpoint uses whatever is loaded — never substitute a literal id as a "sensible default", which silently pins the app and makes the operator's setting look broken.</p>
+        <p><b>It's a default, not a cage.</b> You already hold <code class="field">LM_STUDIO_URL</code> and <code class="field">LM_STUDIO_API_KEY</code>, which is everything needed to enumerate the library yourself and send a different model per request — Hostess adds nothing for this. <code class="field">/api/v0/models</code> reports each model's <code class="field">state</code> and <code class="field">quantization</code>, so a picker can show which are resident (answer immediately) and which will cold-load.</p>
+        <pre>const models = (await (await fetch(`${LM_STUDIO_URL}/api/v0/models`, {
+  headers: { authorization: `Bearer ${LM_STUDIO_API_KEY}` } })).json()).data
+  .filter(m =&gt; m.type === <span class="s">'llm'</span> || m.type === <span class="s">'vlm'</span>)
+  .map(m =&gt; ({ id: m.id, loaded: m.state === <span class="s">'loaded'</span>, quant: m.quantization }));</pre>
+        <p><b>Never tune to the current model.</b> Measured on identical trivial prompts: <code class="field">gemma-4-e2b</code> answered in <b>1.9s</b>, <code class="field">qwen2.5-7b-instruct</code> in <b>8.9s</b>, before counting a cold load; reasoning models are slower still. Use a generous timeout (120s is reasonable for chat). Don't assume vision, tool-calling, long context or a response style either — degrade rather than crash.</p>
+        <p class="why">Changing <code class="field">LM_STUDIO_MODEL</code> in the env panel only takes effect on <b>redeploy</b>, since env is baked in at <code class="field">docker run</code> — verified, the app kept reporting the old model until redeployed. That's the strongest practical argument for Tier 2 below, which re-points a live app with no redeploy at all.</p>
       </div>
 
       <div class="rule">
-        <div class="rule-head"><h3>Assume the model will be swapped under you</h3><span class="tag req">Required</span></div>
-        <p>The operator can point any app at any model in the library, per app, at any time. Your code must not be tuned to whichever one it was written against.</p>
-        <p><b>Timeouts especially.</b> Measured on this fleet, identical trivial prompt: <code class="field">google/gemma-4-e2b</code> answered in <b>1.9s</b>, <code class="field">qwen2.5-7b-instruct</code> in <b>8.9s</b> — and a model that isn't resident yet pays a cold load on top. A reasoning model can spend hundreds of hidden tokens before its first visible one. Set a generous client timeout (120s is reasonable for chat) rather than one that happens to fit today's model.</p>
-        <p>Don't assume capabilities either — vision, tool-calling, a long context, or a particular response style. The operator may swap you onto a 2B model or a coder model that has none of them. Degrade rather than crash.</p>
-      </div>
-
-      <div class="rule">
-        <div class="rule-head"><h3>A model listed in <code class="field">/v1/models</code> is not necessarily loadable</h3><span class="tag req">Required</span></div>
-        <p>That endpoint lists what exists on disk, not what can load right now. Measured: a <i>correct</i> model id returned <code class="field">HTTP 400</code> with <code class="field">"Failed to load model"</code> — an 8B at <code class="field">Q8_0</code> (roughly 8.5&nbsp;GB of weights) had nowhere to go on a 16&nbsp;GB card that was already holding a resident 12B.</p>
-        <p><b>Quantization is the part people miss.</b> Two 8B models are not interchangeable: a <code class="field">Q4_K_S</code> build loads where a <code class="field">Q8_0</code> build of the same model won't. <code class="field">/api/v0/models</code> reports both <code class="field">state</code> (<code class="field">loaded</code> / <code class="field">not-loaded</code>) and <code class="field">quantization</code>, so a picker can show which models are resident (answer immediately), which will cold-load, and how heavy each one is.</p>
-        <p>So treat a per-call failure as normal and recoverable, not as a broken deployment. If you offer a model picker, listing a model is not a promise it will work when picked.</p>
-      </div>
-
-      <div class="rule">
-        <div class="rule-head"><h3>Pass the endpoint's error text through</h3><span class="tag rec">Strongly recommended</span></div>
-        <p>Flattening a failure to its status code hides the only useful part. <code class="field">"Failed to load model"</code>, a mistyped model id, and a rejected API key are all <code class="field">HTTP 400</code> and are indistinguishable without the body.</p>
+        <div class="rule-head"><h3>A model call can fail at request time — say why</h3><span class="tag req">Required</span></div>
+        <p><code class="field">/v1/models</code> lists what exists on disk, not what can load right now. Measured: a <i>correct</i> model id returned <code class="field">HTTP 400</code> — an 8B at <code class="field">Q8_0</code> (~8.5&nbsp;GB of weights) had nowhere to go on a 16&nbsp;GB card already holding a 12B. <b>Quantization is the part people miss:</b> two 8B models are not interchangeable. So treat a per-call failure as normal and recoverable, and never treat listing as a promise.</p>
+        <p>Then surface the endpoint's own message. Flattened to a status code, <code class="field">"Failed to load model"</code>, a mistyped id and a rejected key are all <code class="field">HTTP 400</code> and indistinguishable:</p>
         <pre>if (!res.ok) {
-  const detail = await res.text().catch(() => <span class="s">''</span>);
+  const detail = await res.text().catch(() =&gt; <span class="s">''</span>);
   let msg = <span class="s">''</span>;
   try { msg = JSON.parse(detail)?.error?.message || <span class="s">''</span>; } catch { msg = detail.slice(0, 200); }
   throw new Error(`model endpoint returned HTTP ${res.status}${msg ? ` — ${msg}` : <span class="s">''</span>}`);
 }</pre>
       </div>
-
-      <div class="rule">
-        <div class="rule-head"><h3>Switching model takes effect on redeploy, not immediately</h3><span class="tag rec">Good to know</span></div>
-        <p>Env vars are baked into the container at <code class="field">docker run</code>. Changing <code class="field">LM_STUDIO_MODEL</code> in the dashboard env panel writes the registry, but the running container keeps its old value until it is redeployed — verified, the app kept reporting the previous model until a redeploy.</p>
-        <p>This is the strongest practical argument for Tier 2 below: an app implementing <code class="field">GET/PUT /api/lm</code> can be re-pointed at another model live, with no redeploy at all.</p>
-      </div>
-
 
       <div class="rule">
         <div class="rule-head"><h3>Calling a cloud model? Offer the local library alongside it</h3><span class="tag rec">Recommended</span></div>
@@ -602,20 +566,16 @@ dist/</pre>
       </div>
 
       <div class="rule">
-        <div class="rule-head"><h3>The security guard only reads three files — keep a root entrypoint</h3><span class="tag req">Required to know</span></div>
-        <p>The pre-build scan sees your <code class="field">Dockerfile</code>, your <code class="field">app.yaml</code>, and <b>one</b> entrypoint file, each truncated to 6000 characters. The entrypoint is the first match at the <i>repo root</i> from exactly this list: <code class="field">server.js</code>, <code class="field">index.js</code>, <code class="field">app.js</code>, <code class="field">main.py</code>, <code class="field">app.py</code>, <code class="field">main.go</code>. If your entrypoint lives at <code class="field">src/index.js</code>, <code class="field">bin/www</code>, or <code class="field">cmd/server/main.go</code>, the guard reads none of your application code. That is not a way to skip review — it means the scan protecting the person running your app is looking at nothing, so keep a recognisable root entrypoint even if it only requires the real one.</p>
+        <div class="rule-head"><h3>The security guard reads three files — keep a root entrypoint</h3><span class="tag req">Required to know</span></div>
+        <p>The pre-build scan is an LLM call to the operator's own local model, and a verdict of <code class="field">high</code> throws — nothing is built. If they have no local AI configured the scan is skipped entirely and the deploy proceeds unscanned, so never read "it deployed" as "it passed review".</p>
+        <p>It sees only your <code class="field">Dockerfile</code>, your <code class="field">app.yaml</code>, and <b>one</b> entrypoint file, each truncated to 6000 characters. The entrypoint is the first match at the <i>repo root</i> from exactly this list: <code class="field">server.js</code>, <code class="field">index.js</code>, <code class="field">app.js</code>, <code class="field">main.py</code>, <code class="field">app.py</code>, <code class="field">main.go</code>. If yours lives at <code class="field">src/index.js</code> or <code class="field">cmd/server/main.go</code>, the guard reads none of your application code — so keep a recognisable root entrypoint even if it only requires the real one. That isn't a way to skip review; it means the scan protecting whoever runs your app is looking at nothing.</p>
       </div>
 
       <div class="rule">
-        <div class="rule-head"><h3>A guard verdict of <code class="field">high</code> hard-blocks the deploy</h3><span class="tag req">Required to know</span></div>
-        <p>The scan is an LLM call to the operator’s own local model. <code class="field">high</code> throws and nothing is built. If the operator has no local AI configured the scan is skipped entirely and the deploy proceeds unscanned — so do not treat &ldquo;it deployed&rdquo; as &ldquo;it passed review&rdquo;.</p>
+        <div class="rule-head"><h3>How your container is run</h3><span class="tag rec">Good to know</span></div>
+        <p>Named <code class="field">selfhost-&lt;name&gt;</code>, built from <code class="field">selfhost-&lt;name&gt;:latest</code>, attached to <code class="field">selfhost-net</code>, with <code class="field">--restart unless-stopped</code>. Apps on that network reach each other by container name; the bundled database is <code class="field">selfhost-postgres:5432</code>.</p>
+        <p>Two consequences. Redeploy is <code class="field">docker rm -f</code> then recreate, so the writable layer is destroyed every time — which is exactly why on-disk state needs <code class="field">dataDir</code>. And the restart policy means a container that crashes at boot restarts forever rather than sitting dead, so make boot idempotent and let a missing optional dependency degrade instead of exiting (<a href="#boot">§2</a>).</p>
       </div>
-
-      <div class="rule">
-        <div class="rule-head"><h3>Container, image and network names are fixed</h3><span class="tag rec">Good to know</span></div>
-        <p>Your container is <code class="field">selfhost-&lt;name&gt;</code>, built from image <code class="field">selfhost-&lt;name&gt;:latest</code>, attached to the shared Docker network <code class="field">selfhost-net</code>. Redeploy is <code class="field">docker rm -f</code> then recreate — the container’s own writable layer is destroyed every time, which is exactly why on-disk state needs <code class="field">dataDir</code>. Apps on <code class="field">selfhost-net</code> can reach each other by container name; the bundled database is at <code class="field">selfhost-postgres:5432</code>.</p>
-      </div>
-
 
       <div class="rule">
         <div class="rule-head"><h3>Handle SIGTERM — your container is destroyed on every redeploy</h3><span class="tag req">Required</span></div>
@@ -633,18 +593,9 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
       </div>
 
       <div class="rule">
-        <div class="rule-head"><h3>Restart policy is <code class="field">unless-stopped</code></h3><span class="tag rec">Good to know</span></div>
-        <p>Your container comes back after a host reboot or a Docker daemon restart without anyone clicking anything. A container that crashes on boot will therefore restart forever rather than sitting dead — make boot idempotent and make sure a missing optional dependency degrades instead of exiting (see <a href="#boot">§2</a>).</p>
-      </div>
-
-      <div class="rule">
-        <div class="rule-head"><h3>Env value precedence: operator panel wins, always</h3><span class="tag rec">Good to know</span></div>
-        <p>A value typed into the dashboard env panel is never overwritten by auto-injection. Auto-injection only fills a variable your app actually reads <i>and</i> that has no operator value yet. Operator values and generated secrets both persist across redeploys — your app should never regenerate or cache them itself.</p>
-      </div>
-
-      <div class="rule">
-        <div class="rule-head"><h3>Everything Hostess injects for you</h3><span class="tag auto">Auto-injected</span></div>
-        <p>With <code class="field">postgres: true</code>: <code class="field">DATABASE_URL</code>, <code class="field">DB_HOST</code>, <code class="field">DB_PORT</code>, <code class="field">DB_NAME</code>, <code class="field">DB_USER</code>, <code class="field">DB_PASSWORD</code> — both conventions, so read whichever suits. If your app reads <code class="field">SYNC_SECRET</code>: generated once and kept stable. If it reads <code class="field">LM_STUDIO_URL</code>, <code class="field">LM_STUDIO_API_KEY</code> or <code class="field">LM_STUDIO_MODEL</code>: filled from the fleet’s library config. Nothing else is injected — declaring a name in <code class="field">env:</code> creates an empty panel slot, it does not supply a value.</p>
+        <div class="rule-head"><h3>Environment variables: what arrives, and who wins</h3><span class="tag auto">Auto-injected</span></div>
+        <p>With <code class="field">postgres: true</code>: <code class="field">DATABASE_URL</code> plus <code class="field">DB_HOST</code>/<code class="field">DB_PORT</code>/<code class="field">DB_NAME</code>/<code class="field">DB_USER</code>/<code class="field">DB_PASSWORD</code> — both conventions, read whichever suits. With <code class="field">search: true</code>: <code class="field">SEARXNG_URL</code>. If your app reads <code class="field">SYNC_SECRET</code> it's generated once and kept stable; if it reads <code class="field">LM_STUDIO_URL</code>, <code class="field">LM_STUDIO_API_KEY</code> or <code class="field">LM_STUDIO_MODEL</code>, those come from the fleet's library config.</p>
+        <p>Nothing else is injected — declaring a name in <code class="field">env:</code> creates an <i>empty</i> panel slot, it does not supply a value. A value typed into that panel always wins and is never overwritten by auto-injection; auto-injection only fills a variable your app reads that has no operator value yet. Operator values and generated secrets both survive redeploys, so never regenerate or cache them yourself.</p>
       </div>
 
       <div class="rule">
