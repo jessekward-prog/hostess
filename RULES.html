@@ -299,6 +299,7 @@ icon: public/icon.png    <span class="c1"># optional, cosmetic — see below</sp
         <p>Set <code class="field">search: true</code> and Hostess provisions a shared SearXNG backend and injects <code class="field">SEARXNG_URL</code>, the same way <code class="field">postgres: true</code> provisions a database and injects <code class="field">DATABASE_URL</code>. Query it at <code class="field">{SEARXNG_URL}/search?q=...&amp;format=json</code>.</p>
         <p><b>Why it isn't simply on the app network.</b> A search backend's entire job is fetching and parsing hostile content from the open internet, so it is the most likely thing on the machine to be exploited. It therefore runs on its own <code class="field">hostess-search</code> network that <code class="field">selfhost-postgres</code> is <i>not</i> attached to. Apps that opt in are joined to both networks; the search container can reach those apps and nothing else. Verified: from inside it, <code class="field">selfhost-postgres</code> does not resolve.</p>
         <p>It is also given no published host port (nothing on your LAN can reach it), <code class="field">--cap-drop ALL</code> with three capabilities added back, <code class="field">no-new-privileges</code>, a per-install generated secret key, and a <b>digest-pinned image</b> rather than <code class="field">:latest</code> — an unattended always-on container shouldn't silently change what it's running. It is removed automatically once no app declares <code class="field">search</code> any more.</p>
+        <p><b>Only declare it if the app actually searches.</b> Setting <code class="field">search: true</code> starts an always-on container on someone's home machine whose job is fetching untrusted content from the internet. That's a reasonable trade for an app that needs search and pure added attack surface for one that doesn't.</p>
         <p class="why">The app never learns or configures where search lives — it reads an injected variable, exactly as with Postgres and the public gateway. That's the same principle throughout Hostess: the platform holds the dangerous capability, the app is handed a result.</p>
       </div>
 
@@ -648,6 +649,15 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
         <p>So: calling a weather API, an LLM provider, a webhook — go ahead, nothing to declare. Bundling <code class="field">cloudflared</code> or <code class="field">ngrok</code>, spawning a tunnel, or hardcoding a public domain so one feature can hand out a link — never, no matter how narrow the reason. Declare <code class="field">publicGateway</code> instead and read your current URL from <code class="field">/run/hostess-gateway/url</code>.</p>
       </div>
 
+
+      <div class="rule">
+        <div class="rule-head"><h3>If you search, show the sources — and let the model decline</h3><span class="tag req">Required if using search</span></div>
+        <p>Retrieval working is not the same as the answer being right. Snippet injection has no reranking and no recency weighting, so a stale or badly-ranked result becomes a confident wrong answer with nothing in the UI to contradict it. Two things make that survivable, and both are the app's job:</p>
+        <p><b>Render the sources you injected</b>, as links, under the reply. It's the only way a reader can catch a wrong answer, and it costs nothing — you already have the titles and URLs in hand.</p>
+        <p><b>Tell the model it may decline.</b> A line like <i>"use these results if relevant and cite by number; say so if they do not answer the question"</i> in the injected context turns a fabricated answer into an honest "the results don't cover this".</p>
+        <p class="why">Both behaviours observed in the same test app on the same day: asked for current weather it correctly said the snippets didn't contain it and pointed at the sources; asked who currently holds a political office it answered confidently and wrongly from one bad snippet. The citation was what made the second one catchable.</p>
+      </div>
+
       <div class="rule">
         <div class="rule-head"><h3>Not everything shares one network, and that's deliberate</h3><span class="tag rec">Good to know</span></div>
         <p>Apps and the database share <code class="field">selfhost-net</code>. The search backend does <b>not</b> — it sits on <code class="field">hostess-search</code>, which Postgres is not attached to, and apps declaring <code class="field">search</code> are joined to both. Docker networks do not bridge through a container that sits on two of them, so a compromised search backend cannot reach your database at all; from inside it, <code class="field">selfhost-postgres</code> does not even resolve.</p>
@@ -787,6 +797,7 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
    - AI model: read the LM_STUDIO_* names (see 5, 5b). Auto-detected, no declaration needed.
    - Database: postgres: true, then read DATABASE_URL or the DB_* vars.
    - Reach another app on the same machine: use its container name on selfhost-net, e.g. http://selfhost-<app-name>:<port>.
+   - If search is enabled, render the injected sources as links under the reply, and include a line in the injected context telling the model to cite by number and to say plainly when the results do not answer the question. Snippet injection has no reranking, so a stale result otherwise becomes a confident wrong answer with nothing to contradict it.
    - Let someone OUTSIDE reach one route: declare publicGateway.port and read the current URL from /run/hostess-gateway/url. Never bundle cloudflared/ngrok, never spawn a tunnel, never hardcode a public domain.
    The rule underneath: outbound is free and needs no permission; inbound is always the operator's decision, never the app's.
 
