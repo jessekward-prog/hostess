@@ -232,6 +232,7 @@
       <a href="#ai"><span class="n">05</span>AI / local model link</a>
       <a href="#guard"><span class="n">06</span>Security guard</a>
       <a href="#hygiene"><span class="n">07</span>Repo hygiene</a>
+      <a href="#runtime"><span class="n">08</span>Runtime environment</a>
 
       <span class="label">Reference</span>
       <a href="#lm-contract"><span class="n">→</span>/api/lm contract</a>
@@ -270,6 +271,9 @@
         <li><span class="body">AI-capable apps use the fleet's env var names (<code class="field">LM_STUDIO_URL</code> etc.) so Hostess finds them with no manifest edits — <a href="#env-names">reference</a></span></li>
         <li><span class="body">Nothing in <code class="field">Dockerfile</code>, <code class="field">app.yaml</code>, or the entrypoint reads as privilege-escalation or a hardcoded secret to an LLM reviewer — <a href="#guard">§6</a></span></li>
         <li><span class="body">Real <code class="field">.gitignore</code> covering <code class="field">node_modules/</code> and <code class="field">.env</code> — checked, not assumed — <a href="#hygiene">§7</a></span></li>
+        <li><span class="body">Entrypoint is at the repo <b>root</b> and named so the security scan can find it (<code class="field">server.js</code>, <code class="field">index.js</code>, <code class="field">app.js</code>, <code class="field">main.py</code>, <code class="field">app.py</code>, <code class="field">main.go</code>) — <a href="#runtime">§8</a></span></li>
+        <li><span class="body">No build step depends on git history or tags — the clone is <code class="field">--depth 1</code> — <a href="#runtime">§8</a></span></li>
+        <li><span class="body">Non-JS apps list <b>every</b> env var in <code class="field">env:</code> — auto-detection only scans JS/TS — <a href="#runtime">§8</a></span></li>
       </ul>
     </section>
 
@@ -489,6 +493,56 @@ dist/</pre>
       </div>
     </section>
 
+    <section id="runtime">
+      <div class="sec-head"><span class="sec-num">§8</span><h2>Runtime environment</h2></div>
+      <p class="sec-desc">What Hostess actually does to your repo and around your container. None of this needs a change in <code class="field">app.yaml</code> — it is the environment your app wakes up in, and several items bite apps that were written for a different host.</p>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Your repo is cloned shallow — no git history</h3><span class="tag req">Required to know</span></div>
+        <p>Git sources are fetched with <code class="field">git clone --depth 1</code>. There is no history and there are no tags. Any build step that runs <code class="field">git describe</code>, <code class="field">git rev-parse HEAD~1</code>, or counts commits for a version string will fail or emit garbage — bake the version into a file instead. Local-path deploys are copied <i>without</i> <code class="field">.git</code> at all, so even <code class="field">git rev-parse HEAD</code> is unavailable there.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>autoUpdate only works from a git remote, and polls every 10 minutes</h3><span class="tag rec">Good to know</span></div>
+        <p>Hostess runs <code class="field">git ls-remote</code> against the source every 10 minutes and redeploys when the default branch’s SHA differs from the one recorded at last deploy. A local-path deploy has no remote and no <code class="field">.git</code>, so <code class="field">autoUpdate: true</code> is silently a no-op for it — not an error, just nothing ever happens. Deploy from a git URL if you want this.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>The security guard only reads three files — keep a root entrypoint</h3><span class="tag req">Required to know</span></div>
+        <p>The pre-build scan sees your <code class="field">Dockerfile</code>, your <code class="field">app.yaml</code>, and <b>one</b> entrypoint file, each truncated to 6000 characters. The entrypoint is the first match at the <i>repo root</i> from exactly this list: <code class="field">server.js</code>, <code class="field">index.js</code>, <code class="field">app.js</code>, <code class="field">main.py</code>, <code class="field">app.py</code>, <code class="field">main.go</code>. If your entrypoint lives at <code class="field">src/index.js</code>, <code class="field">bin/www</code>, or <code class="field">cmd/server/main.go</code>, the guard reads none of your application code. That is not a way to skip review — it means the scan protecting the person running your app is looking at nothing, so keep a recognisable root entrypoint even if it only requires the real one.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>A guard verdict of <code class="field">high</code> hard-blocks the deploy</h3><span class="tag req">Required to know</span></div>
+        <p>The scan is an LLM call to the operator’s own local model. <code class="field">high</code> throws and nothing is built. If the operator has no local AI configured the scan is skipped entirely and the deploy proceeds unscanned — so do not treat &ldquo;it deployed&rdquo; as &ldquo;it passed review&rdquo;.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Container, image and network names are fixed</h3><span class="tag rec">Good to know</span></div>
+        <p>Your container is <code class="field">selfhost-&lt;name&gt;</code>, built from image <code class="field">selfhost-&lt;name&gt;:latest</code>, attached to the shared Docker network <code class="field">selfhost-net</code>. Redeploy is <code class="field">docker rm -f</code> then recreate — the container’s own writable layer is destroyed every time, which is exactly why on-disk state needs <code class="field">dataDir</code>. Apps on <code class="field">selfhost-net</code> can reach each other by container name; the bundled database is at <code class="field">selfhost-postgres:5432</code>.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Restart policy is <code class="field">unless-stopped</code></h3><span class="tag rec">Good to know</span></div>
+        <p>Your container comes back after a host reboot or a Docker daemon restart without anyone clicking anything. A container that crashes on boot will therefore restart forever rather than sitting dead — make boot idempotent and make sure a missing optional dependency degrades instead of exiting (see <a href="#boot">§2</a>).</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Env value precedence: operator panel wins, always</h3><span class="tag rec">Good to know</span></div>
+        <p>A value typed into the dashboard env panel is never overwritten by auto-injection. Auto-injection only fills a variable your app actually reads <i>and</i> that has no operator value yet. Operator values and generated secrets both persist across redeploys — your app should never regenerate or cache them itself.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Everything Hostess injects for you</h3><span class="tag auto">Auto-injected</span></div>
+        <p>With <code class="field">postgres: true</code>: <code class="field">DATABASE_URL</code>, <code class="field">DB_HOST</code>, <code class="field">DB_PORT</code>, <code class="field">DB_NAME</code>, <code class="field">DB_USER</code>, <code class="field">DB_PASSWORD</code> — both conventions, so read whichever suits. If your app reads <code class="field">SYNC_SECRET</code>: generated once and kept stable. If it reads <code class="field">LM_STUDIO_URL</code>, <code class="field">LM_STUDIO_API_KEY</code> or <code class="field">LM_STUDIO_MODEL</code>: filled from the fleet’s library config. Nothing else is injected — declaring a name in <code class="field">env:</code> creates an empty panel slot, it does not supply a value.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Non-JavaScript apps must declare every env var by hand</h3><span class="tag req">Required for Python/Go/Ruby</span></div>
+        <p>The auto-detect scan described in <a href="#ai">§5</a> only reads <code class="field">.js/.mjs/.cjs/.ts</code> files. A Python, Go, Ruby or Rust app gets <i>zero</i> auto-detection — every variable it needs, including <code class="field">APP_PIN</code> and the AI names, has to be listed explicitly in <code class="field">env:</code> or it will never appear in the dashboard panel for the operator to set.</p>
+      </div>
+    </section>
+
     <section id="lm-contract">
       <div class="sec-head"><span class="sec-num">Ref</span><h2>/api/lm contract</h2></div>
       <p class="sec-desc">The shape Hostess's ai-link sync (and any app's own settings panel) reads and writes. Implemented today by macro-cmd (dual-provider) and gains-cmd (local only).</p>
@@ -551,7 +605,7 @@ dist/</pre>
     </section>
 
     <footer class="page-foot">
-      jessekward-prog/hostess — reflects the codebase as of the public-gateway work, 2026-09-05. Update this file when the contract changes, not just the code.
+      jessekward-prog/hostess — reflects the codebase as of 2026-09-06 (lib/manifest.js, engine.js, guard.js, clone.js, autoupdate.js). Update this file when the contract changes, not just the code.
     </footer>
 
   </main>
@@ -584,6 +638,7 @@ dist/</pre>
    - dataDir: an absolute container path (optional) -- if the app writes persistent state to disk outside Postgres (uploads, SQLite, etc.), set this so Hostess mounts a volume there instead of losing it on redeploy
    - publicGateway.port: an integer 1-65535, different from port (optional) -- declares a second, narrow internal port for public routes only (see #2b); most apps don't need this
    - description: a short blurb (optional, cosmetic) -- shown on the app's dashboard card
+   - autoUpdate: true or false (optional, default false) -- when true AND the app was deployed from a git remote, Hostess polls the remote every 10 minutes and rebuilds automatically on a new commit. Silently does nothing for local-path deploys, which are copied without .git.
    - icon: a path to an existing image file in the repo (optional, cosmetic) -- shown on the app's dashboard card
    Create this file if it's missing, using the app's real values. If the app has a real icon/logo asset already in the repo and no description/icon set, add them -- cheap and improves the dashboard card.
 
@@ -614,6 +669,14 @@ dist/</pre>
 10. Make sure a real .gitignore exists and covers at minimum: node_modules/, .env, and any build output directory. If it's missing entirely, create one. If .env or node_modules/ are already tracked in git, flag that clearly rather than silently rewriting history.
 
 Optional -- only if the app already has its own admin/settings API and a live AI-model picker on its dashboard card is wanted: implement GET/PUT /api/lm returning {provider, local: {url, model, apiKeySet, models, error?}, anthropic?: {apiKeySet, model}, managedEnv: [...]} (omit "anthropic" entirely if there's no second provider), gated by either normal user auth or an x-sync-secret header matching process.env.SYNC_SECRET (add SYNC_SECRET as an env var the app reads -- don't invent a value, it gets auto-generated).
+
+11. Runtime environment facts worth checking the repo against:
+   - The repo is cloned with git clone --depth 1, so there is no history and there are no tags. If any build step or start script runs git describe / git rev-parse / a commit count to produce a version string, replace it with a value baked into a file -- it will otherwise fail or emit garbage.
+   - The pre-build security scan reads only the Dockerfile, app.yaml, and ONE entrypoint file found at the repo root, matched against exactly this list: server.js, index.js, app.js, main.py, app.py, main.go. If the real entrypoint is somewhere else (src/index.js, bin/www, cmd/server/main.go), add or keep a root file with one of those names so the scan actually sees the app's code.
+   - The container is recreated from scratch on every redeploy (docker rm -f), so anything written to the container filesystem outside dataDir is lost. Check for code writing uploads, SQLite files, caches or logs to a path not covered by dataDir.
+   - Restart policy is unless-stopped, so a container that crashes at boot restarts forever. Confirm boot is idempotent and re-running it against an already-populated database or data volume is safe.
+   - Auto-detection of env var names only scans .js/.mjs/.cjs/.ts files. If this app is Python, Go, Ruby or Rust, every env var it reads -- including APP_PIN and any AI vars -- must be listed explicitly in app.yaml's env: array or the operator will have no way to set it.
+   - Declaring a name in env: creates an empty slot in the dashboard panel; it does not supply a value. Only DATABASE_URL/DB_* (with postgres: true), SYNC_SECRET, and the three LM_STUDIO_* vars are given real values automatically.
 
 Full reference with explanations for all of the above: https://hostess.cmdward.xyz/rules.html</textarea>
 
