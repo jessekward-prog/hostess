@@ -223,6 +223,7 @@
       <a href="#runtime"><span class="n">08</span>Runtime environment</a>
 
       <span class="label">Reference</span>
+      <a href="#connectivity"><span class="n">→</span>Web connectivity</a>
       <a href="#lm-contract"><span class="n">→</span>/api/lm contract</a>
       <a href="#env-names"><span class="n">→</span>Env var names</a>
     </nav>
@@ -625,6 +626,35 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
       </div>
     </section>
 
+    <section id="connectivity">
+      <div class="sec-head"><span class="sec-num">Ref</span><h2>Web connectivity — what your app can reach, and how</h2></div>
+      <p class="sec-desc">Six different needs get confused with each other constantly. Each has exactly one right mechanism, and picking the wrong one is how apps end up bundling a tunnel binary or hardcoding a public domain. Find your row first.</p>
+
+      <div class="tbl-wrap">
+        <table>
+          <tr><th>What you need</th><th>Use this</th><th>Setup</th></tr>
+          <tr><td>Call any external API or website</td><td>Just call it</td><td>None — containers have unrestricted outbound internet</td></tr>
+          <tr><td>Search the web</td><td><code class="field">search: true</code> → <code class="field">SEARXNG_URL</code></td><td>One line in app.yaml (<a href="#manifest">§1</a>)</td></tr>
+          <tr><td>Talk to an AI model</td><td><code class="field">LM_STUDIO_*</code></td><td>None — auto-detected and injected (<a href="#ai">§5</a>)</td></tr>
+          <tr><td>Store data</td><td><code class="field">postgres: true</code> → <code class="field">DATABASE_URL</code></td><td>One line in app.yaml (<a href="#postgres">§4</a>)</td></tr>
+          <tr><td>Reach another app on this machine</td><td>Its container name on <code class="field">selfhost-net</code></td><td>None — e.g. <code class="field">http://selfhost-shelf-cmd:3000</code></td></tr>
+          <tr><td>Give someone <i>outside</i> a link</td><td><code class="field">publicGateway</code></td><td>Declare a second port; Hostess owns the tunnel (<a href="#network">§3</a>)</td></tr>
+        </table>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Outbound is already yours — inbound never is</h3><span class="tag req">Required</span></div>
+        <p>The asymmetry is the whole model. Your container can reach <i>out</i> to anything on the internet with no declaration and no permission — that's ordinary Docker networking and Hostess doesn't restrict it. What you can never do is arrange for the outside world to reach <i>in</i>. That decision belongs to the operator, every time.</p>
+        <p>So: calling a weather API, an LLM provider, a webhook — go ahead, nothing to declare. Bundling <code class="field">cloudflared</code> or <code class="field">ngrok</code>, spawning a tunnel, or hardcoding a public domain so one feature can hand out a link — never, no matter how narrow the reason. Declare <code class="field">publicGateway</code> instead and read your current URL from <code class="field">/run/hostess-gateway/url</code>.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Not everything shares one network, and that's deliberate</h3><span class="tag rec">Good to know</span></div>
+        <p>Apps and the database share <code class="field">selfhost-net</code>. The search backend does <b>not</b> — it sits on <code class="field">hostess-search</code>, which Postgres is not attached to, and apps declaring <code class="field">search</code> are joined to both. Docker networks do not bridge through a container that sits on two of them, so a compromised search backend cannot reach your database at all; from inside it, <code class="field">selfhost-postgres</code> does not even resolve.</p>
+        <p class="why">If you ever add another shared side-service, copy this shape rather than adding it to <code class="field">selfhost-net</code> for convenience. The thing most likely to be exploited is whatever parses untrusted input from the internet, and it should be the thing furthest from your data.</p>
+      </div>
+    </section>
+
     <section id="lm-contract">
       <div class="sec-head"><span class="sec-num">Ref</span><h2>/api/lm contract</h2></div>
       <p class="sec-desc">The shape Hostess's ai-link sync (and any app's own settings panel) reads and writes. Implemented today by macro-cmd (dual-provider) and gains-cmd (local only).</p>
@@ -750,6 +780,15 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
    - Surface the endpoint's own error message rather than only its status code — "Failed to load model", a bad model id and a rejected key are all HTTP 400 and indistinguishable otherwise.
 
 5c. If the app would benefit from web search, set search: true in app.yaml rather than calling a search API directly or bundling one. Hostess provisions a shared SearXNG on an isolated network and injects SEARXNG_URL; query {SEARXNG_URL}/search?q=...&format=json. Fetch results yourself and pass them into the prompt as context -- do not define a search "tool" and rely on the model to call it, because a model can report having searched when it did not. Treat a missing SEARXNG_URL as "search unavailable" and keep working without it.
+
+5d. Before adding any networking code, match the need to the right mechanism -- these get confused constantly:
+   - Call an external API or website: just call it. Containers already have unrestricted outbound internet; nothing to declare.
+   - Search the web: set search: true in app.yaml and read SEARXNG_URL (see 5c). Do not bundle a scraper or call a search API directly.
+   - AI model: read the LM_STUDIO_* names (see 5, 5b). Auto-detected, no declaration needed.
+   - Database: postgres: true, then read DATABASE_URL or the DB_* vars.
+   - Reach another app on the same machine: use its container name on selfhost-net, e.g. http://selfhost-<app-name>:<port>.
+   - Let someone OUTSIDE reach one route: declare publicGateway.port and read the current URL from /run/hostess-gateway/url. Never bundle cloudflared/ngrok, never spawn a tunnel, never hardcode a public domain.
+   The rule underneath: outbound is free and needs no permission; inbound is always the operator's decision, never the app's.
 
 6. Every app must gate access behind a PIN -- this is required, not optional, and Hostess does not manufacture the value for you. On first launch, with no PIN set yet, show a "set your PIN" screen: enter a PIN, enter it again to confirm the two match, then persist it (hashed) and gate every route behind it from then on. APP_PIN is still the fleet-wide env var name -- an operator can set it from the dashboard's env panel to preseed a PIN and skip the first-launch screen, or to override one already set interactively. If the app has no database, adding this gate is what makes dataDir mandatory -- declare it in app.yaml at the same time, because a PIN written anywhere else in the container is destroyed on the next redeploy and silently sends every user back to the setup screen.
    The PIN entry UI must accept the keyboard's number row AND the numpad, not just clicks on an on-screen keypad. Two tests are needed, not one: e.key reports a digit for the numpad only when Num Lock is ON, and sends Home/End/PageUp/Insert when it is off, so also test e.code:
