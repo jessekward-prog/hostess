@@ -269,6 +269,7 @@
         <li><span class="body">App gates access behind a PIN, asks you to set one (enter + confirm) on first launch, and its entry field accepts both the keyboard's number row and the numpad — <a href="#boot">§2</a></span></li>
         <li><span class="body">If <code class="field">postgres: true</code>, the DB pool honors <code class="field">sslmode=disable</code> in <code class="field">DATABASE_URL</code> — <a href="#postgres">§4</a></span></li>
         <li><span class="body">AI-capable apps use the fleet's env var names (<code class="field">LM_STUDIO_URL</code> etc.) so Hostess finds them with no manifest edits — <a href="#env-names">reference</a></span></li>
+        <li><span class="body">AI apps hardcode no model id, tolerate a slow or unloadable one, and use a generous timeout — the operator can swap models per app — <a href="#ai">§5</a></span></li>
         <li><span class="body">Nothing in <code class="field">Dockerfile</code>, <code class="field">app.yaml</code>, or the entrypoint reads as privilege-escalation or a hardcoded secret to an LLM reviewer — <a href="#guard">§6</a></span></li>
         <li><span class="body">Real <code class="field">.gitignore</code> covering <code class="field">node_modules/</code> and <code class="field">.env</code> — checked, not assumed — <a href="#hygiene">§7</a></span></li>
         <li><span class="body">Entrypoint is at the repo <b>root</b> and named so the security scan can find it (<code class="field">server.js</code>, <code class="field">index.js</code>, <code class="field">app.js</code>, <code class="field">main.py</code>, <code class="field">app.py</code>, <code class="field">main.go</code>) — <a href="#runtime">§8</a></span></li>
@@ -446,6 +447,47 @@ ssl: /sslmode=disable/i.test(process.env.DATABASE_URL || <span class="s">''</spa
           </table>
         </div>
         <p class="why">Gap closed 2026-09-06 — llm-cmd deployed through Hostess with none of these set, so it silently ran against a stale default library address with no API key, and every chat/model call bounced off the library's own auth. The fix belongs at the platform level, not in every app's Dockerfile: apps just declare the names, Hostess owns knowing the one real value.</p>
+      </div>
+
+
+      <div class="rule">
+        <div class="rule-head"><h3>Never hardcode a model — and don't fall back to one either</h3><span class="tag req">Required</span></div>
+        <p><code class="field">LM_STUDIO_MODEL</code> is the operator's choice, and there are a dozen-plus models in the library to choose from. If it's unset, <b>omit <code class="field">model</code> from the request entirely</b> so the endpoint uses whatever is currently loaded — do not substitute a literal id as a "sensible default".</p>
+        <pre><span class="c1">// Right — no model means "whatever the endpoint has loaded"</span>
+body: JSON.stringify({ model: process.env.LM_STUDIO_MODEL || undefined, messages })
+
+<span class="c1">// Wrong — silently pins the app, and makes the operator's setting look broken</span>
+body: JSON.stringify({ model: process.env.LM_STUDIO_MODEL || <span class="s">'google/gemma-4-e2b'</span>, messages })</pre>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Assume the model will be swapped under you</h3><span class="tag req">Required</span></div>
+        <p>The operator can point any app at any model in the library, per app, at any time. Your code must not be tuned to whichever one it was written against.</p>
+        <p><b>Timeouts especially.</b> Measured on this fleet, identical trivial prompt: <code class="field">google/gemma-4-e2b</code> answered in <b>1.9s</b>, <code class="field">qwen2.5-7b-instruct</code> in <b>8.9s</b> — and a model that isn't resident yet pays a cold load on top. A reasoning model can spend hundreds of hidden tokens before its first visible one. Set a generous client timeout (120s is reasonable for chat) rather than one that happens to fit today's model.</p>
+        <p>Don't assume capabilities either — vision, tool-calling, a long context, or a particular response style. The operator may swap you onto a 2B model or a coder model that has none of them. Degrade rather than crash.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>A model listed in <code class="field">/v1/models</code> is not necessarily loadable</h3><span class="tag req">Required</span></div>
+        <p>That endpoint lists what exists on disk, not what can load right now — a single GPU can only hold so much. Measured: a <i>correct</i> model id returned <code class="field">HTTP 400</code> with <code class="field">"Failed to load model"</code> because there was no room for it alongside the model already resident.</p>
+        <p>So treat a per-call failure as normal and recoverable, not as a broken deployment. If you offer a model picker, listing a model is not a promise it will work when picked.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Pass the endpoint's error text through</h3><span class="tag rec">Strongly recommended</span></div>
+        <p>Flattening a failure to its status code hides the only useful part. <code class="field">"Failed to load model"</code>, a mistyped model id, and a rejected API key are all <code class="field">HTTP 400</code> and are indistinguishable without the body.</p>
+        <pre>if (!res.ok) {
+  const detail = await res.text().catch(() => <span class="s">''</span>);
+  let msg = <span class="s">''</span>;
+  try { msg = JSON.parse(detail)?.error?.message || <span class="s">''</span>; } catch { msg = detail.slice(0, 200); }
+  throw new Error(`model endpoint returned HTTP ${res.status}${msg ? ` — ${msg}` : <span class="s">''</span>}`);
+}</pre>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Switching model takes effect on redeploy, not immediately</h3><span class="tag rec">Good to know</span></div>
+        <p>Env vars are baked into the container at <code class="field">docker run</code>. Changing <code class="field">LM_STUDIO_MODEL</code> in the dashboard env panel writes the registry, but the running container keeps its old value until it is redeployed — verified, the app kept reporting the previous model until a redeploy.</p>
+        <p>This is the strongest practical argument for Tier 2 below: an app implementing <code class="field">GET/PUT /api/lm</code> can be re-pointed at another model live, with no redeploy at all.</p>
       </div>
 
       <div class="rule">
@@ -682,6 +724,13 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
 5. If the app calls a vision or chat AI model, use these exact environment variable names (rename anything that currently uses different names for the same thing):
    LM_STUDIO_URL, LM_STUDIO_API_KEY, LM_STUDIO_MODEL, ANTHROPIC_API_KEY, OPENAI_API_KEY, VISION_PROVIDER (local or anthropic)
    Hostess auto-injects real values for LM_STUDIO_URL/LM_STUDIO_API_KEY/LM_STUDIO_MODEL from its own fleet-wide library config on deploy, the same way postgres:true auto-injects DATABASE_URL -- no action needed in the app itself beyond reading these three names, and no need to hardcode a real key as a "just in case" default the way a URL fallback is sometimes used for convenience.
+
+5b. If the app calls a model, it must survive that model being swapped for a different one — the operator picks from a dozen-plus models in the library, per app:
+   - Never hardcode a model id, and never use one as a fallback. If LM_STUDIO_MODEL is unset, omit "model" from the request entirely so the endpoint uses whatever is loaded. A literal fallback silently pins the app.
+   - Use a generous request timeout (120s is reasonable). Measured on the same trivial prompt, one model answered in 1.9s and another in 8.9s, before counting a cold model load; reasoning models are slower still. Never tune a timeout to the model the app was written against.
+   - Do not assume vision, tool-calling, long context, or a response style. Degrade instead of crashing if the model can't do it.
+   - Treat a per-call HTTP 400 as normal and recoverable, not as a broken deployment: a model listed by /v1/models may still fail to load for lack of GPU memory.
+   - Surface the endpoint's own error message rather than only its status code — "Failed to load model", a bad model id and a rejected key are all HTTP 400 and indistinguishable otherwise.
 
 6. Every app must gate access behind a PIN -- this is required, not optional, and Hostess does not manufacture the value for you. On first launch, with no PIN set yet, show a "set your PIN" screen: enter a PIN, enter it again to confirm the two match, then persist it (hashed) and gate every route behind it from then on. APP_PIN is still the fleet-wide env var name -- an operator can set it from the dashboard's env panel to preseed a PIN and skip the first-launch screen, or to override one already set interactively. If the app has no database, adding this gate is what makes dataDir mandatory -- declare it in app.yaml at the same time, because a PIN written anywhere else in the container is destroyed on the next redeploy and silently sends every user back to the setup screen.
    The PIN entry UI must accept the keyboard's number row AND the numpad, not just clicks on an on-screen keypad. Two tests are needed, not one: e.key reports a digit for the numpad only when Num Lock is ON, and sends Home/End/PageUp/Insert when it is off, so also test e.code:
