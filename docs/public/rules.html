@@ -334,20 +334,26 @@ const anthropic = process.env.ANTHROPIC_API_KEY ? new Anthropic(<span class="k">
 
       <div class="rule">
         <div class="rule-head"><h3>A PIN gate is required — first launch asks you to set one</h3><span class="tag req">Required</span></div>
-        <p>Every app deployed through Hostess must gate access behind a PIN. Hostess does not manufacture the value for you: with no PIN set yet, first launch must show a "set your PIN" screen — enter a PIN, enter it again to confirm the two match, then persist it (hashed, alongside whatever storage the app already has — a Postgres row if <code class="field">postgres: true</code>, otherwise a file under <code class="field">dataDir</code>) and gate every route behind it from then on.</p>
+        <p>Every app deployed through Hostess must gate access behind a PIN. Hostess does not manufacture the value for you: with no PIN set yet, first launch must show a "set your PIN" screen — enter a PIN, enter it again to confirm the two match, then persist it (hashed, alongside whatever storage the app already has — a Postgres row if <code class="field">postgres: true</code>, otherwise a file under <code class="field">dataDir</code>) and gate every route behind it from then on. <b>If the app has no database, adding this gate is what makes <code class="field">dataDir</code> mandatory</b> — declare it in <code class="field">app.yaml</code> at the same time. A PIN written anywhere else in the container is destroyed by the next redeploy (<a href="#runtime">§8</a>), silently sending every user back to the first-launch setup screen.</p>
         <p><code class="field">APP_PIN</code> is still the fleet-wide env var name for it — declaring it in <code class="field">app.yaml</code>'s <code class="field">env</code> list (or just referencing <code class="field">process.env.APP_PIN</code> in source) surfaces it on the dashboard's env panel, so an operator can preseed a PIN there to skip the first-launch screen entirely, or override one that was set interactively.</p>
         <p class="why">Changed 2026-09-06 — an earlier version of this rule had Hostess auto-generate a random PIN on first deploy. In practice that's worse than the "set it yourself" flow: the operator had to go dig the value out of a deploy log or an env panel field before they could log in at all, which is barely better than the guessable placeholder it replaced. Setting your own PIN the moment the app first asks is both simpler and how Hostess's own dashboard account system already works.</p>
       </div>
 
       <div class="rule">
         <div class="rule-head"><h3>Accept keyboard input, not just an on-screen keypad</h3><span class="tag req">Required</span></div>
-        <p>A PIN screen that only responds to clicks on its own on-screen keypad is slower than it needs to be on any device with a real keyboard. Listen for both the number row and the numpad — <code class="field">e.key</code> already normalizes both to the same digit characters (with Num Lock on), so one check covers both:</p>
+        <p>A PIN screen that only responds to clicks on its own on-screen keypad is slower than it needs to be on any device with a real keyboard. Listen for the number row <i>and</i> the numpad — but note that one test is not enough. <code class="field">e.key</code> only reports a digit for the numpad when <b>Num Lock is on</b>; with it off, the same physical keys send <code class="field">Home</code>, <code class="field">End</code>, <code class="field">PageUp</code>, <code class="field">Insert</code> and friends. <code class="field">e.code</code> is physical and unaffected by Num Lock, so test both:</p>
         <pre>document.addEventListener(<span class="s">'keydown'</span>, e => {
-  if (/^[0-9]$/.test(e.key)) enterDigit(e.key);   <span class="c1">// number row AND numpad — same e.key</span>
+  <span class="c1">// number row, and numpad with Num Lock ON</span>
+  <span class="c1">// e.code also catches the numpad with Num Lock OFF, where e.key is 'Home' etc.</span>
+  const digit = /^[0-9]$/.test(e.key)        ? e.key
+              : /^Numpad[0-9]$/.test(e.code) ? e.code.slice(6)
+              : null;
+  if (digit) enterDigit(digit);
   else if (e.key === <span class="s">'Backspace'</span>) deleteDigit();
   else if (e.key === <span class="s">'Enter'</span>) submitPin();
 });</pre>
-        <p class="why">Matches llm-cmd's own gate, which already listens this way — worth calling out explicitly since a from-scratch PIN screen easily ends up wired to its clickable keypad only, with keyboard entry never implemented at all.</p>
+        <p><b>If the PIN field is a real <code class="field">&lt;input&gt;</code> rather than a custom keypad, do not <code class="field">preventDefault()</code> non-digit keys to force digits-only.</b> Validate on submit instead. Swallowing everything that isn't a digit turns a Num-Lock-off numpad into a field that accepts nothing and explains nothing — the user presses keys and the box stays empty.</p>
+        <p class="why">Measured, not assumed: pressing numpad 7, numpad 0 and top-row 7 in a browser with Num Lock off, the <code class="field">e.key</code> test alone matched 1 of 3. Adding the <code class="field">e.code</code> test matched all 3. An earlier version of this rule recommended the single <code class="field">e.key</code> check and would have shipped exactly that dead-numpad bug — found 2026-09-06 while building a test app against these rules.</p>
       </div>
 
       <div class="rule">
@@ -433,6 +439,7 @@ ssl: /sslmode=disable/i.test(process.env.DATABASE_URL || <span class="s">''</spa
             <tr><td>LM_STUDIO_API_KEY</td><td>Bearer key the local endpoint requires</td><td>Yes, from the fleet's library config</td></tr>
             <tr><td>LM_STUDIO_MODEL</td><td>Model id to request</td><td>Yes, from the fleet's library config</td></tr>
             <tr><td>ANTHROPIC_API_KEY</td><td>Claude, if the app supports it as a second provider</td><td>No — no fleet-wide default, set per app</td></tr>
+            <tr><td>OPENAI_API_KEY</td><td>OpenAI, if the app supports it as a provider</td><td>No — no fleet-wide default, set per app</td></tr>
             <tr><td>VISION_PROVIDER</td><td><code class="field">local</code> or <code class="field">anthropic</code> — which one unattended calls default to</td><td>No — per-app choice</td></tr>
             <tr><td>SYNC_SECRET</td><td>Only needed for Tier 2 — see below</td><td>Generated, not injected — see below</td></tr>
           </table>
@@ -595,6 +602,7 @@ dist/</pre>
           <tr><td>Local model key</td><td>LM_STUDIO_API_KEY</td><td>LM_KEY, LOCAL_API_KEY</td></tr>
           <tr><td>Local model id</td><td>LM_STUDIO_MODEL</td><td>LM_MODEL, MODEL_NAME</td></tr>
           <tr><td>Claude key</td><td>ANTHROPIC_API_KEY</td><td>CLAUDE_API_KEY, CLAUDE_KEY</td></tr>
+          <tr><td>OpenAI key</td><td>OPENAI_API_KEY</td><td>OAI_KEY, GPT_API_KEY</td></tr>
           <tr><td>Default provider</td><td>VISION_PROVIDER</td><td>AI_PROVIDER, MODE</td></tr>
           <tr><td>Machine-auth secret</td><td>SYNC_SECRET</td><td>API_SECRET, WEBHOOK_KEY</td></tr>
         </table>
@@ -655,10 +663,13 @@ dist/</pre>
    Also don't assume a fresh/empty database on every deploy or restart.
 
 5. If the app calls a vision or chat AI model, use these exact environment variable names (rename anything that currently uses different names for the same thing):
-   LM_STUDIO_URL, LM_STUDIO_API_KEY, LM_STUDIO_MODEL, ANTHROPIC_API_KEY, VISION_PROVIDER (local or anthropic)
+   LM_STUDIO_URL, LM_STUDIO_API_KEY, LM_STUDIO_MODEL, ANTHROPIC_API_KEY, OPENAI_API_KEY, VISION_PROVIDER (local or anthropic)
    Hostess auto-injects real values for LM_STUDIO_URL/LM_STUDIO_API_KEY/LM_STUDIO_MODEL from its own fleet-wide library config on deploy, the same way postgres:true auto-injects DATABASE_URL -- no action needed in the app itself beyond reading these three names, and no need to hardcode a real key as a "just in case" default the way a URL fallback is sometimes used for convenience.
 
-6. Every app must gate access behind a PIN -- this is required, not optional, and Hostess does not manufacture the value for you. On first launch, with no PIN set yet, show a "set your PIN" screen: enter a PIN, enter it again to confirm the two match, then persist it (hashed) and gate every route behind it from then on. APP_PIN is still the fleet-wide env var name -- an operator can set it from the dashboard's env panel to preseed a PIN and skip the first-launch screen, or to override one already set interactively. The PIN entry UI must accept both the keyboard's number row and the numpad, not just clicks on an on-screen keypad -- checking `/^[0-9]$/.test(e.key)` on keydown covers both in one check, since e.key normalizes numpad digits (Num Lock on) to the same characters as the top row.
+6. Every app must gate access behind a PIN -- this is required, not optional, and Hostess does not manufacture the value for you. On first launch, with no PIN set yet, show a "set your PIN" screen: enter a PIN, enter it again to confirm the two match, then persist it (hashed) and gate every route behind it from then on. APP_PIN is still the fleet-wide env var name -- an operator can set it from the dashboard's env panel to preseed a PIN and skip the first-launch screen, or to override one already set interactively. If the app has no database, adding this gate is what makes dataDir mandatory -- declare it in app.yaml at the same time, because a PIN written anywhere else in the container is destroyed on the next redeploy and silently sends every user back to the setup screen.
+   The PIN entry UI must accept the keyboard's number row AND the numpad, not just clicks on an on-screen keypad. Two tests are needed, not one: e.key reports a digit for the numpad only when Num Lock is ON, and sends Home/End/PageUp/Insert when it is off, so also test e.code:
+     const digit = /^[0-9]$/.test(e.key) ? e.key : /^Numpad[0-9]$/.test(e.code) ? e.code.slice(6) : null;
+   And if the PIN field is a real <input> rather than a custom keypad, do NOT preventDefault() non-digit keys to force digits-only -- validate on submit instead, or a Num-Lock-off numpad leaves the field empty with no feedback.
 
 7. Check the client's boot sequence for auth races: anything that fires a request requiring the auth cookie/token (a background sync pull, a periodic refresh) must wait until the client has confirmed it's actually unlocked -- firing it unconditionally on page load means it can still be in flight, cookie-less, at the exact moment a fast login succeeds, and its own 401 handler can then re-lock a session that just got granted.
 
