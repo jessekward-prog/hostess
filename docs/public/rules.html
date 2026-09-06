@@ -520,6 +520,20 @@ body: JSON.stringify({ model: chosen || undefined, messages })</pre>
         <p>This is the strongest practical argument for Tier 2 below: an app implementing <code class="field">GET/PUT /api/lm</code> can be re-pointed at another model live, with no redeploy at all.</p>
       </div>
 
+
+      <div class="rule">
+        <div class="rule-head"><h3>Calling a cloud model? Offer the local library alongside it</h3><span class="tag rec">Recommended</span></div>
+        <p>An app that only speaks to a paid cloud API works fine here, but it costs money per request and sends the operator's data off their machine — on a platform whose whole point is self-hosting, that should at least be a choice. If the app already calls OpenAI or Claude, add the local library as a second provider and default to it, keeping the cloud path as a fallback.</p>
+        <p>For an <b>OpenAI-shaped</b> client this is nearly free, because LM Studio serves an OpenAI-compatible <code class="field">/v1/chat/completions</code> — it's a base URL, key and model swap, no structural change:</p>
+        <pre><span class="c1">// Same SDK, same call shape, pointed at the fleet's own model</span>
+const client = new OpenAI({
+  baseURL: process.env.LM_STUDIO_URL ? `${process.env.LM_STUDIO_URL}/v1` : undefined,
+  apiKey:  process.env.LM_STUDIO_URL ? process.env.LM_STUDIO_API_KEY : process.env.OPENAI_API_KEY,
+});</pre>
+        <p><b>An app on the Anthropic SDK is a different matter — flag it, don't rewrite it.</b> The request shape, response parsing and tool-use blocks don't map onto an OpenAI-compatible endpoint, and a mechanical conversion produces confidently broken code. Report it and let a human decide.</p>
+        <p class="why">Keep the cloud provider rather than ripping it out. <code class="field">VISION_PROVIDER</code> exists precisely so an app can offer both and let the operator pick; a local 2B model is not a drop-in replacement for a frontier one, and deciding that trade is the operator's call, not the converter's.</p>
+      </div>
+
       <div class="rule">
         <div class="rule-head"><h3>Tier 2 — implement GET/PUT /api/lm</h3><span class="tag rec">Recommended for AI-capable apps</span></div>
         <p>Full contract is in the reference section below. In short: report your current connection state, accept live updates to it, persist them somewhere that survives a restart, and gate the routes so a trusted machine (not just a logged-in person) can call them.</p>
@@ -732,8 +746,17 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
           <tr><td>OpenAI key</td><td>OPENAI_API_KEY</td><td>OAI_KEY, GPT_API_KEY</td></tr>
           <tr><td>Default provider</td><td>VISION_PROVIDER</td><td>AI_PROVIDER, MODE</td></tr>
           <tr><td>Machine-auth secret</td><td>SYNC_SECRET</td><td>API_SECRET, WEBHOOK_KEY</td></tr>
+          <tr><td>Search backend</td><td>SEARXNG_URL</td><td>SEARCH_URL, SEARX_HOST</td></tr>
         </table>
       </div>
+      <div class="callout">
+        <b>Why <code class="field">SEARXNG_URL</code> is not auto-detected:</b> unlike the AI variables, it is
+        injected by the platform when you declare <code class="field">search: true</code> — exactly like
+        <code class="field">DATABASE_URL</code>, which is also absent from the scan. Auto-detecting it would put it in the
+        env panel as an operator-editable field, and a search endpoint an app can be
+        pointed at is a value worth <i>not</i> making editable. Read the name; let Hostess supply it.
+      </div>
+
       <div class="callout">
         <b>Extending this list:</b> if a new app needs a genuinely new concept, add the name here and to <code class="field">AI_ENV_VAR_RE</code> in Hostess's <code class="field">lib/manifest.js</code> — one regex, one place.
       </div>
@@ -812,6 +835,8 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
    - If search is enabled, render the injected sources as links under the reply, and include a line in the injected context telling the model to cite by number and to say plainly when the results do not answer the question. Snippet injection has no reranking, so a stale result otherwise becomes a confident wrong answer with nothing to contradict it.
    - Let someone OUTSIDE reach one route: declare publicGateway.port and read the current URL from /run/hostess-gateway/url. Never bundle cloudflared/ngrok, never spawn a tunnel, never hardcode a public domain.
    The rule underneath: outbound is free and needs no permission; inbound is always the operator's decision, never the app's.
+
+5e. If the app calls a paid cloud model (OpenAI, Anthropic), add the local library as a second provider and default to it, keeping the cloud path as a fallback -- do not remove the cloud provider. For an OpenAI-shaped client this is just a baseURL/key/model swap, since LM Studio serves an OpenAI-compatible /v1/chat/completions: point baseURL at `${LM_STUDIO_URL}/v1` with LM_STUDIO_API_KEY. If the app uses the Anthropic SDK, do NOT mechanically convert it -- the request shape, response parsing and tool-use blocks do not map across, and the result will be confidently broken. Report it and leave it for a human.
 
 6. Every app must gate access behind a PIN -- this is required, not optional, and Hostess does not manufacture the value for you. On first launch, with no PIN set yet, show a "set your PIN" screen: enter a PIN, enter it again to confirm the two match, then persist it (hashed) and gate every route behind it from then on. APP_PIN is still the fleet-wide env var name -- an operator can set it from the dashboard's env panel to preseed a PIN and skip the first-launch screen, or to override one already set interactively. If the app has no database, adding this gate is what makes dataDir mandatory -- declare it in app.yaml at the same time, because a PIN written anywhere else in the container is destroyed on the next redeploy and silently sends every user back to the setup screen.
    The PIN entry UI must accept the keyboard's number row AND the numpad, not just clicks on an on-screen keypad. Two tests are needed, not one: e.key reports a digit for the numpad only when Num Lock is ON, and sends Home/End/PageUp/Insert when it is off, so also test e.code:
