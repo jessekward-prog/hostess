@@ -292,6 +292,7 @@ postgres: false         <span class="c1"># optional, default false — see §4</
 env:                   <span class="c1"># optional — see §5, mostly unnecessary now (auto-detected)</span>
   - SOME_VAR
 dataDir: /app/data      <span class="c1"># optional, absolute container path — see below</span>
+search: false            <span class="c1"># optional — opt-in web search backend, see below</span>
 autoUpdate: false        <span class="c1"># optional, default false — see below</span>
 description: "..."       <span class="c1"># optional, cosmetic — see below</span>
 icon: public/icon.png    <span class="c1"># optional, cosmetic — see below</span></pre>
@@ -301,6 +302,15 @@ icon: public/icon.png    <span class="c1"># optional, cosmetic — see below</sp
       <div class="rule">
         <div class="rule-head"><h3>dataDir — persistent storage outside Postgres</h3><span class="tag rec">Optional</span></div>
         <p>An absolute path inside the container. Hostess mounts a named Docker volume there (survives redeploys/restarts, same as the bundled Postgres does) — for uploads, SQLite files, or any other on-disk state that isn't in the database.</p>
+      </div>
+
+
+      <div class="rule">
+        <div class="rule-head"><h3>search — opt-in web search, on a network your data isn't on</h3><span class="tag rec">Optional</span></div>
+        <p>Set <code class="field">search: true</code> and Hostess provisions a shared SearXNG backend and injects <code class="field">SEARXNG_URL</code>, the same way <code class="field">postgres: true</code> provisions a database and injects <code class="field">DATABASE_URL</code>. Query it at <code class="field">{SEARXNG_URL}/search?q=...&amp;format=json</code>.</p>
+        <p><b>Why it isn't simply on the app network.</b> A search backend's entire job is fetching and parsing hostile content from the open internet, so it is the most likely thing on the machine to be exploited. It therefore runs on its own <code class="field">hostess-search</code> network that <code class="field">selfhost-postgres</code> is <i>not</i> attached to. Apps that opt in are joined to both networks; the search container can reach those apps and nothing else. Verified: from inside it, <code class="field">selfhost-postgres</code> does not resolve.</p>
+        <p>It is also given no published host port (nothing on your LAN can reach it), <code class="field">--cap-drop ALL</code> with three capabilities added back, <code class="field">no-new-privileges</code>, a per-install generated secret key, and a <b>digest-pinned image</b> rather than <code class="field">:latest</code> — an unattended always-on container shouldn't silently change what it's running. It is removed automatically once no app declares <code class="field">search</code> any more.</p>
+        <p class="why">The app never learns or configures where search lives — it reads an injected variable, exactly as with Postgres and the public gateway. That's the same principle throughout Hostess: the platform holds the dangerous capability, the app is handed a result.</p>
       </div>
 
       <div class="rule">
@@ -750,6 +760,8 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
    - Treat a per-call HTTP 400 as normal and recoverable, not as a broken deployment: a model listed by /v1/models may still fail to load for lack of GPU memory.
    - Do not lock the app to the injected model. It already has LM_STUDIO_URL and LM_STUDIO_API_KEY, which is all that is needed to GET {LM_STUDIO_URL}/api/v0/models (state + quantization) or /v1/models (ids only) and send a different "model" per request. If a model picker would be useful to this app's users, build it -- treat LM_STUDIO_MODEL as the preselected default, not the only option. Prefer showing which models are already loaded, since a resident model answers immediately while a cold one pays a load and a heavily-quantized one may fail to load at all.
    - Surface the endpoint's own error message rather than only its status code — "Failed to load model", a bad model id and a rejected key are all HTTP 400 and indistinguishable otherwise.
+
+5c. If the app would benefit from web search, set search: true in app.yaml rather than calling a search API directly or bundling one. Hostess provisions a shared SearXNG on an isolated network and injects SEARXNG_URL; query {SEARXNG_URL}/search?q=...&format=json. Fetch results yourself and pass them into the prompt as context -- do not define a search "tool" and rely on the model to call it, because a model can report having searched when it did not. Treat a missing SEARXNG_URL as "search unavailable" and keep working without it.
 
 6. Every app must gate access behind a PIN -- this is required, not optional, and Hostess does not manufacture the value for you. On first launch, with no PIN set yet, show a "set your PIN" screen: enter a PIN, enter it again to confirm the two match, then persist it (hashed) and gate every route behind it from then on. APP_PIN is still the fleet-wide env var name -- an operator can set it from the dashboard's env panel to preseed a PIN and skip the first-launch screen, or to override one already set interactively. If the app has no database, adding this gate is what makes dataDir mandatory -- declare it in app.yaml at the same time, because a PIN written anywhere else in the container is destroyed on the next redeploy and silently sends every user back to the setup screen.
    The PIN entry UI must accept the keyboard's number row AND the numpad, not just clicks on an on-screen keypad. Two tests are needed, not one: e.key reports a digit for the numpad only when Num Lock is ON, and sends Home/End/PageUp/Insert when it is off, so also test e.code:
