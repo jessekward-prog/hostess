@@ -260,6 +260,7 @@
         <li><span class="body">Nothing in <code class="field">Dockerfile</code>, <code class="field">app.yaml</code>, or the entrypoint reads as privilege-escalation or a hardcoded secret to an LLM reviewer — <a href="#guard">§6</a></span></li>
         <li><span class="body">Real <code class="field">.gitignore</code> covering <code class="field">node_modules/</code> and <code class="field">.env</code> — checked, not assumed — <a href="#hygiene">§7</a></span></li>
         <li><span class="body">Entrypoint is at the repo <b>root</b> and named so the security scan can find it (<code class="field">server.js</code>, <code class="field">index.js</code>, <code class="field">app.js</code>, <code class="field">main.py</code>, <code class="field">app.py</code>, <code class="field">main.go</code>) — <a href="#runtime">§8</a></span></li>
+        <li><span class="body">App installs a <code class="field">SIGTERM</code> handler and the Dockerfile uses exec-form <code class="field">CMD</code> — otherwise every redeploy SIGKILLs it mid-write — <a href="#runtime">§8</a></span></li>
         <li><span class="body">No build step depends on git history or tags — the clone is <code class="field">--depth 1</code> — <a href="#runtime">§8</a></span></li>
         <li><span class="body">Non-JS apps list <b>every</b> env var in <code class="field">env:</code> — auto-detection only scans JS/TS — <a href="#runtime">§8</a></span></li>
       </ul>
@@ -517,6 +518,22 @@ dist/</pre>
         <p>Your container is <code class="field">selfhost-&lt;name&gt;</code>, built from image <code class="field">selfhost-&lt;name&gt;:latest</code>, attached to the shared Docker network <code class="field">selfhost-net</code>. Redeploy is <code class="field">docker rm -f</code> then recreate — the container’s own writable layer is destroyed every time, which is exactly why on-disk state needs <code class="field">dataDir</code>. Apps on <code class="field">selfhost-net</code> can reach each other by container name; the bundled database is at <code class="field">selfhost-postgres:5432</code>.</p>
       </div>
 
+
+      <div class="rule">
+        <div class="rule-head"><h3>Handle SIGTERM — your container is destroyed on every redeploy</h3><span class="tag req">Required</span></div>
+        <p>Redeploy is <code class="field">docker rm -f</code>: SIGTERM, a ten-second grace period, then SIGKILL. <b>Node running as PID 1 gets no default signal disposition from the kernel</b>, so a server with no explicit handler doesn't just exit slowly — it never sees the signal at all, sits out the full grace period, and is killed mid-write.</p>
+        <pre><span class="c1">// Without this, SIGTERM is silently dropped when node is PID 1.</span>
+for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</span>]) {
+  process.on(sig, () => {
+    server.close(() => process.exit(0));
+    <span class="c1">// Don't let a hung keep-alive connection outlast the grace period.</span>
+    setTimeout(() => process.exit(0), 4000).unref();
+  });
+}</pre>
+        <p>Use the <b>exec form</b> of <code class="field">CMD</code> as well — <code class="field">CMD ["node", "server.js"]</code>, never <code class="field">CMD node server.js</code>. The shell form makes <code class="field">/bin/sh</code> PID 1, and it does not forward signals to your process at all, so the handler above never runs.</p>
+        <p class="why">Measured on this fleet 2026-09-06, not assumed: with no handler, <code class="field">docker stop</code> took <b>10.16s</b> and recorded exit code <b>137</b> (SIGKILL). Shell-form <code class="field">CMD</code> measured the same. With the handlers above and exec form: <b>0.19s</b>, exit code <b>0</b>. At the time of writing, <i>none</i> of the nine apps deployed here handled SIGTERM — so every redeploy of every app was costing ten seconds and ending in a kill. Speed is the minor half; the real risk is an app with <code class="field">dataDir</code> or Postgres being killed between a file write and the row that points at it.</p>
+      </div>
+
       <div class="rule">
         <div class="rule-head"><h3>Restart policy is <code class="field">unless-stopped</code></h3><span class="tag rec">Good to know</span></div>
         <p>Your container comes back after a host reboot or a Docker daemon restart without anyone clicking anything. A container that crashes on boot will therefore restart forever rather than sitting dead — make boot idempotent and make sure a missing optional dependency degrades instead of exiting (see <a href="#boot">§2</a>).</p>
@@ -673,6 +690,7 @@ Optional -- only if the app already has its own admin/settings API and a live AI
    - The repo is cloned with git clone --depth 1, so there is no history and there are no tags. If any build step or start script runs git describe / git rev-parse / a commit count to produce a version string, replace it with a value baked into a file -- it will otherwise fail or emit garbage.
    - The pre-build security scan reads only the Dockerfile, app.yaml, and ONE entrypoint file found at the repo root, matched against exactly this list: server.js, index.js, app.js, main.py, app.py, main.go. If the real entrypoint is somewhere else (src/index.js, bin/www, cmd/server/main.go), add or keep a root file with one of those names so the scan actually sees the app's code.
    - The container is recreated from scratch on every redeploy (docker rm -f), so anything written to the container filesystem outside dataDir is lost. Check for code writing uploads, SQLite files, caches or logs to a path not covered by dataDir.
+   - The container is stopped with SIGTERM, a 10-second grace period, then SIGKILL, on every single redeploy. Node running as PID 1 receives no default signal handling from the kernel, so unless the app explicitly installs one it never sees SIGTERM and is always killed. Add handlers for SIGTERM and SIGINT that close the server and exit, and make sure the Dockerfile uses exec-form CMD (CMD ["node", "server.js"]) not shell form (CMD node server.js) -- the shell form puts /bin/sh at PID 1, which does not forward signals at all. This matters most for any app writing to dataDir or a database, which can otherwise be killed between a file write and its matching row.
    - Restart policy is unless-stopped, so a container that crashes at boot restarts forever. Confirm boot is idempotent and re-running it against an already-populated database or data volume is safe.
    - Auto-detection of env var names only scans .js/.mjs/.cjs/.ts files. If this app is Python, Go, Ruby or Rust, every env var it reads -- including APP_PIN and any AI vars -- must be listed explicitly in app.yaml's env: array or the operator will have no way to set it.
    - Declaring a name in env: creates an empty slot in the dashboard panel; it does not supply a value. Only DATABASE_URL/DB_* (with postgres: true), SYNC_SECRET, and the three LM_STUDIO_* vars are given real values automatically.
