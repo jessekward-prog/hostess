@@ -448,6 +448,23 @@ body: JSON.stringify({ model: process.env.LM_STUDIO_MODEL || undefined, messages
 body: JSON.stringify({ model: process.env.LM_STUDIO_MODEL || <span class="s">'google/gemma-4-e2b'</span>, messages })</pre>
       </div>
 
+
+      <div class="rule">
+        <div class="rule-head"><h3><code class="field">LM_STUDIO_MODEL</code> is a default, not a cage</h3><span class="tag rec">Strongly recommended</span></div>
+        <p>An app that only ever sends the injected model id is locked to whatever the operator picked fleet-wide, and changing it costs a redeploy. It doesn't have to be — <b>you already hold <code class="field">LM_STUDIO_URL</code> and <code class="field">LM_STUDIO_API_KEY</code>, which is everything needed to enumerate the library yourself</b> and send a different <code class="field">model</code> per request. Hostess adds nothing for this; treat the injected value as the preselected default.</p>
+        <pre><span class="c1">// LM Studio's richer list: state and quantization, not just ids</span>
+const res = await fetch(`${LM_STUDIO_URL}/api/v0/models`, {
+  headers: { authorization: `Bearer ${LM_STUDIO_API_KEY}` },
+});
+const models = (await res.json()).data
+  .filter(m => m.type === <span class="s">'llm'</span> || m.type === <span class="s">'vlm'</span>)
+  .map(m => ({ id: m.id, loaded: m.state === <span class="s">'loaded'</span>, quant: m.quantization }));
+
+<span class="c1">// then just send the chosen one; omit `model` to accept the endpoint's default</span>
+body: JSON.stringify({ model: chosen || undefined, messages })</pre>
+        <p class="why">Verified end to end on a test app: it listed all 13 chat models, marked which were resident, and switched to a 12B for one message with <b>no redeploy and no change on the Hostess side</b>. The plain <code class="field">/v1/models</code> works too if you only need ids.</p>
+      </div>
+
       <div class="rule">
         <div class="rule-head"><h3>Assume the model will be swapped under you</h3><span class="tag req">Required</span></div>
         <p>The operator can point any app at any model in the library, per app, at any time. Your code must not be tuned to whichever one it was written against.</p>
@@ -457,7 +474,8 @@ body: JSON.stringify({ model: process.env.LM_STUDIO_MODEL || <span class="s">'go
 
       <div class="rule">
         <div class="rule-head"><h3>A model listed in <code class="field">/v1/models</code> is not necessarily loadable</h3><span class="tag req">Required</span></div>
-        <p>That endpoint lists what exists on disk, not what can load right now — a single GPU can only hold so much. Measured: a <i>correct</i> model id returned <code class="field">HTTP 400</code> with <code class="field">"Failed to load model"</code> because there was no room for it alongside the model already resident.</p>
+        <p>That endpoint lists what exists on disk, not what can load right now. Measured: a <i>correct</i> model id returned <code class="field">HTTP 400</code> with <code class="field">"Failed to load model"</code> — an 8B at <code class="field">Q8_0</code> (roughly 8.5&nbsp;GB of weights) had nowhere to go on a 16&nbsp;GB card that was already holding a resident 12B.</p>
+        <p><b>Quantization is the part people miss.</b> Two 8B models are not interchangeable: a <code class="field">Q4_K_S</code> build loads where a <code class="field">Q8_0</code> build of the same model won't. <code class="field">/api/v0/models</code> reports both <code class="field">state</code> (<code class="field">loaded</code> / <code class="field">not-loaded</code>) and <code class="field">quantization</code>, so a picker can show which models are resident (answer immediately), which will cold-load, and how heavy each one is.</p>
         <p>So treat a per-call failure as normal and recoverable, not as a broken deployment. If you offer a model picker, listing a model is not a promise it will work when picked.</p>
       </div>
 
@@ -718,6 +736,7 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
    - Use a generous request timeout (120s is reasonable). Measured on the same trivial prompt, one model answered in 1.9s and another in 8.9s, before counting a cold model load; reasoning models are slower still. Never tune a timeout to the model the app was written against.
    - Do not assume vision, tool-calling, long context, or a response style. Degrade instead of crashing if the model can't do it.
    - Treat a per-call HTTP 400 as normal and recoverable, not as a broken deployment: a model listed by /v1/models may still fail to load for lack of GPU memory.
+   - Do not lock the app to the injected model. It already has LM_STUDIO_URL and LM_STUDIO_API_KEY, which is all that is needed to GET {LM_STUDIO_URL}/api/v0/models (state + quantization) or /v1/models (ids only) and send a different "model" per request. If a model picker would be useful to this app's users, build it -- treat LM_STUDIO_MODEL as the preselected default, not the only option. Prefer showing which models are already loaded, since a resident model answers immediately while a cold one pays a load and a heavily-quantized one may fail to load at all.
    - Surface the endpoint's own error message rather than only its status code — "Failed to load model", a bad model id and a rejected key are all HTTP 400 and indistinguishable otherwise.
 
 6. Every app must gate access behind a PIN -- this is required, not optional, and Hostess does not manufacture the value for you. On first launch, with no PIN set yet, show a "set your PIN" screen: enter a PIN, enter it again to confirm the two match, then persist it (hashed) and gate every route behind it from then on. APP_PIN is still the fleet-wide env var name -- an operator can set it from the dashboard's env panel to preseed a PIN and skip the first-launch screen, or to override one already set interactively. If the app has no database, adding this gate is what makes dataDir mandatory -- declare it in app.yaml at the same time, because a PIN written anywhere else in the container is destroyed on the next redeploy and silently sends every user back to the setup screen.
