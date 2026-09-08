@@ -65,8 +65,32 @@ Restart=on-failure
 WantedBy=default.target
 EOF
 
+cat > "$HOME/.config/systemd/user/${SERVICE_NAME}-update.service" <<EOF
+[Unit]
+Description=Hostess self-update
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=$INSTALL_DIR
+ExecStart=/bin/bash -c 'git pull --ff-only && npm install --omit=dev && systemctl --user restart ${SERVICE_NAME}'
+EOF
+
+cat > "$HOME/.config/systemd/user/${SERVICE_NAME}-update.timer" <<EOF
+[Unit]
+Description=Hostess self-update timer
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+
+[Install]
+WantedBy=timers.target
+EOF
+
 systemctl --user daemon-reload
 systemctl --user enable --now "$SERVICE_NAME"
+systemctl --user enable --now "${SERVICE_NAME}-update.timer"
 loginctl enable-linger "$USER" 2>/dev/null || true
 
 echo ""

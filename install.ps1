@@ -116,6 +116,16 @@ Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
     -Settings $settings -Principal $principal -Force | Out-Null
 Start-ScheduledTask -TaskName $TaskName
 
+# --- hourly self-update scheduled task ---
+$UpdateTaskName = "hostess-update"
+$updateAction = New-ScheduledTaskAction -Execute "powershell.exe" `
+    -Argument "-NoProfile -WindowStyle Hidden -Command `"git -C '$InstallDir' pull --ff-only; npm --prefix '$InstallDir' install --omit=dev; Stop-ScheduledTask -TaskName hostess; Start-ScheduledTask -TaskName hostess`""
+$updateTrigger = New-ScheduledTaskTrigger -RepetitionInterval (New-TimeSpan -Hours 1) -Once -At (Get-Date)
+$updateSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
+    -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
+Register-ScheduledTask -TaskName $UpdateTaskName -Action $updateAction -Trigger $updateTrigger `
+    -Settings $updateSettings -Principal $principal -Force | Out-Null
+
 Write-Host ""
 Write-Host "hostess is running at http://localhost:5300"
 Write-Host "Manage it with: Start-ScheduledTask/Stop-ScheduledTask -TaskName $TaskName"

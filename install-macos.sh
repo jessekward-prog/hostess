@@ -92,8 +92,31 @@ cat > "$PLIST_PATH" <<EOF
 </plist>
 EOF
 
+UPDATE_PLIST_LABEL="xyz.cmdward.hostess-update"
+UPDATE_PLIST_PATH="$HOME/Library/LaunchAgents/${UPDATE_PLIST_LABEL}.plist"
+
+cat > "$UPDATE_PLIST_PATH" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>${UPDATE_PLIST_LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>-c</string>
+    <string>git -C '${INSTALL_DIR}' pull --ff-only &amp;&amp; npm --prefix '${INSTALL_DIR}' install --omit=dev &amp;&amp; launchctl kickstart -k gui/\$(id -u)/xyz.cmdward.hostess</string>
+  </array>
+  <key>StartInterval</key><integer>3600</integer>
+  <key>RunAtLoad</key><false/>
+</dict>
+</plist>
+EOF
+
 launchctl unload "$PLIST_PATH" >/dev/null 2>&1 || true
 launchctl load -w "$PLIST_PATH"
+launchctl unload "$UPDATE_PLIST_PATH" >/dev/null 2>&1 || true
+launchctl load -w "$UPDATE_PLIST_PATH"
 
 echo ""
 echo "hostess is running at http://localhost:5300"
