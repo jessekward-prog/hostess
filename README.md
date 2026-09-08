@@ -10,12 +10,12 @@ Full walkthrough with copy-paste commands for every option: **[hostess.cmdward.x
 
 **Linux** (Debian/Ubuntu-family):
 ```
-curl -fsSL https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.sh | bash
+git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || git -C ~/hostess pull --ff-only; ~/hostess/install.sh
 ```
 
 **macOS:**
 ```
-curl -fsSL https://raw.githubusercontent.com/jessekward-prog/hostess/main/install-macos.sh | bash
+git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || git -C ~/hostess pull --ff-only; ~/hostess/install-macos.sh
 ```
 
 **Windows** (PowerShell — re-launches itself elevated, approve the UAC prompt):
