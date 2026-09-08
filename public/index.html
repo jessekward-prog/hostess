@@ -332,6 +332,7 @@
   #marketplace-grid { grid-template-columns: repeat(2, 1fr); }
   .marketplace-card .app-card-head { padding: 22px 20px 0; }
   .marketplace-card .app-logo-fallback { width: 34px; height: 34px; font-size: 16px; border-radius: 8px; }
+  .marketplace-card .app-logo { width: 34px; height: 34px; border-radius: 8px; }
   .marketplace-card .app-title { font-size: 18px; }
   .marketplace-card .app-desc { height: auto; -webkit-line-clamp: 4; margin: 12px 20px 18px; font-size: 13.5px; }
   .marketplace-download { width: calc(100% - 40px); margin: 0 20px 20px; padding: 13px 18px; font-size: 14px; }
@@ -1356,7 +1357,7 @@ function marketplaceCard(item) {
     <div class="card-content">
       <div class="app-card-head">
         <div class="app-title-row">
-          <span class="app-logo-fallback">${item.name[0].toUpperCase()}</span>
+          ${item.icon ? `<img class="app-logo" src="${item.icon}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'app-logo-fallback',textContent:'${item.name[0].toUpperCase()}'}))">` : `<span class="app-logo-fallback">${item.name[0].toUpperCase()}</span>`}
           <p class="app-title">${item.name}</p>
         </div>
       </div>
