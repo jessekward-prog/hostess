@@ -18,7 +18,13 @@ const app = express();
 const PORT = 5300;
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), {
+  setHeaders(res, filePath) {
+    if (path.basename(filePath) === 'index.html') {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+  },
+}));
 
 app.get('/api/auth/status', (req, res) => {
   res.json({ hasAccount: auth.hasAccount(), loggedIn: auth.isLoggedIn(req) });
