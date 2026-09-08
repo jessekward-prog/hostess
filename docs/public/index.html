@@ -373,7 +373,7 @@
             <p class="card-desc">One command. Works on a clean machine, safe to re-run.</p>
           </div>
           <div class="card-body">
-            <div class="code-block accent" id="cmd-linux">curl -fsSL https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.sh | bash</div>
+            <div class="code-block accent" id="cmd-linux">git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || git -C ~/hostess pull --ff-only; ~/hostess/install.sh</div>
           </div>
           <div class="card-foot">
             <button class="icon-btn" data-copy="cmd-linux" onclick="copyCmd(this)">
@@ -464,7 +464,7 @@ systemctl --user stop    hostess</div>
             <p class="card-desc">One command. Works on a clean machine, safe to re-run.</p>
           </div>
           <div class="card-body">
-            <div class="code-block accent" id="cmd-macos">curl -fsSL https://raw.githubusercontent.com/jessekward-prog/hostess/main/install-macos.sh | bash</div>
+            <div class="code-block accent" id="cmd-macos">git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || git -C ~/hostess pull --ff-only; ~/hostess/install-macos.sh</div>
           </div>
           <div class="card-foot">
             <button class="icon-btn" data-copy="cmd-macos" onclick="copyCmd(this)">
