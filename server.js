@@ -6,11 +6,13 @@ const guard = require('./lib/guard');
 const settings = require('./lib/settings');
 const ailink = require('./lib/ailink');
 const autoupdate = require('./lib/autoupdate');
+const selfupdate = require('./lib/selfupdate');
 const auth = require('./lib/auth');
 const tunnel = require('./lib/tunnel');
 const gateway = require('./lib/gateway');
 const registry = require('./lib/registry');
 const tailscale = require('./lib/tailscale');
+const marketplace = require('./lib/marketplace');
 
 const app = express();
 const PORT = 5300;
@@ -161,6 +163,10 @@ app.post('/api/apps/:name/gateway/disable', (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/marketplace', (req, res) => {
+  res.json(marketplace.list());
+});
+
 app.post('/api/apps', async (req, res) => {
   const { source } = req.body || {};
   if (!source) return res.status(400).json({ error: 'Missing "source" (repo URL or local path)' });
@@ -295,6 +301,7 @@ app.put('/api/lm', (req, res) => {
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`hostess dashboard: http://localhost:${PORT}`);
   autoupdate.start(console.log);
+  selfupdate.start(console.log);
 });
 
 process.on('SIGTERM', () => { tunnel.stopAll(); process.exit(0); });
