@@ -13,12 +13,22 @@ if [ "$(uname -s)" != "Darwin" ]; then
   exit 1
 fi
 
+# --- Xcode Command Line Tools (git is a stub that GUI-prompts without them) ---
+if ! xcode-select -p >/dev/null 2>&1; then
+  echo "Command Line Tools aren't installed yet — a macOS dialog is about to open." >&2
+  xcode-select --install >/dev/null 2>&1 || true
+  echo "Approve that dialog, wait for the install to finish, then re-run this script." >&2
+  exit 1
+fi
+
 # --- Homebrew ---
 if ! command -v brew >/dev/null 2>&1; then
   echo "Installing Homebrew..."
   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-  eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
 fi
+# Run every time (not just on fresh install) so this script's PATH always
+# prefers Homebrew's bin over any older/system node, git, etc. on PATH.
+eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
 
 # --- prerequisites ---
 if ! command -v git >/dev/null 2>&1; then
@@ -26,8 +36,12 @@ if ! command -v git >/dev/null 2>&1; then
   brew install git
 fi
 
-if ! command -v node >/dev/null 2>&1; then
-  echo "Installing Node.js..."
+NODE_MAJOR=0
+if command -v node >/dev/null 2>&1; then
+  NODE_MAJOR="$(node -v | sed 's/^v//;s/\..*//')"
+fi
+if [ "$NODE_MAJOR" -lt 18 ]; then
+  echo "Installing Node.js via Homebrew..."
   brew install node
 fi
 
@@ -38,7 +52,7 @@ fi
 
 if ! docker info >/dev/null 2>&1; then
   echo "Starting Docker Desktop..."
-  open -a Docker
+  open -a Docker 2>/dev/null || open -a "Docker Desktop" 2>/dev/null || open /Applications/Docker.app 2>/dev/null || true
   echo -n "Waiting for Docker to be ready (first run needs you to approve its permissions dialog)..."
   attempts=0
   until docker info >/dev/null 2>&1 || [ "$attempts" -ge 100 ]; do
@@ -88,6 +102,10 @@ cat > "$PLIST_PATH" <<EOF
   <key>KeepAlive</key><true/>
   <key>StandardOutPath</key><string>/tmp/hostess.log</string>
   <key>StandardErrorPath</key><string>/tmp/hostess.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>${HOME}/.docker/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
 </dict>
 </plist>
 EOF
@@ -109,6 +127,10 @@ cat > "$UPDATE_PLIST_PATH" <<EOF
   </array>
   <key>StartInterval</key><integer>3600</integer>
   <key>RunAtLoad</key><false/>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>${HOME}/.docker/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
 </dict>
 </plist>
 EOF

@@ -15,8 +15,10 @@ git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || 
 
 **macOS:**
 ```
+xcode-select -p >/dev/null 2>&1 || { xcode-select --install; echo "Approve the Command Line Tools dialog, then re-run this command."; }
 git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || git -C ~/hostess pull --ff-only; ~/hostess/install-macos.sh
 ```
+(On a brand-new Mac without Command Line Tools, `git clone` pops an installer dialog instead of running — the first line catches that up front.)
 
 **Windows** (PowerShell — re-launches itself elevated, approve the UAC prompt):
 ```
