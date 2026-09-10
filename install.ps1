@@ -53,6 +53,22 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     Refresh-Path
 }
 
+# Docker Desktop's named pipe only accepts docker-users members (or admins).
+# Its own GUI first-run wizard normally adds you to that group, but a silent
+# winget install skips that wizard entirely -- so the scheduled task below,
+# which runs at standard (Limited) rights rather than this elevated session,
+# can come up unable to reach Docker at all even though the check right below
+# this (run as Administrator) succeeds. Add the membership ourselves so it
+# doesn't depend on the user ever clicking through that wizard.
+try {
+    if (Get-LocalGroup -Name "docker-users" -ErrorAction SilentlyContinue) {
+        if (-not (Get-LocalGroupMember -Group "docker-users" -Member $env:USERNAME -ErrorAction SilentlyContinue)) {
+            Write-Host "Adding $env:USERNAME to the docker-users group..."
+            Add-LocalGroupMember -Group "docker-users" -Member $env:USERNAME -ErrorAction SilentlyContinue
+        }
+    }
+} catch {}
+
 $wslStatus = wsl --status 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Enabling WSL2 (required by Docker Desktop)..."

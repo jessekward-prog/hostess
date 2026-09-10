@@ -26,11 +26,12 @@ if [ "$NODE_MAJOR" -lt 18 ]; then
   $SUDO apt-get install -y nodejs
 fi
 
+DOCKER_GROUP_JUST_ADDED=0
 if ! command -v docker >/dev/null 2>&1; then
   echo "Installing Docker..."
   curl -fsSL https://get.docker.com | $SUDO sh
   $SUDO usermod -aG docker "$USER"
-  echo "Added $USER to the docker group — log out and back in (or run 'newgrp docker') before deploying anything."
+  DOCKER_GROUP_JUST_ADDED=1
 fi
 
 # --- fetch the app ---
@@ -89,12 +90,25 @@ WantedBy=timers.target
 EOF
 
 systemctl --user daemon-reload
-systemctl --user enable --now "$SERVICE_NAME"
+systemctl --user enable "$SERVICE_NAME"
 systemctl --user enable --now "${SERVICE_NAME}-update.timer"
 loginctl enable-linger "$USER" 2>/dev/null || true
 
-echo ""
-echo "hostess is running at http://localhost:5300"
-echo "Manage it with: systemctl --user {status,restart,stop} $SERVICE_NAME"
-sleep 1
-command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:5300" >/dev/null 2>&1 || true
+if [ "$DOCKER_GROUP_JUST_ADDED" = "1" ]; then
+  # This shell's own docker-group membership won't apply until a fresh
+  # login, and systemd --user (already running before the usermod above)
+  # would hand the service that same stale group list if started now — it'd
+  # come up "active" but every docker call inside it would fail permission
+  # denied. Enable it (survives reboot) but leave starting it for a session
+  # that actually has the new group.
+  echo ""
+  echo "Docker was just installed and $USER was added to the docker group."
+  echo "Log out and back in (or reboot), then run: systemctl --user start $SERVICE_NAME"
+else
+  systemctl --user start "$SERVICE_NAME"
+  echo ""
+  echo "hostess is running at http://localhost:5300"
+  echo "Manage it with: systemctl --user {status,restart,stop} $SERVICE_NAME"
+  sleep 1
+  command -v xdg-open >/dev/null 2>&1 && xdg-open "http://localhost:5300" >/dev/null 2>&1 || true
+fi
