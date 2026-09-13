@@ -282,7 +282,7 @@ env:                   <span class="c1"># optional — see §5, mostly unnecessa
   - SOME_VAR
 dataDir: /app/data      <span class="c1"># optional, absolute container path — see below</span>
 search: false            <span class="c1"># optional — opt-in web search backend, see below</span>
-autoUpdate: false        <span class="c1"># optional, default false — see below</span>
+autoUpdate: true         <span class="c1"># recommended for git deploys, default false — see below</span>
 description: "..."       <span class="c1"># optional, cosmetic — see below</span>
 icon: public/icon.png    <span class="c1"># optional, cosmetic — see below</span></pre>
         <p class="why"><b>Why <code class="field">port</code> trips people up:</b> it's the port your process binds to <i>inside the container</i>, not the host port you'll browse to — Hostess picks that automatically from 4000–4999 and remaps it for you.</p>
@@ -304,8 +304,9 @@ icon: public/icon.png    <span class="c1"># optional, cosmetic — see below</sp
       </div>
 
       <div class="rule">
-        <div class="rule-head"><h3>autoUpdate — pull and rebuild automatically</h3><span class="tag rec">Optional</span></div>
-        <p>If <code class="field">true</code> and the app was deployed from a git remote, Hostess pulls and rebuilds on its own rather than waiting for a manual redeploy click.</p>
+        <div class="rule-head"><h3>autoUpdate — pull and rebuild automatically</h3><span class="tag rec">Recommended</span></div>
+        <p>If <code class="field">true</code> and the app was deployed from a git remote, Hostess pulls and rebuilds on its own rather than waiting for a manual redeploy click. Set it to <code class="field">true</code> on anything deployed from a git URL — otherwise every push needs someone to remember to come back here and click redeploy, and the deployed app quietly drifts behind the repo.</p>
+        <p><strong>It takes one manual redeploy to switch on.</strong> The flag is read out of <code class="field">app.yaml</code> at deploy time and written into <code class="field">registry.json</code>; the poller then reads the <em>registry</em>, not your repo. So the commit that adds <code class="field">autoUpdate: true</code> can't deploy itself — an app currently registered with it off is never polled, so it never sees that commit. Push the flag, then redeploy once by hand (dashboard button, or <code class="field">node deploy.js &lt;git-url&gt;</code>). Every push after that is automatic.</p>
       </div>
 
       <div class="rule">
@@ -551,6 +552,7 @@ dist/</pre>
       <div class="rule">
         <div class="rule-head"><h3>autoUpdate only works from a git remote, and polls every 10 minutes</h3><span class="tag rec">Good to know</span></div>
         <p>Hostess runs <code class="field">git ls-remote</code> against the source every 10 minutes and redeploys when the default branch’s SHA differs from the one recorded at last deploy. A local-path deploy has no remote and no <code class="field">.git</code>, so <code class="field">autoUpdate: true</code> is silently a no-op for it — not an error, just nothing ever happens. Deploy from a git URL if you want this.</p>
+        <p>If an app isn’t updating on its own, check <code class="field">registry.json</code> rather than <code class="field">app.yaml</code> — <code class="field">autoUpdate</code> and <code class="field">commitSha</code> there are what the poller actually reads, and they only change when the app is deployed. A repo whose <code class="field">app.yaml</code> says <code class="field">true</code> while its registry record says <code class="field">false</code> has never been redeployed since the flag was added, and will sit on the old commit forever.</p>
       </div>
 
       <div class="rule">
@@ -735,7 +737,7 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
    - dataDir: an absolute container path (optional) -- if the app writes persistent state to disk outside Postgres (uploads, SQLite, etc.), set this so Hostess mounts a volume there instead of losing it on redeploy
    - publicGateway.port: an integer 1-65535, different from port (optional) -- declares a second, narrow internal port for public routes only (see #2b); most apps don't need this
    - description: a short blurb (optional, cosmetic) -- shown on the app's dashboard card
-   - autoUpdate: true or false (optional, default false) -- when true AND the app was deployed from a git remote, Hostess polls the remote every 10 minutes and rebuilds automatically on a new commit. Silently does nothing for local-path deploys, which are copied without .git.
+   - autoUpdate: true or false (optional, default false) -- set this to true whenever the app is deployed from a git URL, so pushes redeploy themselves instead of the running app drifting behind the repo until someone remembers to click redeploy. When true, Hostess polls the remote every 10 minutes and rebuilds on a new commit. Silently does nothing for local-path deploys, which are copied without .git. It cannot switch itself on: the flag is read from app.yaml at deploy time and cached in registry.json, and the poller reads that registry rather than your repo -- so an app currently registered with autoUpdate off is never polled and never sees the commit that enables it. After adding the flag, say clearly that it needs one manual redeploy (dashboard button, or `node deploy.js &lt;git-url&gt;`) before it takes effect; every push after that is automatic.
    - icon: a path to an existing image file in the repo (optional, cosmetic) -- shown on the app's dashboard card
    Create this file if it's missing, using the app's real values. If the app has a real icon/logo asset already in the repo and no description/icon set, add them -- cheap and improves the dashboard card.
 
