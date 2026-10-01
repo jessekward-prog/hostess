@@ -1,6 +1,7 @@
 const path = require('path');
 const express = require('express');
 const qrcode = require('qrcode');
+const ntfy = require('./lib/ntfy');
 const engine = require('./lib/engine');
 const guard = require('./lib/guard');
 const settings = require('./lib/settings');
@@ -304,30 +305,46 @@ app.put('/api/lm', (req, res) => {
   res.json({ url, selected: model, apiKeySet: !!settings.get('lmApiKey') });
 });
 
-// The fleet's push server (ntfy). Apps that read NTFY_URL / NTFY_TOKEN / NTFY_TOPIC get these on
-// deploy (lib/engine.js). The token is write-only from here: GET only says whether one is set.
-app.get('/api/push', (req, res) => {
-  res.json({ url: settings.get('ntfyUrl') || '', topic: settings.get('ntfyTopic') || '', tokenSet: !!settings.get('ntfyToken') });
-});
+// The fleet's push server (lib/ntfy.js): built in, ntfy.sh, or the operator's own. Apps that read
+// NTFY_URL / NTFY_TOKEN / NTFY_TOPIC get it on deploy. Tokens are write-only from here.
+async function pushState() {
+  const c = ntfy.config();
+  const link = ntfy.phoneLink(c);
+  return {
+    mode: c.mode, url: c.phoneUrl || '', topic: c.topic || '', link,
+    qr: link ? await qrcode.toDataURL(link, { margin: 1, width: 280 }) : null,
+    custom: { url: settings.get('ntfyUrl') || '', topic: settings.get('ntfyTopic') || '', tokenSet: !!settings.get('ntfyToken') },
+  };
+}
 
-app.put('/api/push', (req, res) => {
+app.get('/api/push', async (req, res) => res.json(await pushState()));
+
+// Saves the "my server" fields and switches to that mode.
+app.put('/api/push', async (req, res) => {
   const { url, token, topic } = req.body || {};
   if (typeof url === 'string' && url.trim() && !/^https?:\/\/[^\s/]+/.test(url.trim())) return res.status(400).json({ error: 'The server address must start with http:// or https://' });
   if (typeof topic === 'string' && topic.trim() && !/^[-_A-Za-z0-9]{1,64}$/.test(topic.trim())) return res.status(400).json({ error: 'Topic: letters, numbers, - and _ only' });
   if (typeof url === 'string') settings.set('ntfyUrl', url.trim().replace(/\/+$/, ''));
   if (typeof token === 'string') settings.set('ntfyToken', token.trim());
   if (typeof topic === 'string') settings.set('ntfyTopic', topic.trim());
-  res.json({ url: settings.get('ntfyUrl') || '', topic: settings.get('ntfyTopic') || '', tokenSet: !!settings.get('ntfyToken') });
+  try { await ntfy.setMode('custom'); res.json(await pushState()); } catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post('/api/push/mode', async (req, res) => {
+  const mode = req.body && req.body.mode;
+  if (!['builtin', 'ntfysh', ''].includes(mode)) return res.status(400).json({ error: 'Unknown push mode.' });
+  try { await ntfy.setMode(mode, console.log); res.json(await pushState()); }
+  catch (err) { res.status(400).json({ error: err.message, reason: err.reason, enableUrl: err.enableUrl, fixCommand: err.fixCommand }); }
 });
 
 app.post('/api/push/test', async (req, res) => {
-  const url = settings.get('ntfyUrl'), token = settings.get('ntfyToken');
-  if (!url) return res.status(400).json({ error: 'Set the server address first.' });
+  const c = ntfy.config();
+  if (!c.hostUrl || !c.topic) return res.status(400).json({ error: 'Pick a push server first.' });
   try {
-    const r = await fetch(`${url}/`, {
+    const r = await fetch(`${c.hostUrl}/`, {
       method: 'POST', signal: AbortSignal.timeout(10000),
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: JSON.stringify({ topic: settings.get('ntfyTopic') || 'hostess', title: 'Hostess', message: 'Push is set up. Apps that read NTFY_URL get this server on their next deploy.' }),
+      headers: c.token ? { Authorization: `Bearer ${c.token}` } : {},
+      body: JSON.stringify({ topic: c.topic, title: 'Hostess', message: 'Push is set up. Apps that read NTFY_URL get this server on their next deploy.' }),
     });
     if (!r.ok) throw new Error(`the server answered HTTP ${r.status}${r.status === 403 ? ' (token missing or not allowed to publish)' : ''}`);
     res.json({ ok: true });
