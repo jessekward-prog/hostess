@@ -386,6 +386,26 @@
       </div>
     </div>
     <div class="myai-section">
+      <button class="myai-toggle" id="push-toggle">
+        <span class="chev">▸</span><span>PUSH</span>
+        <span class="myai-dot" id="push-dot"></span>
+      </button>
+      <div class="myai-panel" id="push-panel">
+        <div class="myai-body">
+          <span class="myai-hint">One ntfy server for every app. Any app that reads NTFY_URL, NTFY_TOKEN or NTFY_TOPIC gets these on its next deploy. A value set on an app's own card still wins.</span>
+          <span class="myai-status" id="push-status"></span>
+          <input class="myai-input" id="push-url-input" placeholder="ntfy server, e.g. https://ntfy.sh" autocomplete="off">
+          <input class="myai-input" id="push-token-input" type="password" placeholder="access token (only if the server has auth on)" autocomplete="off">
+          <input class="myai-input" id="push-topic-input" placeholder="default topic, e.g. my-alerts" autocomplete="off" spellcheck="false">
+          <div style="display:flex; gap:6px;">
+            <button class="myai-save" id="push-save-btn">save</button>
+            <button class="myai-save" id="push-test-btn" type="button" style="background:transparent; color:var(--s-text-1); border:1px solid var(--s-border);">send test</button>
+          </div>
+          <span class="myai-saved-flash" id="push-saved-flash" hidden>saved</span>
+        </div>
+      </div>
+    </div>
+    <div class="myai-section">
       <button class="myai-toggle" id="account-toggle">
         <span class="chev">▸</span><span>Account</span>
       </button>
@@ -1132,6 +1152,7 @@ async function load() {
   }
 
   await refreshAiConfigured();
+  refreshPush();
   installedAppNames = new Set(apps.map((a) => a.name));
   renderMarketplaceGrid();
 
@@ -1793,6 +1814,49 @@ mountWaveBackground(document.querySelector('aside.sidebar'), '232,132,10'); // c
 }
 
 // ── Account panel — change password, suggesting a fresh random passphrase.
+// ---------- push (the fleet's ntfy server) ----------
+const pushToggle = document.getElementById('push-toggle');
+const pushPanel = document.getElementById('push-panel');
+const pushStatus = document.getElementById('push-status');
+const pushUrlInput = document.getElementById('push-url-input');
+const pushTokenInput = document.getElementById('push-token-input');
+const pushTopicInput = document.getElementById('push-topic-input');
+
+function showPush(p) {
+  pushUrlInput.value = p.url;
+  pushTopicInput.value = p.topic;
+  pushTokenInput.value = '';
+  pushTokenInput.placeholder = p.tokenSet ? 'token set — paste a new one to replace' : 'access token (only if the server has auth on)';
+  document.getElementById('push-dot').classList.toggle('connected', !!p.url);
+  pushStatus.textContent = p.url ? `apps get ${p.url}${p.topic ? ` · topic ${p.topic}` : ''}` : 'not set — apps that read NTFY_URL get nothing';
+}
+async function refreshPush() {
+  try { showPush(await api('/api/push')); } catch (err) { pushStatus.textContent = `can't load: ${err.message}`; }
+}
+
+pushToggle.addEventListener('click', () => {
+  const opening = !pushToggle.classList.contains('open');
+  pushToggle.classList.toggle('open');
+  pushPanel.classList.toggle('open');
+  if (opening) refreshPush();
+});
+
+document.getElementById('push-save-btn').addEventListener('click', async () => {
+  const body = { url: pushUrlInput.value, topic: pushTopicInput.value };
+  if (pushTokenInput.value.trim()) body.token = pushTokenInput.value; // blank keeps the saved token
+  try {
+    showPush(await api('/api/push', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
+    const flash = document.getElementById('push-saved-flash');
+    flash.hidden = false; setTimeout(() => { flash.hidden = true; }, 1500);
+  } catch (err) { pushStatus.textContent = `not saved: ${err.message}`; }
+});
+
+document.getElementById('push-test-btn').addEventListener('click', async () => {
+  pushStatus.textContent = 'sending...';
+  try { await api('/api/push/test', { method: 'POST' }); pushStatus.textContent = 'test sent — check your phone'; }
+  catch (err) { pushStatus.textContent = `test failed: ${err.message}`; }
+});
+
 const accountToggle = document.getElementById('account-toggle');
 const accountPanel = document.getElementById('account-panel');
 const accountNewPassword = document.getElementById('account-new-password');

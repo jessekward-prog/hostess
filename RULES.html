@@ -259,6 +259,7 @@
         <li><span class="body">If <code class="field">postgres: true</code>, the DB pool honors <code class="field">sslmode=disable</code> in <code class="field">DATABASE_URL</code> — <a href="#postgres">§4</a></span></li>
         <li><span class="body">AI-capable apps use the fleet's env var names (<code class="field">LM_STUDIO_URL</code> etc.) so Hostess finds them with no manifest edits — <a href="#env-names">reference</a></span></li>
         <li><span class="body">AI apps hardcode no model id, tolerate a slow or unloadable one, and use a generous timeout — the operator can swap models per app — <a href="#ai">§5</a></span></li>
+        <li><span class="body">Apps that send push notifications read <code class="field">NTFY_URL</code> / <code class="field">NTFY_TOKEN</code> / <code class="field">NTFY_TOPIC</code>, treat a missing <code class="field">NTFY_URL</code> as push off, and publish JSON to the server root — <a href="#connectivity">reference</a></span></li>
         <li><span class="body">Nothing in <code class="field">Dockerfile</code>, <code class="field">app.yaml</code>, or the entrypoint reads as privilege-escalation or a hardcoded secret to an LLM reviewer — <a href="#guard">§6</a></span></li>
         <li><span class="body">Real <code class="field">.gitignore</code> covering <code class="field">node_modules/</code> and <code class="field">.env</code> — checked, not assumed — <a href="#hygiene">§7</a></span></li>
         <li><span class="body">Entrypoint is at the repo <b>root</b> and named so the security scan can find it (<code class="field">server.js</code>, <code class="field">index.js</code>, <code class="field">app.js</code>, <code class="field">main.py</code>, <code class="field">app.py</code>, <code class="field">main.go</code>) — <a href="#runtime">§8</a></span></li>
@@ -584,7 +585,7 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
 
       <div class="rule">
         <div class="rule-head"><h3>Environment variables: what arrives, and who wins</h3><span class="tag auto">Auto-injected</span></div>
-        <p>With <code class="field">postgres: true</code>: <code class="field">DATABASE_URL</code> plus <code class="field">DB_HOST</code>/<code class="field">DB_PORT</code>/<code class="field">DB_NAME</code>/<code class="field">DB_USER</code>/<code class="field">DB_PASSWORD</code> — both conventions, read whichever suits. With <code class="field">search: true</code>: <code class="field">SEARXNG_URL</code>. If your app reads <code class="field">SYNC_SECRET</code> it's generated once and kept stable; if it reads <code class="field">LM_STUDIO_URL</code>, <code class="field">LM_STUDIO_API_KEY</code> or <code class="field">LM_STUDIO_MODEL</code>, those come from the fleet's library config.</p>
+        <p>With <code class="field">postgres: true</code>: <code class="field">DATABASE_URL</code> plus <code class="field">DB_HOST</code>/<code class="field">DB_PORT</code>/<code class="field">DB_NAME</code>/<code class="field">DB_USER</code>/<code class="field">DB_PASSWORD</code> — both conventions, read whichever suits. With <code class="field">search: true</code>: <code class="field">SEARXNG_URL</code>. If your app reads <code class="field">SYNC_SECRET</code> it's generated once and kept stable; if it reads <code class="field">LM_STUDIO_URL</code>, <code class="field">LM_STUDIO_API_KEY</code> or <code class="field">LM_STUDIO_MODEL</code>, those come from the fleet's library config; if it reads <code class="field">NTFY_URL</code>, <code class="field">NTFY_TOKEN</code> or <code class="field">NTFY_TOPIC</code>, those come from the dashboard's PUSH panel.</p>
         <p>Nothing else is injected — declaring a name in <code class="field">env:</code> creates an <i>empty</i> panel slot, it does not supply a value. A value typed into that panel always wins and is never overwritten by auto-injection; auto-injection only fills a variable your app reads that has no operator value yet. Operator values and generated secrets both survive redeploys, so never regenerate or cache them yourself.</p>
       </div>
 
@@ -604,6 +605,7 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
           <tr><td>Call any external API or website</td><td>Just call it</td><td>None — containers have unrestricted outbound internet</td></tr>
           <tr><td>Search the web</td><td><code class="field">search: true</code> → <code class="field">SEARXNG_URL</code></td><td>One line in app.yaml (<a href="#manifest">§1</a>)</td></tr>
           <tr><td>Talk to an AI model</td><td><code class="field">LM_STUDIO_*</code></td><td>None — auto-detected and injected (<a href="#ai">§5</a>)</td></tr>
+          <tr><td>Push a notification to the operator's phone</td><td><code class="field">NTFY_*</code></td><td>None — auto-detected, and injected once the operator fills in the PUSH panel. POST JSON <code class="field">{topic, title, message}</code> to the server root, not headers: a non-ASCII header value throws inside <code class="field">fetch</code>.</td></tr>
           <tr><td>Store data</td><td><code class="field">postgres: true</code> → <code class="field">DATABASE_URL</code></td><td>One line in app.yaml (<a href="#postgres">§4</a>)</td></tr>
           <tr><td>Reach another app on this machine</td><td>Its container name on <code class="field">selfhost-net</code></td><td>None — e.g. <code class="field">http://selfhost-shelf-cmd:3000</code></td></tr>
           <tr><td>Give someone <i>outside</i> a link</td><td><code class="field">publicGateway</code></td><td>Declare a second port; Hostess owns the tunnel (<a href="#network">§3</a>)</td></tr>
@@ -688,6 +690,9 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
           <tr><td>Default provider</td><td>VISION_PROVIDER</td><td>AI_PROVIDER, MODE</td></tr>
           <tr><td>Machine-auth secret</td><td>SYNC_SECRET</td><td>API_SECRET, WEBHOOK_KEY</td></tr>
           <tr><td>Search backend</td><td>SEARXNG_URL</td><td>SEARCH_URL, SEARX_HOST</td></tr>
+          <tr><td>Push server</td><td>NTFY_URL</td><td>PUSH_URL, NOTIFY_URL, NTFY_HOST</td></tr>
+          <tr><td>Push access token</td><td>NTFY_TOKEN</td><td>PUSH_TOKEN, NTFY_KEY</td></tr>
+          <tr><td>Push topic</td><td>NTFY_TOPIC</td><td>PUSH_TOPIC, NTFY_CHANNEL</td></tr>
         </table>
       </div>
       <div class="callout">
@@ -699,12 +704,12 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
       </div>
 
       <div class="callout">
-        <b>Extending this list:</b> if a new app needs a genuinely new concept, add the name here and to <code class="field">AI_ENV_VAR_RE</code> in Hostess's <code class="field">lib/manifest.js</code> — one regex, one place.
+        <b>Extending this list:</b> if a new app needs a genuinely new concept, add the name here, add a detection pattern to <code class="field">KNOWN_ENV_VAR_RES</code> in Hostess's <code class="field">lib/manifest.js</code>, and if Hostess should supply the value, an <code class="field">injectFleet</code> line in <code class="field">lib/engine.js</code> — the way <code class="field">NTFY_*</code> was added.
       </div>
     </section>
 
     <footer class="page-foot">
-      jessekward-prog/hostess — reflects the codebase as of 2026-09-06 (lib/manifest.js, engine.js, guard.js, clone.js, autoupdate.js). Update this file when the contract changes, not just the code.
+      jessekward-prog/hostess — reflects the codebase as of 2026-10-02 (lib/manifest.js, engine.js, guard.js, clone.js, autoupdate.js). Update this file when the contract changes, not just the code.
     </footer>
 
   </main>
@@ -778,6 +783,7 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
    The rule underneath: outbound is free and needs no permission; inbound is always the operator's decision, never the app's.
 
 5e. If the app calls a paid cloud model (OpenAI, Anthropic), add the local library as a second provider and default to it, keeping the cloud path as a fallback -- do not remove the cloud provider. For an OpenAI-shaped client this is just a baseURL/key/model swap, since LM Studio serves an OpenAI-compatible /v1/chat/completions: point baseURL at `${LM_STUDIO_URL}/v1` with LM_STUDIO_API_KEY. If the app uses the Anthropic SDK, do NOT mechanically convert it -- the request shape, response parsing and tool-use blocks do not map across, and the result will be confidently broken. Report it and leave it for a human.
+5f. If the app sends push notifications to the operator, use ntfy through NTFY_URL, NTFY_TOKEN and NTFY_TOPIC (rename anything else that means the same thing). Hostess auto-detects these names and injects the values from its PUSH panel, the same way it does LM_STUDIO_*. Treat a missing NTFY_URL as "push off" and keep working. Send NTFY_TOKEN as a Bearer header only when it is set. POST a JSON body {topic, title, message} to the server root rather than passing Title/Tags as headers: a non-ASCII header value throws inside fetch.
 
 6. Every app must gate access behind a PIN -- this is required, not optional, and Hostess does not manufacture the value for you. On first launch, with no PIN set yet, show a "set your PIN" screen: enter a PIN, enter it again to confirm the two match, then persist it (hashed) and gate every route behind it from then on. APP_PIN is still the fleet-wide env var name -- an operator can set it from the dashboard's env panel to preseed a PIN and skip the first-launch screen, or to override one already set interactively. If the app has no database, adding this gate is what makes dataDir mandatory -- declare it in app.yaml at the same time, because a PIN written anywhere else in the container is destroyed on the next redeploy and silently sends every user back to the setup screen.
    The PIN entry UI must accept the keyboard's number row AND the numpad, not just clicks on an on-screen keypad. Two tests are needed, not one: e.key reports a digit for the numpad only when Num Lock is ON, and sends Home/End/PageUp/Insert when it is off, so also test e.code:
@@ -801,7 +807,7 @@ Optional -- only if the app already has its own admin/settings API and a live AI
    - The container is stopped with SIGTERM, a 10-second grace period, then SIGKILL, on every single redeploy. Node running as PID 1 receives no default signal handling from the kernel, so unless the app explicitly installs one it never sees SIGTERM and is always killed. Add handlers for SIGTERM and SIGINT that close the server and exit, and make sure the Dockerfile uses exec-form CMD (CMD ["node", "server.js"]) not shell form (CMD node server.js) -- the shell form puts /bin/sh at PID 1, which does not forward signals at all. This matters most for any app writing to dataDir or a database, which can otherwise be killed between a file write and its matching row.
    - Restart policy is unless-stopped, so a container that crashes at boot restarts forever. Confirm boot is idempotent and re-running it against an already-populated database or data volume is safe.
    - Auto-detection of env var names only scans .js/.mjs/.cjs/.ts files. If this app is Python, Go, Ruby or Rust, every env var it reads -- including APP_PIN and any AI vars -- must be listed explicitly in app.yaml's env: array or the operator will have no way to set it.
-   - Declaring a name in env: creates an empty slot in the dashboard panel; it does not supply a value. Only DATABASE_URL/DB_* (with postgres: true), SYNC_SECRET, and the three LM_STUDIO_* vars are given real values automatically.
+   - Declaring a name in env: creates an empty slot in the dashboard panel; it does not supply a value. Only DATABASE_URL/DB_* (with postgres: true), SEARXNG_URL (with search: true), SYNC_SECRET, the three LM_STUDIO_* vars, and the three NTFY_* vars (once the operator fills in the PUSH panel) are given real values automatically.
 
 Full reference with explanations for all of the above: https://hostess.cmdward.xyz/rules.html</textarea>
 

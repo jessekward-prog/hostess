@@ -304,6 +304,38 @@ app.put('/api/lm', (req, res) => {
   res.json({ url, selected: model, apiKeySet: !!settings.get('lmApiKey') });
 });
 
+// The fleet's push server (ntfy). Apps that read NTFY_URL / NTFY_TOKEN / NTFY_TOPIC get these on
+// deploy (lib/engine.js). The token is write-only from here: GET only says whether one is set.
+app.get('/api/push', (req, res) => {
+  res.json({ url: settings.get('ntfyUrl') || '', topic: settings.get('ntfyTopic') || '', tokenSet: !!settings.get('ntfyToken') });
+});
+
+app.put('/api/push', (req, res) => {
+  const { url, token, topic } = req.body || {};
+  if (typeof url === 'string' && url.trim() && !/^https?:\/\/[^\s/]+/.test(url.trim())) return res.status(400).json({ error: 'The server address must start with http:// or https://' });
+  if (typeof topic === 'string' && topic.trim() && !/^[-_A-Za-z0-9]{1,64}$/.test(topic.trim())) return res.status(400).json({ error: 'Topic: letters, numbers, - and _ only' });
+  if (typeof url === 'string') settings.set('ntfyUrl', url.trim().replace(/\/+$/, ''));
+  if (typeof token === 'string') settings.set('ntfyToken', token.trim());
+  if (typeof topic === 'string') settings.set('ntfyTopic', topic.trim());
+  res.json({ url: settings.get('ntfyUrl') || '', topic: settings.get('ntfyTopic') || '', tokenSet: !!settings.get('ntfyToken') });
+});
+
+app.post('/api/push/test', async (req, res) => {
+  const url = settings.get('ntfyUrl'), token = settings.get('ntfyToken');
+  if (!url) return res.status(400).json({ error: 'Set the server address first.' });
+  try {
+    const r = await fetch(`${url}/`, {
+      method: 'POST', signal: AbortSignal.timeout(10000),
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: JSON.stringify({ topic: settings.get('ntfyTopic') || 'hostess', title: 'Hostess', message: 'Push is set up. Apps that read NTFY_URL get this server on their next deploy.' }),
+    });
+    if (!r.ok) throw new Error(`the server answered HTTP ${r.status}${r.status === 403 ? ' (token missing or not allowed to publish)' : ''}`);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`hostess dashboard: http://localhost:${PORT}`);
   autoupdate.start(console.log);
