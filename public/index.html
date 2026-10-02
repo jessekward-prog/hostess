@@ -132,8 +132,8 @@
   .myai-select { width: 100%; background: var(--s-bg); border: 1px solid var(--s-border); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: var(--s-text-1); outline: none; font-family: inherit; }
   .myai-label { font-size: 9px; color: var(--s-text-3); letter-spacing: 0.1em; }
   #push-panel.open { max-height: 1400px; }
-  .push-qr { width: 150px; height: 150px; image-rendering: pixelated; background: #fff; padding: 6px; border-radius: 6px; align-self: center; }
-  .push-open { text-decoration: none; display: inline-block; }
+  .push-addr { display: flex; flex-direction: column; gap: 6px; }
+  .push-addr code { word-break: break-all; padding: 6px 8px; border: 1px solid var(--s-border); border-radius: 4px; color: var(--s-text-0); font-size: 11px; user-select: all; }
 
   .env-row { display: flex; flex-direction: column; gap: 3px; margin: 0 16px 8px; }
   .env-row[hidden] { display: none; }
@@ -1830,10 +1830,9 @@ function pushSteps(p) {
   const out = []; let n = 0; const step = (title, body) => out.push(`<div><b>${++n}. ${title}</b> — ${body}</div>`);
   step('Tailscale on your phone', 'install it and sign in with the same account as this machine (see Private Link).');
   step('Install ntfy', 'Play Store or F-Droid on Android, App Store on iPhone.');
-  step('Copy the server address', `scan this with your phone's camera and copy what it shows: <b>${escHtml(p.url)}</b>. If it opens an ntfy page instead, that's the right server: copy the address from the browser bar.`);
-  out.push(`<img class="push-qr" src="${p.qr}" alt="QR code of ${escHtml(p.url)}">`);
-  step('Subscribe', `in ntfy tap <b>+</b>, type <b>${escHtml(p.topic)}</b>, tick <b>Use another server</b>, paste the address, tap Subscribe.`);
-  out.push(`<div>Already reading this on your phone? This does steps 3 and 4 in one tap: <a class="myai-save push-open" href="${escHtml(p.link)}">open in ntfy</a></div>`);
+  step('Copy the server address', 'easiest with this dashboard open on your phone; otherwise type it in.');
+  out.push(`<div class="push-addr"><code>${escHtml(p.url)}</code><button class="myai-save" type="button" data-act="push-copy">copy</button></div>`);
+  step('Subscribe', `in ntfy tap <b>+</b>, type the topic <b>${escHtml(p.topic)}</b>, tick <b>Use another server</b>, paste the address, tap <b>Subscribe</b>.`);
   step('Tap send test', 'it should arrive within a couple of seconds.');
   out.push('<div style="border-top:1px solid var(--s-border);padding-top:6px;">Only your own devices on Tailscale can reach this server. If the phone drops off Tailscale, notifications wait until it reconnects.</div>');
   return out.join('');
@@ -1855,6 +1854,15 @@ pushToggle.addEventListener('click', () => {
   pushToggle.classList.toggle('open');
   pushPanel.classList.toggle('open');
   if (opening) refreshPush();
+});
+
+pushTutorial.addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-act="push-copy"]');
+  if (!btn) return;
+  const code = btn.previousElementSibling;
+  try { await navigator.clipboard.writeText(code.textContent); btn.textContent = 'copied'; }
+  catch { getSelection().selectAllChildren(code); btn.textContent = 'selected'; } // no clipboard access: leave it highlighted to copy by hand
+  setTimeout(() => { btn.textContent = 'copy'; }, 1200);
 });
 
 document.getElementById('push-info-btn').addEventListener('click', (e) => {
