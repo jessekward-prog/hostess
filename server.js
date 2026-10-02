@@ -310,7 +310,9 @@ app.put('/api/lm', (req, res) => {
 async function pushState() {
   const c = ntfy.config();
   const link = ntfy.phoneLink(c);
-  return { running: !!c.url, url: c.phoneUrl || '', topic: c.topic || '', link, qr: link ? await qrcode.toDataURL(link, { margin: 1, width: 280 }) : null };
+  // The QR holds the plain server address, which a phone camera offers to copy; ntfy:// links
+  // only work tapped on the phone itself, so they stay on the "open in ntfy" button.
+  return { running: !!c.url, url: c.phoneUrl || '', topic: c.topic || '', link, qr: c.phoneUrl ? await qrcode.toDataURL(c.phoneUrl, { margin: 1, width: 280 }) : null };
 }
 
 app.get('/api/push', async (req, res) => res.json(await pushState()));

@@ -1830,9 +1830,10 @@ function pushSteps(p) {
   const out = []; let n = 0; const step = (title, body) => out.push(`<div><b>${++n}. ${title}</b> — ${body}</div>`);
   step('Tailscale on your phone', 'install it and sign in with the same account as this machine (see Private Link).');
   step('Install ntfy', 'Play Store or F-Droid on Android, App Store on iPhone.');
-  step('Subscribe', "scan this with your phone's camera, or tap the button if this page is open on your phone.");
-  out.push(`<img class="push-qr" src="${p.qr}" alt="QR code that opens ${escHtml(p.link)}">`, `<a class="myai-save push-open" href="${escHtml(p.link)}">open in ntfy</a>`);
-  out.push(`<div>By hand: in ntfy tap <b>+</b>, type <b>${escHtml(p.topic)}</b>, tick <b>Use another server</b>, enter <b>${escHtml(p.url)}</b>, tap Subscribe.</div>`);
+  step('Copy the server address', `scan this with your phone's camera and copy what it shows: <b>${escHtml(p.url)}</b>. If it opens an ntfy page instead, that's the right server: copy the address from the browser bar.`);
+  out.push(`<img class="push-qr" src="${p.qr}" alt="QR code of ${escHtml(p.url)}">`);
+  step('Subscribe', `in ntfy tap <b>+</b>, type <b>${escHtml(p.topic)}</b>, tick <b>Use another server</b>, paste the address, tap Subscribe.`);
+  out.push(`<div>Already reading this on your phone? This does steps 3 and 4 in one tap: <a class="myai-save push-open" href="${escHtml(p.link)}">open in ntfy</a></div>`);
   step('Tap send test', 'it should arrive within a couple of seconds.');
   out.push('<div style="border-top:1px solid var(--s-border);padding-top:6px;">Only your own devices on Tailscale can reach this server. If the phone drops off Tailscale, notifications wait until it reconnects.</div>');
   return out.join('');
