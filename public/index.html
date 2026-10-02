@@ -132,11 +132,6 @@
   .myai-select { width: 100%; background: var(--s-bg); border: 1px solid var(--s-border); border-radius: 4px; padding: 6px 8px; font-size: 11px; color: var(--s-text-1); outline: none; font-family: inherit; }
   .myai-label { font-size: 9px; color: var(--s-text-3); letter-spacing: 0.1em; }
   #push-panel.open { max-height: 1400px; }
-  .push-modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
-  .push-modes button { font-size: 10px; padding: 5px 0; border: 1px solid var(--s-border); border-radius: 4px; color: var(--s-text-2); background: transparent; cursor: pointer; }
-  .push-modes button:hover { color: var(--s-text-0); }
-  .push-modes button[aria-checked="true"] { border-color: var(--s-accent); color: var(--s-text-0); background: var(--s-surface-2); }
-  .push-custom { display: flex; flex-direction: column; gap: 6px; }
   .push-qr { width: 150px; height: 150px; image-rendering: pixelated; background: #fff; padding: 6px; border-radius: 6px; align-self: center; }
   .push-open { text-decoration: none; display: inline-block; }
 
@@ -401,27 +396,14 @@
       <div class="myai-panel" id="push-panel">
         <div class="myai-body">
           <div style="display:flex;align-items:center;justify-content:space-between;">
-            <span class="myai-hint" style="max-width:80%;">One push server for every app. Apps that read NTFY_URL, NTFY_TOKEN or NTFY_TOPIC get it on their next deploy.</span>
+            <span class="myai-hint" style="max-width:80%;">Hostess runs one push server for every app, reachable only from your own devices over Tailscale. Apps that read NTFY_URL get it on their next deploy.</span>
             <button class="myai-info-btn" id="push-info-btn" title="set up your phone">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
             </button>
           </div>
-          <div class="push-modes" role="radiogroup" aria-label="Push server">
-            <button type="button" role="radio" data-push-mode="">off</button>
-            <button type="button" role="radio" data-push-mode="builtin">built in</button>
-            <button type="button" role="radio" data-push-mode="ntfysh">ntfy.sh</button>
-            <button type="button" role="radio" data-push-mode="custom">own</button>
-          </div>
-          <span class="myai-hint" id="push-mode-hint"></span>
-          <div id="push-custom" class="push-custom" hidden>
-            <input class="myai-input" id="push-url-input" placeholder="ntfy server, e.g. https://ntfy.example.com" autocomplete="off">
-            <input class="myai-input" id="push-token-input" type="password" placeholder="access token (only if the server has auth on)" autocomplete="off">
-            <input class="myai-input" id="push-topic-input" placeholder="topic, e.g. my-alerts" autocomplete="off" spellcheck="false">
-            <button class="myai-save" id="push-save-btn">save</button>
-          </div>
+          <button class="myai-save" id="push-start-btn" type="button" hidden>start push server</button>
           <span class="myai-status" id="push-status"></span>
           <button class="myai-save" id="push-test-btn" type="button" style="background:transparent; color:var(--s-text-1); border:1px solid var(--s-border);">send test</button>
-          <span class="myai-saved-flash" id="push-saved-flash" hidden>saved</span>
           <div class="myai-tutorial" id="push-tutorial" hidden></div>
         </div>
       </div>
@@ -1835,57 +1817,32 @@ mountWaveBackground(document.querySelector('aside.sidebar'), '232,132,10'); // c
 }
 
 // ── Account panel — change password, suggesting a fresh random passphrase.
-// ---------- push (the fleet's ntfy server: built in, ntfy.sh, or your own) ----------
+// ---------- push (Hostess's own ntfy server, see lib/ntfy.js) ----------
 const pushToggle = document.getElementById('push-toggle');
 const pushPanel = document.getElementById('push-panel');
 const pushStatus = document.getElementById('push-status');
 const pushTutorial = document.getElementById('push-tutorial');
-const pushUrlInput = document.getElementById('push-url-input');
-const pushTokenInput = document.getElementById('push-token-input');
-const pushTopicInput = document.getElementById('push-topic-input');
-const PUSH_HINTS = {
-  '': 'Off. Apps that read NTFY_URL get nothing and run with push off.',
-  builtin: 'Runs on this machine. Your phone reaches it over Tailscale, so nothing is open to the internet.',
-  ntfysh: "ntfy's free public server. Nothing to set up, but anyone who learns the topic can read the messages.",
-  custom: 'Your own ntfy server.',
-};
-let pushState = { mode: '' };
-let pushPicked = null; // "own" chosen but not saved yet
+const pushStartBtn = document.getElementById('push-start-btn');
 
 const escHtml = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function pushSteps(p) {
-  if (!p.mode || !p.topic) return '<div>Pick a push server above first, then come back here for the phone steps.</div>';
+  if (!p.running) return '<div>Start the push server first, then come back here for the phone steps.</div>';
   const out = []; let n = 0; const step = (title, body) => out.push(`<div><b>${++n}. ${title}</b> — ${body}</div>`);
-  if (p.mode === 'builtin') step('Tailscale on your phone', 'install it and sign in with the same account as this machine (see Private Link).');
+  step('Tailscale on your phone', 'install it and sign in with the same account as this machine (see Private Link).');
   step('Install ntfy', 'Play Store or F-Droid on Android, App Store on iPhone.');
   step('Subscribe', "scan this with your phone's camera, or tap the button if this page is open on your phone.");
-  if (p.qr) out.push(`<img class="push-qr" src="${p.qr}" alt="QR code that opens ${escHtml(p.link)}">`, `<a class="myai-save push-open" href="${escHtml(p.link)}">open in ntfy</a>`);
-  out.push(p.mode === 'ntfysh'
-    ? `<div>By hand: in ntfy tap <b>+</b>, type the topic <b>${escHtml(p.topic)}</b>, leave the server as ntfy.sh, tap Subscribe.</div>`
-    : `<div>By hand: in ntfy tap <b>+</b>, type <b>${escHtml(p.topic)}</b>, tick <b>Use another server</b>, enter <b>${escHtml(p.url)}</b>, tap Subscribe.${p.mode === 'custom' ? ' If it asks you to log in, use an account that can read the topic, not the token above; that one can only send.' : ''}</div>`);
+  out.push(`<img class="push-qr" src="${p.qr}" alt="QR code that opens ${escHtml(p.link)}">`, `<a class="myai-save push-open" href="${escHtml(p.link)}">open in ntfy</a>`);
+  out.push(`<div>By hand: in ntfy tap <b>+</b>, type <b>${escHtml(p.topic)}</b>, tick <b>Use another server</b>, enter <b>${escHtml(p.url)}</b>, tap Subscribe.</div>`);
   step('Tap send test', 'it should arrive within a couple of seconds.');
-  const note = {
-    builtin: 'Only your own devices on Tailscale can reach this server. If the phone drops off Tailscale, notifications wait until it reconnects.',
-    ntfysh: 'ntfy.sh is public: the topic name is the only thing keeping these private. Don’t share it or the QR code.',
-    custom: 'iPhone: for instant delivery your server needs <b>upstream-base-url</b> set (see ntfy’s docs).',
-  }[p.mode];
-  out.push(`<div style="border-top:1px solid var(--s-border);padding-top:6px;">${note}</div>`);
+  out.push('<div style="border-top:1px solid var(--s-border);padding-top:6px;">Only your own devices on Tailscale can reach this server. If the phone drops off Tailscale, notifications wait until it reconnects.</div>');
   return out.join('');
 }
 
 function showPush(p) {
-  pushState = p;
-  const shown = pushPicked !== null ? pushPicked : p.mode;
-  document.querySelectorAll('[data-push-mode]').forEach((b) => b.setAttribute('aria-checked', b.dataset.pushMode === shown));
-  document.getElementById('push-mode-hint').textContent = PUSH_HINTS[shown];
-  document.getElementById('push-custom').hidden = shown !== 'custom';
-  pushUrlInput.value = p.custom.url;
-  pushTopicInput.value = p.custom.topic;
-  pushTokenInput.value = '';
-  pushTokenInput.placeholder = p.custom.tokenSet ? 'token set — paste a new one to replace' : 'access token (only if the server has auth on)';
-  document.getElementById('push-dot').classList.toggle('connected', !!(p.mode && p.url));
-  pushStatus.textContent = !p.mode ? 'off' : p.url ? `phones subscribe at ${p.url} · topic ${p.topic}` : 'not finished — fill in the server below';
-  document.getElementById('push-test-btn').disabled = !(p.mode && p.url);
+  pushStartBtn.hidden = p.running;
+  document.getElementById('push-dot').classList.toggle('connected', p.running);
+  pushStatus.textContent = p.running ? `phones subscribe at ${p.url} · topic ${p.topic}` : 'not started yet — it also starts by itself the first time an app that uses push deploys';
+  document.getElementById('push-test-btn').hidden = !p.running;
   pushTutorial.innerHTML = pushSteps(p);
 }
 async function refreshPush() {
@@ -1905,24 +1862,12 @@ document.getElementById('push-info-btn').addEventListener('click', (e) => {
   e.currentTarget.classList.toggle('active', !showing);
 });
 
-document.querySelectorAll('[data-push-mode]').forEach((b) => b.addEventListener('click', async () => {
-  const mode = b.dataset.pushMode;
-  if (mode === 'custom') { pushPicked = 'custom'; return showPush(pushState); } // applies on save
-  pushPicked = null;
-  pushStatus.textContent = mode === 'builtin' ? 'starting the built-in server...' : mode ? 'setting up...' : 'turning off...';
-  try { showPush(await api('/api/push/mode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) })); }
+pushStartBtn.addEventListener('click', async () => {
+  pushStartBtn.disabled = true;
+  pushStatus.textContent = 'starting — the first time downloads the server, which can take a minute...';
+  try { showPush(await api('/api/push/start', { method: 'POST' })); }
   catch (err) { pushStatus.textContent = err.message; }
-}));
-
-document.getElementById('push-save-btn').addEventListener('click', async () => {
-  const body = { url: pushUrlInput.value, topic: pushTopicInput.value };
-  if (pushTokenInput.value.trim()) body.token = pushTokenInput.value; // blank keeps the saved token
-  try {
-    pushPicked = null;
-    showPush(await api('/api/push', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
-    const flash = document.getElementById('push-saved-flash');
-    flash.hidden = false; setTimeout(() => { flash.hidden = true; }, 1500);
-  } catch (err) { pushStatus.textContent = `not saved: ${err.message}`; }
+  pushStartBtn.disabled = false;
 });
 
 document.getElementById('push-test-btn').addEventListener('click', async () => {
