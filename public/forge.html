@@ -523,9 +523,23 @@ function scriptError(html) {
   const doc = new DOMParser().parseFromString(html, 'text/html');
   for (const el of doc.querySelectorAll('script:not([src])')) {
     if (el.type && !/javascript/i.test(el.type)) continue;
-    try { new Function(el.textContent); } catch (err) { return err.message; }
+    try { new Function(el.textContent); } catch (err) { return withLine(el.textContent, err.message); }
   }
   return null;
+}
+
+// A parse error never says where it is, and without a line the model rarely finds it. The first
+// prefix of the script that fails with the same message ends on the culprit line.
+function withLine(js, msg) {
+  const lines = js.split('\n');
+  for (let k = 1; k <= lines.length; k++) {
+    try { new Function(lines.slice(0, k).join('\n')); } catch (e) {
+      if (e.message !== msg) continue;
+      const hint = /await/.test(msg) ? ' Make the function that directly contains this line async; inside forEach or map callbacks, use a for...of loop in an async function instead.' : '';
+      return `${msg}, at line ${k} of the script: ${lines[k - 1].trim().slice(0, 160)}.${hint}`;
+    }
+  }
+  return msg;
 }
 const MAX_AUTO_FIXES = 2;
 
