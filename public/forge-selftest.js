@@ -27,7 +27,7 @@
       if (!visible(el) || el.disabled || el.readOnly) continue;
       const type = (el.getAttribute('type') || 'text').toLowerCase();
       if (el.tagName === 'SELECT') { if (el.options.length > 1) { el.selectedIndex = 1; el.dispatchEvent(new Event('change', { bubbles: true })); } }
-      else if (type === 'number' || type === 'range') setValue(el, '25');
+      else if (type === 'number' || type === 'range') setValue(el, String(Math.min(el.max !== '' ? Number(el.max) : 25, Math.max(el.min !== '' ? Number(el.min) : 25, 25))));
       else if (type === 'date') setValue(el, today);
       else if (type === 'time') setValue(el, ['22:30', '06:30', '07:15'][timeN++ % 3]); // bedtime, then wake time
       else if (type === 'datetime-local') setValue(el, `${today}T22:30`);
