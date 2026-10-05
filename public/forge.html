@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Forge · Hostess</title>
+<link rel="icon" type="image/svg+xml" href="/icon.svg">
+<meta name="theme-color" content="#000000">
+<style>
+  :root {
+    --s-font: 'JetBrains Mono', 'Fira Mono', ui-monospace, Menlo, Consolas, monospace;
+    --s-bg: #000000; --s-surface: #111111; --s-surface-2: #1e1e1e; --s-border: #333333;
+    --s-accent: #ffffff; --s-accent-faint: rgba(255,255,255,0.07);
+    --s-text-0: #ffffff; --s-text-1: #b0b0b0; --s-text-3: #8a8a8a;
+    --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-base: 14px; --fs-lg: 15px; --fs-xl: 17px;
+    --ok: #3fb37f; --warn: #e0a53f; --danger: #e0564f;
+    --crt-green: #3dff7a; --crt-green-rgb: 61,255,122;
+    --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--s-bg); color: var(--s-text-1); font: var(--fs-base)/1.5 var(--s-font); -webkit-font-smoothing: antialiased; overscroll-behavior: none; }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  button { cursor: pointer; border: none; background: none; padding: 0; }
+  button:disabled { cursor: default; opacity: 0.45; }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--s-accent); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: var(--s-border); border-radius: 3px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
+
+  .app { display: grid; grid-template-rows: auto 1fr; height: 100dvh; }
+  header.top {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top));
+    border-bottom: 1px solid var(--s-border); background: var(--s-surface);
+  }
+  .back { display: inline-flex; align-items: center; gap: 6px; color: var(--s-text-3); text-decoration: none; font-size: var(--fs-sm); min-height: 36px; }
+  .back:hover { color: var(--s-text-0); }
+  .brand { color: var(--s-text-0); font-size: var(--fs-xl); font-weight: 600; letter-spacing: 0.02em; }
+  .brand .caret { color: var(--crt-green); animation: blink 1.1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .top-spacer { flex: 1; }
+  .ctl { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: 1px solid var(--s-border); border-radius: 8px; background: var(--s-bg); font-size: var(--fs-sm); color: var(--s-text-1); }
+  .ctl:hover:not(:disabled) { border-color: var(--s-text-3); color: var(--s-text-0); }
+  select.ctl { max-width: 220px; }
+
+  .panes { display: grid; grid-template-columns: 320px minmax(320px, 1fr) minmax(360px, 1.25fr); min-height: 0; }
+  .pane { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--s-border); }
+  .pane:last-child { border-right: none; }
+  .pane-head { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 14px; border-bottom: 1px solid var(--s-border); font-size: var(--fs-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--s-text-3); flex-shrink: 0; }
+  .pane-head .grow { flex: 1; }
+  .tabs { display: none; }
+
+  /* ---------- chat ---------- */
+  .chat-scroll { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .msg { padding: 10px 12px; border-radius: 10px; font-size: var(--fs-md); white-space: pre-wrap; word-wrap: break-word; animation: rise 0.25s var(--ease); }
+  .msg.user { align-self: flex-end; max-width: 88%; background: var(--s-surface-2); color: var(--s-text-0); }
+  .msg.bot { align-self: flex-start; max-width: 92%; border: 1px solid var(--s-border); }
+  .msg.err { border-color: rgba(224,86,79,0.5); color: #ff8a84; }
+  @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
+  .empty { color: var(--s-text-3); font-size: var(--fs-md); display: flex; flex-direction: column; gap: 14px; }
+  .empty h2 { color: var(--s-text-0); font-size: var(--fs-lg); font-weight: 600; margin: 0; }
+  .examples { display: flex; flex-direction: column; gap: 6px; }
+  .example { text-align: left; padding: 10px 12px; min-height: 44px; border: 1px solid var(--s-border); border-radius: 8px; font-size: var(--fs-md); color: var(--s-text-1); transition: border-color 0.15s, background 0.15s; }
+  .example:hover { border-color: var(--s-text-3); background: var(--s-accent-faint); color: var(--s-text-0); }
+  .section-label { font-size: var(--fs-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--s-text-3); margin-top: 6px; }
+  .project { display: flex; align-items: center; gap: 10px; padding: 10px 12px; min-height: 44px; border: 1px solid var(--s-border); border-radius: 8px; text-align: left; width: 100%; }
+  .project:hover { border-color: var(--s-text-3); }
+  .project .pn { color: var(--s-text-0); font-size: var(--fs-md); }
+  .project .pd { color: var(--s-text-3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .project .pt { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .pill { font-size: var(--fs-xs); padding: 2px 7px; border-radius: 999px; border: 1px solid rgba(63,179,127,0.5); color: var(--ok); flex-shrink: 0; }
+
+  .composer { border-top: 1px solid var(--s-border); padding: 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px; }
+  .composer textarea { width: 100%; min-height: 64px; max-height: 200px; resize: none; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--s-border); background: var(--s-surface); color: var(--s-text-0); font-size: var(--fs-md); }
+  .composer textarea:focus { outline: none; border-color: var(--s-text-3); }
+  .composer-row { display: flex; gap: 8px; align-items: center; }
+  .composer-row .hint { flex: 1; font-size: var(--fs-xs); color: var(--s-text-3); }
+  .btn { height: 40px; padding: 0 16px; border-radius: 8px; background: var(--s-accent); color: #000; font-weight: 600; font-size: var(--fs-md); transition: transform 0.1s, opacity 0.15s; }
+  .btn:active:not(:disabled) { transform: scale(0.97); }
+  .btn.ghost { background: transparent; color: var(--s-text-1); border: 1px solid var(--s-border); }
+  .btn.go { background: var(--crt-green); }
+
+  /* ---------- workings ---------- */
+  .work-scroll { flex: 1; overflow-y: auto; padding: 14px; display: flex; flex-direction: column; gap: 12px; }
+  .step { border: 1px solid var(--s-border); border-radius: 10px; overflow: hidden; animation: rise 0.25s var(--ease); flex-shrink: 0; }
+  .step-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; min-height: 44px; text-align: left; font-size: var(--fs-md); color: var(--s-text-0); }
+  .step-head .meta { margin-left: auto; color: var(--s-text-3); font-size: var(--fs-xs); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--s-border); flex-shrink: 0; }
+  .step.live .dot { background: var(--crt-green); box-shadow: 0 0 8px rgba(var(--crt-green-rgb),0.7); animation: pulse 1s ease-in-out infinite; }
+  .step.done .dot { background: var(--ok); }
+  .step.fail .dot { background: var(--danger); }
+  @keyframes pulse { 50% { opacity: 0.35; } }
+  .step-body { border-top: 1px solid var(--s-border); padding: 10px 12px; font-size: var(--fs-sm); }
+  .note { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; border-bottom: 1px dashed var(--s-border); }
+  .note:last-child { border-bottom: none; }
+  .note-top { display: flex; gap: 8px; align-items: baseline; }
+  .note-title { color: var(--s-text-0); }
+  .note-path { color: var(--s-text-3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+  .note-score { color: var(--crt-green); font-size: var(--fs-xs); }
+  .bar { height: 3px; background: var(--s-surface-2); border-radius: 2px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; background: var(--crt-green); opacity: 0.7; transform-origin: left; animation: grow 0.6s var(--ease); }
+  @keyframes grow { from { transform: scaleX(0); } }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip { font-size: var(--fs-xs); padding: 1px 6px; border-radius: 4px; background: var(--s-surface-2); color: var(--s-text-1); }
+  pre.stream { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: var(--fs-xs); line-height: 1.55; color: var(--s-text-1); max-height: 260px; overflow-y: auto; }
+  pre.code { max-height: none; color: rgba(var(--crt-green-rgb),0.85); }
+  .step.code-step { flex: 1 0 auto; display: flex; flex-direction: column; min-height: 200px; }
+  .step.code-step .step-body { flex: 1; overflow-y: auto; max-height: 55vh; }
+  .cursor::after { content: '▋'; color: var(--crt-green); animation: blink 1s steps(1) infinite; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; flex-shrink: 0; }
+  .stat { border: 1px solid var(--s-border); border-radius: 8px; padding: 8px 10px; }
+  .stat .k { font-size: var(--fs-xs); color: var(--s-text-3); letter-spacing: 0.08em; text-transform: uppercase; }
+  .stat .v { color: var(--s-text-0); font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }
+  .work-empty { color: var(--s-text-3); font-size: var(--fs-md); margin: auto; text-align: center; max-width: 280px; }
+
+  /* ---------- preview ---------- */
+  .preview-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--s-border); flex-shrink: 0; flex-wrap: wrap; }
+  .name-input { height: 36px; flex: 1; min-width: 120px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--s-border); background: var(--s-bg); color: var(--s-text-0); font-size: var(--fs-sm); }
+  .name-input:focus { outline: none; border-color: var(--s-text-3); }
+  .stage { flex: 1; position: relative; background: repeating-linear-gradient(45deg, #070707 0 10px, #0b0b0b 10px 20px); display: flex; justify-content: center; align-items: stretch; min-height: 0; padding: 16px; }
+  .frame-wrap { position: relative; width: 100%; height: 100%; transition: width 0.3s var(--ease); border-radius: 10px; overflow: hidden; background: #fff; box-shadow: 0 0 0 1px var(--s-border); }
+  .stage.phone .frame-wrap { width: 390px; max-width: 100%; }
+  .frame-wrap iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; transition: opacity 0.18s; }
+  .frame-wrap iframe.back { opacity: 0; pointer-events: none; }
+  .stage-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--s-text-3); font-size: var(--fs-md); background: var(--s-bg); text-align: center; padding: 24px; }
+  .building { position: absolute; top: 10px; right: 10px; z-index: 2; font-size: var(--fs-xs); padding: 4px 9px; border-radius: 999px; background: rgba(0,0,0,0.8); color: var(--crt-green); border: 1px solid rgba(var(--crt-green-rgb),0.4); }
+  .install-log { border-top: 1px solid var(--s-border); max-height: 34%; display: flex; flex-direction: column; flex-shrink: 0; }
+  .install-log pre { margin: 0; padding: 10px 12px; overflow-y: auto; font-size: var(--fs-xs); white-space: pre-wrap; }
+  .install-log .done-row { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--s-border); font-size: var(--fs-sm); color: var(--ok); }
+
+  .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translate(-50%, 20px); opacity: 0; z-index: 100; padding: 10px 16px; border-radius: 10px; background: var(--s-surface-2); border: 1px solid var(--s-border); color: var(--s-text-0); font-size: var(--fs-md); transition: transform 0.3s var(--ease), opacity 0.3s; max-width: calc(100vw - 32px); pointer-events: none; }
+  .toast.show { transform: translate(-50%, 0); opacity: 1; }
+
+  .popover { position: absolute; top: 56px; right: 16px; z-index: 50; width: min(380px, calc(100vw - 32px)); padding: 14px; border-radius: 10px; background: var(--s-surface); border: 1px solid var(--s-border); box-shadow: 0 12px 40px rgba(0,0,0,0.6); display: flex; flex-direction: column; gap: 10px; font-size: var(--fs-sm); animation: rise 0.2s var(--ease); }
+  .popover .name-input { width: 100%; }
+
+  /* Below 1024px one pane at a time, switched by tabs. */
+  @media (max-width: 1023px) {
+    .app { grid-template-rows: auto auto 1fr; }
+    .tabs { display: flex; border-bottom: 1px solid var(--s-border); background: var(--s-surface); }
+    .tabs button { flex: 1; height: 44px; font-size: var(--fs-sm); color: var(--s-text-3); border-bottom: 2px solid transparent; }
+    .tabs button[aria-selected="true"] { color: var(--s-text-0); border-bottom-color: var(--crt-green); }
+    .panes { grid-template-columns: 1fr; }
+    .pane { border-right: none; }
+    .pane:not(.active) { display: none; }
+    .pane-head { display: none; }
+    select.ctl { max-width: 140px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+  @media (max-width: 520px) { .back span { display: none; } }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <a class="back" href="/"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg><span>Hostess</span></a>
+    <span class="brand">Forge<span class="caret">_</span></span>
+    <span class="top-spacer"></span>
+    <select class="ctl" id="model" title="Which model writes the app"></select>
+    <button class="ctl" id="notesBtn" type="button" title="Notes folder the model reads from">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z"/><path d="M6.5 17A2.5 2.5 0 0 0 4 19.5 2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
+      <span id="notesLabel">Notes</span>
+    </button>
+  </header>
+  <div class="popover" id="notesPop" hidden>
+    <div style="color:var(--s-text-0)">Notes folder</div>
+    <div style="color:var(--s-text-3)">A folder of Markdown notes on this machine, such as an Obsidian vault. Before writing, Forge picks the notes that best match your request and shows you which ones it read.</div>
+    <input class="name-input" id="vaultInput" placeholder="/home/you/Obsidian/MyVault" autocomplete="off" spellcheck="false">
+    <div style="display:flex; gap:8px; justify-content:flex-end;">
+      <button class="btn ghost" id="vaultCancel" type="button">Cancel</button>
+      <button class="btn" id="vaultSave" type="button">Save</button>
+    </div>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-pane="chat" aria-selected="true">Chat</button>
+    <button role="tab" data-pane="work" aria-selected="false">Workings</button>
+    <button role="tab" data-pane="preview" aria-selected="false">Preview</button>
+  </nav>
+
+  <div class="panes">
+    <section class="pane active" data-pane="chat">
+      <div class="pane-head"><span class="grow">Chat</span><button class="ctl" id="newBtn" type="button">New app</button></div>
+      <div class="chat-scroll" id="chat"></div>
+      <div class="composer">
+        <textarea id="prompt" placeholder="Describe the app you want…" rows="3"></textarea>
+        <div class="composer-row">
+          <span class="hint" id="hint">Enter to send · Shift+Enter for a new line</span>
+          <button class="btn ghost" id="stopBtn" type="button" hidden>Stop</button>
+          <button class="btn" id="sendBtn" type="button">Build</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="work">
+      <div class="pane-head"><span class="grow">Workings</span><span id="workStatus"></span></div>
+      <div class="work-scroll" id="work">
+        <div class="work-empty">This is where you watch the model work: the notes it reads, its thinking, and the code as it writes it.</div>
+      </div>
+    </section>
+
+    <section class="pane" data-pane="preview">
+      <div class="pane-head"><span class="grow">Preview</span></div>
+      <div class="preview-bar">
+        <input class="name-input" id="appName" placeholder="app-name" autocomplete="off" spellcheck="false" aria-label="App name">
+        <button class="ctl" id="deviceBtn" type="button" title="Phone or full width">Phone</button>
+        <button class="ctl" id="reloadBtn" type="button" title="Restart the preview">Reload</button>
+        <button class="btn go" id="installBtn" type="button" disabled>Install</button>
+      </div>
+      <div class="stage phone" id="stage">
+        <div class="frame-wrap">
+          <iframe id="frameA" sandbox="allow-scripts allow-forms allow-modals" title="App preview"></iframe>
+          <iframe id="frameB" class="back" sandbox="allow-scripts allow-forms allow-modals" title="App preview" aria-hidden="true"></iframe>
+          <div class="building" id="building" hidden>building…</div>
+          <div class="stage-empty" id="stageEmpty">Your app appears here as it's written.</div>
+        </div>
+      </div>
+      <div class="install-log" id="installLog" hidden>
+        <pre id="installPre"></pre>
+        <div class="done-row" id="installDone" hidden><span id="installDoneText"></span><a class="btn ghost" href="/" style="display:inline-flex;align-items:center;text-decoration:none;margin-left:auto;">Open in Hostess</a></div>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const EXAMPLES = [
+  'A tracker for how many minutes my kids read each day, with a weekly total for each kid',
+  'A shared shopping list for the house, grouped by aisle, that I can tick off at the shops',
+  'A plant watering schedule that tells me which plants are due today',
+  'A recipe box where I paste a recipe and the AI tidies it into ingredients and steps',
+];
+
+const state = { name: '', requests: [], html: '', busy: false, ctrl: null, previewData: {} };
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
+  if (res.status === 401) { location.href = '/'; throw new Error('login required'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+// Reads a server-sent-event POST response, calling onEvent per parsed event.
+async function streamPost(path, body, onEvent, signal) {
+  const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
+  if (res.status === 401) { location.href = '/'; return; }
+  if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `HTTP ${res.status}`);
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    const parts = buf.split('\n\n');
+    buf = parts.pop();
+    for (const p of parts) if (p.startsWith('data: ')) onEvent(JSON.parse(p.slice(6)));
+  }
+}
+
+let toastTimer;
+function toast(text) {
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+/* ---------- tabs (narrow screens) ---------- */
+function showPane(name) {
+  document.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.pane === name)));
+  document.querySelectorAll('.pane').forEach((p) => p.classList.toggle('active', p.dataset.pane === name));
+}
+document.querySelectorAll('.tabs button').forEach((b) => b.addEventListener('click', () => showPane(b.dataset.pane)));
+const narrow = () => matchMedia('(max-width: 1023px)').matches;
+
+/* ---------- chat ---------- */
+function addMsg(kind, text) {
+  const chat = $('chat');
+  chat.querySelector('.empty')?.remove();
+  const el = document.createElement('div');
+  el.className = `msg ${kind}`;
+  el.textContent = text;
+  chat.appendChild(el);
+  chat.scrollTop = chat.scrollHeight;
+  return el;
+}
+
+async function renderEmpty() {
+  const chat = $('chat');
+  chat.innerHTML = `<div class="empty">
+    <h2>What should we build?</h2>
+    <div>Describe an app for yourself or your household. Forge writes it with your own AI, you watch it take shape, and Install puts it on this server.</div>
+    <div class="examples">${EXAMPLES.map((e) => `<button class="example" type="button">${esc(e)}</button>`).join('')}</div>
+    <div id="projects"></div>
+  </div>`;
+  chat.querySelectorAll('.example').forEach((b) => b.addEventListener('click', () => { $('prompt').value = b.textContent; $('prompt').focus(); }));
+  try {
+    const projects = await api('/api/forge/projects');
+    if (!projects.length) return;
+    $('projects').innerHTML = `<div class="section-label">Your apps</div><div class="examples" style="margin-top:8px">${projects.map((p) => `
+      <button class="project" type="button" data-name="${esc(p.name)}">
+        <span class="pt"><span class="pn">${esc(p.name)}</span><span class="pd">${esc(p.description || 'draft')}</span></span>
+        ${p.installed ? '<span class="pill">installed</span>' : ''}
+      </button>`).join('')}</div>`;
+    $('projects').querySelectorAll('.project').forEach((b) => b.addEventListener('click', () => openProject(b.dataset.name)));
+  } catch { /* the list is optional */ }
+}
+
+async function openProject(name) {
+  try {
+    const p = await api(`/api/forge/projects/${encodeURIComponent(name)}`);
+    Object.assign(state, { name: p.name, requests: p.requests || [], html: p.html, summary: p.description || '', previewData: {} });
+    $('appName').value = p.name;
+    $('chat').innerHTML = '';
+    state.requests.forEach((r) => addMsg('user', r));
+    addMsg('bot', p.description || 'Loaded. Describe a change to keep going.');
+    $('installBtn').disabled = false;
+    $('installBtn').textContent = p.installed ? 'Update' : 'Install';
+    renderPreview(p.html, true);
+    if (narrow()) showPane('preview');
+  } catch (err) { toast(err.message); }
+}
+
+function newApp() {
+  if (state.busy) return;
+  Object.assign(state, { name: '', requests: [], html: '', summary: '', previewData: {} });
+  $('appName').value = '';
+  $('installBtn').disabled = true;
+  $('installBtn').textContent = 'Install';
+  $('installLog').hidden = true;
+  $('stageEmpty').hidden = false;
+  $('work').innerHTML = '<div class="work-empty">This is where you watch the model work: the notes it reads, its thinking, and the code as it writes it.</div>';
+  renderEmpty();
+  showPane('chat');
+}
+
+/* ---------- workings ---------- */
+function step(title, { live = true, open = true, cls = '' } = {}) {
+  const el = document.createElement('div');
+  el.className = `step ${live ? 'live' : 'done'} ${cls}`;
+  el.innerHTML = `<button class="step-head" type="button" aria-expanded="${open}"><span class="dot"></span><span class="t">${esc(title)}</span><span class="meta"></span></button><div class="step-body" ${open ? '' : 'hidden'}></div>`;
+  const head = el.querySelector('.step-head');
+  const body = el.querySelector('.step-body');
+  head.addEventListener('click', () => { body.hidden = !body.hidden; head.setAttribute('aria-expanded', String(!body.hidden)); });
+  $('work').appendChild(el);
+  return {
+    el, body,
+    meta: (t) => { el.querySelector('.meta').textContent = t; },
+    title: (t) => { el.querySelector('.t').textContent = t; },
+    finish: (ok = true) => { el.classList.remove('live'); el.classList.add(ok ? 'done' : 'fail'); },
+    collapse: () => { body.hidden = true; head.setAttribute('aria-expanded', 'false'); },
+  };
+}
+
+function renderNotes(s, ctx) {
+  if (!ctx.vault) {
+    s.body.innerHTML = '<span style="color:var(--s-text-3)">No notes folder set, so the model works from your request alone. Set one with the Notes button.</span>';
+    s.meta('none');
+    return;
+  }
+  if (!ctx.notes.length) {
+    s.body.innerHTML = '<span style="color:var(--s-text-3)">Nothing in your notes matched this request.</span>';
+    s.meta('0 matched');
+    return;
+  }
+  const max = Math.max(...ctx.notes.map((n) => n.score));
+  s.body.innerHTML = ctx.notes.map((n) => `
+    <div class="note">
+      <div class="note-top"><span class="note-title">${esc(n.title)}</span><span class="note-path">${esc(n.path)}</span><span class="note-score">${n.score}</span></div>
+      <div class="bar"><i style="width:${Math.round((n.score / max) * 100)}%"></i></div>
+      <div class="chips">${n.matched.map((m) => `<span class="chip">${esc(m)}</span>`).join('')}</div>
+    </div>`).join('');
+  s.meta(`${ctx.notes.length} read`);
+}
+
+function statBox() {
+  const el = document.createElement('div');
+  el.className = 'stats';
+  el.innerHTML = ['first token', 'speed', 'tokens', 'time'].map((k) => `<div class="stat"><div class="k">${k}</div><div class="v" data-k="${k}">–</div></div>`).join('');
+  $('work').appendChild(el);
+  return (k, v) => { el.querySelector(`[data-k="${k}"]`).textContent = v; };
+}
+
+/* ---------- preview ---------- */
+// Runs inside the sandboxed preview (no same-origin, so it can't reach Hostess's API or cookies).
+// Stands in for the real app backend: /api/* calls are relayed to this page by postMessage.
+const SHIM = `<script>(()=>{let n=0;const w=new Map();
+addEventListener('message',e=>{const d=e.data;if(!d||d.__forge!=='res'||!w.has(d.id))return;w.get(d.id)(d);w.delete(d.id);});
+const of=window.fetch.bind(window);
+window.fetch=(input,init={})=>{const u=typeof input==='string'?input:input.url;const m=String(u).match(/(?:^|\\/)(api\\/.*)$/);
+if(!m||/^[a-z]+:\\/\\//i.test(u)&&!u.startsWith(location.origin))return of(input,init);
+const id=++n;return new Promise(r=>{w.set(id,d=>r(new Response(d.body,{status:d.status,headers:{'Content-Type':'application/json'}})));
+parent.postMessage({__forge:'req',id,path:'/'+m[1],method:(init.method||(typeof input==='object'&&input.method)||'GET').toUpperCase(),body:init.body??null},'*');});};
+addEventListener('error',e=>parent.postMessage({__forge:'err',msg:String(e.message)},'*'));})();<\/script>`;
+
+function withShim(html) {
+  return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + SHIM) : SHIM + html;
+}
+
+let front = $('frameA'), back = $('frameB'), pendingSwap = false;
+back.addEventListener('load', swap);
+front.addEventListener('load', swap);
+function swap(e) {
+  if (e.target !== back || !pendingSwap) return;
+  pendingSwap = false;
+  back.classList.remove('back'); back.removeAttribute('aria-hidden');
+  front.classList.add('back'); front.setAttribute('aria-hidden', 'true');
+  [front, back] = [back, front];
+}
+let lastRendered = '';
+function renderPreview(html, force = false) {
+  if (!html || (!force && html === lastRendered)) return;
+  lastRendered = html;
+  $('stageEmpty').hidden = true;
+  pendingSwap = true;
+  back.srcdoc = withShim(html);
+}
+
+window.addEventListener('message', async (e) => {
+  if (e.source !== front.contentWindow && e.source !== back.contentWindow) return;
+  const d = e.data;
+  if (!d || d.__forge !== 'req') return;
+  const reply = (status, body) => e.source.postMessage({ __forge: 'res', id: d.id, status, body: JSON.stringify(body) }, '*');
+  try {
+    const dm = d.path.match(/^\/api\/data\/([a-zA-Z0-9_-]{1,64})$/);
+    if (dm) {
+      if (d.method === 'GET') return reply(200, state.previewData[dm[1]] ?? null);
+      if (d.method === 'PUT') { state.previewData[dm[1]] = d.body ? JSON.parse(d.body) : null; return reply(200, { ok: true }); }
+      if (d.method === 'DELETE') { delete state.previewData[dm[1]]; return reply(200, { ok: true }); }
+    }
+    if (d.path === '/api/ai' && d.method === 'POST') {
+      const body = d.body ? JSON.parse(d.body) : {};
+      return reply(200, await api('/api/forge/ai', { method: 'POST', body: JSON.stringify({ ...body, model: $('model').value }) }));
+    }
+    if (d.path === '/api/push' && d.method === 'POST') {
+      const b = d.body ? JSON.parse(d.body) : {};
+      toast(`Phone notification: ${b.title ? b.title + ' — ' : ''}${b.message || ''}`);
+      return reply(200, { ok: true });
+    }
+    reply(404, { error: 'not found' });
+  } catch (err) { reply(500, { error: err.message }); }
+});
+
+$('deviceBtn').addEventListener('click', () => {
+  const phone = $('stage').classList.toggle('phone');
+  $('deviceBtn').textContent = phone ? 'Phone' : 'Full';
+});
+$('reloadBtn').addEventListener('click', () => renderPreview(state.html, true));
+
+/* ---------- generation ---------- */
+// The model may wrap the file in a code fence or add a sentence after it; keep only the document.
+function extract(text) {
+  const start = text.search(/<!doctype html|<html[\s>]/i);
+  if (start < 0) return { html: '', summary: '' };
+  const endIdx = text.search(/<\/html>/i);
+  const html = endIdx < 0 ? text.slice(start) : text.slice(start, endIdx + 7);
+  const summary = endIdx < 0 ? '' : text.slice(endIdx + 7).replace(/```|\*\*|__/g, '').trim();
+  return { html, summary, complete: endIdx >= 0 };
+}
+const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'my-app';
+
+async function send() {
+  const text = $('prompt').value.trim();
+  if (!text || state.busy) return;
+  $('prompt').value = '';
+  state.requests.push(text);
+  addMsg('user', text);
+  const bot = addMsg('bot', 'Working on it…');
+  setBusy(true);
+  $('work').innerHTML = '';
+  if (narrow()) showPane('work');
+
+  const notes = step('Reading your notes');
+  const prompt = step('Putting the prompt together', { open: false });
+  let think = null;
+  const write = step('Writing the app', { cls: 'code-step' });
+  write.body.innerHTML = '<pre class="stream code cursor"></pre>';
+  const codeEl = write.body.querySelector('pre');
+  const stat = statBox();
+
+  let raw = '', reasoning = '', inThink = false, tokens = 0, firstAt = 0, usage = null, failed = null;
+  const t0 = performance.now();
+  const tick = setInterval(() => {
+    const secs = (performance.now() - t0) / 1000;
+    stat('time', `${secs.toFixed(1)}s`);
+    if (firstAt) stat('speed', `${(tokens / ((performance.now() - firstAt) / 1000)).toFixed(1)} t/s`);
+    const { html } = extract(raw);
+    if (html.length > 200) { renderPreview(html); $('building').hidden = false; }
+  }, 700);
+
+  const onThinking = (t) => {
+    if (!think) {
+      think = step('Thinking');
+      think.body.innerHTML = '<pre class="stream cursor"></pre>';
+      $('work').insertBefore(think.el, write.el);
+    }
+    reasoning += t;
+    const pre = think.body.querySelector('pre');
+    pre.textContent = reasoning;
+    pre.scrollTop = pre.scrollHeight;
+    think.meta(`${reasoning.length} chars`);
+  };
+
+  try {
+    state.ctrl = new AbortController();
+    await streamPost('/api/forge/generate', { requests: state.requests, html: state.html, model: $('model').value }, (ev) => {
+      if (ev.type === 'context') {
+        renderNotes(notes, ev);
+        notes.finish();
+        prompt.body.innerHTML = `<pre class="stream">${esc(ev.system)}\n\n──── request ────\n\n${esc(ev.user.length > 4000 ? ev.user.slice(0, 1500) + '\n…\n' + ev.user.slice(-1500) : ev.user)}</pre>`;
+        prompt.meta(`${ev.model || 'default model'} · ${Math.round((ev.system.length + ev.user.length) / 4)} tokens`);
+        prompt.finish();
+        write.meta('waiting for first token…');
+      } else if (ev.type === 'reasoning') {
+        if (!firstAt) { firstAt = performance.now(); stat('first token', `${((firstAt - t0) / 1000).toFixed(1)}s`); }
+        tokens++;
+        onThinking(ev.text);
+      } else if (ev.type === 'content') {
+        if (!firstAt) { firstAt = performance.now(); stat('first token', `${((firstAt - t0) / 1000).toFixed(1)}s`); }
+        tokens++;
+        // Some models put their reasoning inline in <think> tags instead of a separate field.
+        let chunk = ev.text;
+        while (chunk) {
+          if (inThink) {
+            const end = chunk.indexOf('</think>');
+            if (end < 0) { onThinking(chunk); chunk = ''; } else { onThinking(chunk.slice(0, end)); inThink = false; chunk = chunk.slice(end + 8); }
+          } else {
+            const start = chunk.indexOf('<think>');
+            if (start < 0) { raw += chunk; chunk = ''; } else { raw += chunk.slice(0, start); inThink = true; chunk = chunk.slice(start + 7); }
+          }
+        }
+        if (think && !inThink && !think.el.classList.contains('done')) { think.finish(); think.body.querySelector('pre').classList.remove('cursor'); think.collapse(); }
+        codeEl.textContent = raw;
+        write.body.scrollTop = write.body.scrollHeight;
+        write.meta(`${raw.split('\n').length} lines`);
+      } else if (ev.type === 'usage') {
+        usage = ev.usage;
+      } else if (ev.type === 'error') {
+        failed = ev.error;
+      }
+    }, state.ctrl.signal);
+  } catch (err) {
+    failed = err.name === 'AbortError' ? 'Stopped.' : err.message;
+  }
+  clearInterval(tick);
+  codeEl.classList.remove('cursor');
+  $('building').hidden = true;
+  if (think && !think.el.classList.contains('done')) think.finish();
+  const elapsed = (performance.now() - t0) / 1000;
+  stat('time', `${elapsed.toFixed(1)}s`);
+  if (usage) {
+    stat('tokens', String(usage.completion_tokens));
+    if (firstAt) stat('speed', `${(usage.completion_tokens / ((performance.now() - firstAt) / 1000)).toFixed(1)} t/s`);
+  } else stat('tokens', String(tokens));
+
+  const { html, summary, complete } = extract(raw);
+  if (failed || !complete) {
+    write.finish(false);
+    bot.classList.add('err');
+    bot.textContent = failed || (html ? 'The model stopped before finishing the page. Try again, or pick a bigger model.' : 'The model answered without writing a page. Try rephrasing, or pick another model.');
+    state.requests.pop();
+    if (state.html) renderPreview(state.html, true);
+    setBusy(false);
+    return;
+  }
+  write.finish();
+  state.html = html;
+  state.summary = summary;
+  renderPreview(html, true);
+  bot.textContent = summary || 'Done. Try it in the preview, or describe a change.';
+  if (!state.name) {
+    const title = (html.match(/<title>([^<]*)<\/title>/i) || [])[1] || state.requests[0];
+    state.name = slug(title);
+    $('appName').value = state.name;
+  }
+  $('installBtn').disabled = false;
+  setBusy(false);
+  save(summary);
+  if (narrow()) showPane('preview');
+}
+
+async function save(description) {
+  const name = slug($('appName').value || state.name);
+  try {
+    await api(`/api/forge/projects/${name}`, { method: 'PUT', body: JSON.stringify({ html: state.html, requests: state.requests, description: description || undefined }) });
+    state.name = name;
+  } catch (err) { toast(`Not saved: ${err.message}`); }
+}
+
+function setBusy(busy) {
+  state.busy = busy;
+  $('sendBtn').disabled = busy;
+  $('stopBtn').hidden = !busy;
+  $('installBtn').disabled = busy || !state.html;
+  $('workStatus').textContent = busy ? 'live' : '';
+  $('workStatus').style.color = busy ? 'var(--crt-green)' : '';
+  $('sendBtn').textContent = state.requests.length > (busy ? 1 : 0) ? 'Change' : 'Build';
+  $('prompt').placeholder = state.html || busy ? 'Describe a change…' : 'Describe the app you want…';
+}
+
+$('sendBtn').addEventListener('click', send);
+$('stopBtn').addEventListener('click', () => state.ctrl?.abort());
+$('newBtn').addEventListener('click', newApp);
+$('prompt').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
+});
+
+/* ---------- install ---------- */
+$('installBtn').addEventListener('click', async () => {
+  const name = slug($('appName').value || state.name);
+  $('appName').value = name;
+  $('installBtn').disabled = true;
+  $('installLog').hidden = false;
+  $('installDone').hidden = true;
+  const pre = $('installPre');
+  pre.textContent = '';
+  const line = (t) => { pre.textContent += t + '\n'; pre.scrollTop = pre.scrollHeight; };
+  try {
+    await streamPost(`/api/forge/projects/${name}/install`, { html: state.html, requests: state.requests, description: state.summary }, (ev) => {
+      if (ev.type === 'log') line(ev.line);
+      if (ev.type === 'error') throw new Error(ev.error);
+      if (ev.type === 'done') {
+        state.name = name;
+        $('installDoneText').textContent = `${name} is running.`;
+        $('installDone').hidden = false;
+        $('installBtn').textContent = 'Update';
+        navigator.vibrate?.([20, 40, 30]);
+      }
+    });
+  } catch (err) {
+    line(`\nFailed: ${err.message}`);
+    toast('Install failed. The log has the details.');
+  }
+  $('installBtn').disabled = false;
+});
+
+/* ---------- header controls ---------- */
+async function loadModels() {
+  try {
+    const lm = await api('/api/lm');
+    const sel = $('model');
+    if (!lm.url) { sel.innerHTML = '<option value="">No AI connected</option>'; toast('Connect your AI in the Hostess sidebar (MY AI) first.'); return; }
+    const remembered = (() => { try { return localStorage.getItem('forge.model'); } catch { return null; } })();
+    const models = lm.models.filter((m) => !/embed/i.test(m));
+    sel.innerHTML = models.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+    sel.value = models.includes(remembered) ? remembered : (lm.selected || models[0] || '');
+  } catch (err) { toast(err.message); }
+}
+$('model').addEventListener('change', () => { try { localStorage.setItem('forge.model', $('model').value); } catch { /* private mode */ } });
+
+async function loadVault() {
+  try {
+    const { vault } = await api('/api/forge/settings');
+    $('vaultInput').value = vault;
+    $('notesLabel').textContent = vault ? vault.split('/').filter(Boolean).pop() : 'Notes';
+  } catch { /* shown on save */ }
+}
+$('notesBtn').addEventListener('click', () => { $('notesPop').hidden = !$('notesPop').hidden; if (!$('notesPop').hidden) $('vaultInput').focus(); });
+$('vaultCancel').addEventListener('click', () => { $('notesPop').hidden = true; loadVault(); });
+$('vaultSave').addEventListener('click', async () => {
+  try {
+    await api('/api/forge/settings', { method: 'PUT', body: JSON.stringify({ vault: $('vaultInput').value }) });
+    $('notesPop').hidden = true;
+    loadVault();
+    toast('Notes folder saved.');
+  } catch (err) { toast(err.message); }
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('notesPop').hidden = true; });
+
+renderEmpty();
+loadModels();
+loadVault();
+</script>
+</body>
+</html>

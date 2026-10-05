@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 const express = require('express');
 const qrcode = require('qrcode');
@@ -14,6 +15,7 @@ const gateway = require('./lib/gateway');
 const registry = require('./lib/registry');
 const tailscale = require('./lib/tailscale');
 const marketplace = require('./lib/marketplace');
+const forge = require('./lib/forge');
 
 const app = express();
 const PORT = 5300;
@@ -333,6 +335,74 @@ app.post('/api/push/test', async (req, res) => {
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
+});
+
+// Forge (lib/forge.js). Generation and install stream as server-sent events so the page can show
+// the model's work as it happens.
+function sse(res) {
+  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' });
+  return (event) => res.write(`data: ${JSON.stringify(event)}\n\n`);
+}
+
+app.get('/api/forge/settings', (req, res) => res.json({ vault: settings.get('forgeVault') || '' }));
+
+app.put('/api/forge/settings', (req, res) => {
+  const vault = String((req.body && req.body.vault) || '').trim();
+  if (vault && !fs.existsSync(vault)) return res.status(400).json({ error: `No folder at ${vault}` });
+  settings.set('forgeVault', vault);
+  res.json({ vault });
+});
+
+app.post('/api/forge/generate', async (req, res) => {
+  const { requests, html, model } = req.body || {};
+  if (!Array.isArray(requests) || !requests.length || !requests.every((r) => typeof r === 'string')) {
+    return res.status(400).json({ error: 'Describe the app first.' });
+  }
+  const emit = sse(res);
+  const ctrl = new AbortController();
+  res.on('close', () => ctrl.abort());
+  try {
+    await forge.generate({ requests, html: typeof html === 'string' ? html : '', model }, emit, ctrl.signal);
+    emit({ type: 'done' });
+  } catch (err) {
+    if (!ctrl.signal.aborted) emit({ type: 'error', error: err.message });
+  }
+  res.end();
+});
+
+app.post('/api/forge/ai', async (req, res) => {
+  try { res.json({ text: await forge.previewAi(req.body || {}) }); }
+  catch (err) { res.status(502).json({ error: err.message }); }
+});
+
+app.get('/api/forge/projects', (req, res) => res.json(forge.listProjects()));
+
+app.get('/api/forge/projects/:name', (req, res) => {
+  try { res.json(forge.getProject(req.params.name)); }
+  catch (err) { res.status(404).json({ error: err.message }); }
+});
+
+app.put('/api/forge/projects/:name', (req, res) => {
+  try { forge.saveProject({ ...req.body, name: req.params.name }); res.json({ ok: true }); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.delete('/api/forge/projects/:name', (req, res) => {
+  if (registry.get(req.params.name)) return res.status(400).json({ error: 'This app is installed. Remove it from the dashboard first.' });
+  try { forge.deleteProject(req.params.name); res.json({ ok: true }); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
+app.post('/api/forge/projects/:name/install', async (req, res) => {
+  const emit = sse(res);
+  try {
+    const dir = forge.saveProject({ ...req.body, name: req.params.name });
+    const record = await engine.deployApp(dir, (line) => emit({ type: 'log', line }));
+    emit({ type: 'done', port: record.port });
+  } catch (err) {
+    emit({ type: 'error', error: err.message });
+  }
+  res.end();
 });
 
 app.listen(PORT, '127.0.0.1', () => {
