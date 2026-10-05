@@ -605,6 +605,29 @@ function markupError(html) {
   }
   return null;
 }
+// Measured on ~250 saved builds: changed 6, fixed 5, broke none.
+// A renamed element: the script looks up exactly one id that no element has, and exactly one element
+// has an id nothing ever looks up. That is almost always the same element under a new name, so it
+// gets the name the script expects. Fixed in code, no model round; anything less clear-cut is left.
+function repairIds(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const js = [...doc.querySelectorAll('script:not([src])')].map((s) => s.textContent).join('\n');
+  const literal = (re) => [...js.matchAll(re)].map((m) => m[1]);
+  const looked = new Set([
+    ...literal(/getElementById\(\s*["'`]([\w-]+)["'`]\s*\)/g),
+    ...literal(/querySelector(?:All)?\(\s*["'`]#([\w-]+)["'`]\s*\)/g),
+  ]);
+  const made = new Set(literal(/\bid\s*=\s*["'`]([\w-]+)["'`]/g));
+  const inPage = [...doc.body.querySelectorAll('[id]')].filter((e) => !e.closest('script')).map((e) => e.id);
+  // An id built at runtime (`empty-${x}`) or used in CSS/labels counts as "used" too.
+  const css = [...doc.querySelectorAll('style')].map((s) => s.textContent).join('\n');
+  const usedElsewhere = (id) => js.includes(`'${id}'`) || js.includes(`"${id}"`) || js.includes(`#${id}`) || new RegExp(`#${id}\\b`).test(css) || doc.querySelector(`[for="${id}"], [form="${id}"], [aria-labelledby~="${id}"], [aria-controls="${id}"]`);
+  const missing = [...looked].filter((id) => !inPage.includes(id) && !made.has(id));
+  const unused = inPage.filter((id) => !looked.has(id) && !usedElsewhere(id));
+  if (missing.length !== 1 || unused.length !== 1) return null;
+  const re = new RegExp(`(\\sid=["'])${unused[0]}(["'])`);
+  return re.test(html) ? html.replace(re, `$1${missing[0]}$2`) : null;
+}
 const MAX_AUTO_FIXES = 2;
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -765,6 +788,10 @@ async function pagePass(body, label, { use = true } = {}) {
   let best = null;
   for (let round = 0; ; round++) {
     const ex = extract(raw);
+    if (!failed && ex.complete) {
+      const renamed = repairIds(ex.html);
+      if (renamed) { ex.html = renamed; addStepEl(step('Fixed automatically: an element the script looks for had been renamed', { live: false, open: false })); }
+    }
     if (!failed && ex.complete && /await/.test(scriptError(ex.html) || '')) {
       const repaired = autoRepair(ex.html);
       if (repaired) { ex.html = repaired; addStepEl(step('Fixed automatically: made the functions that use await async', { live: false, open: false })); }
