@@ -102,3 +102,15 @@ Object.defineProperty(window, 'today', {
   set: (v) => Object.defineProperty(window, 'today', { value: v, writable: true, configurable: true }), // `var today = x` keeps x
   configurable: true,
 });
+
+// <input type="number" min="0.01"> without a step only accepts 0.01, 1.01, 2.01…, so "25" is rejected
+// with a confusing browser message. Pages mean "any amount": say so. Also for inputs added later.
+(() => {
+  const fixStep = (root) => root.querySelectorAll && root.querySelectorAll('input[type=number]:not([step])').forEach((el) => {
+    if (/\./.test(el.getAttribute('min') || '')) el.setAttribute('step', 'any');
+  });
+  document.addEventListener('DOMContentLoaded', () => {
+    fixStep(document);
+    new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => n.nodeType === 1 && (fixStep(n), n.matches && n.matches('input[type=number]:not([step])') && fixStep(n.parentNode))))).observe(document.body, { childList: true, subtree: true });
+  });
+})();
