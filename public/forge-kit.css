@@ -57,9 +57,11 @@ button:not([class]):disabled, .btn:disabled { opacity: 0.45; cursor: default; tr
 .btn-primary.center { justify-content: center; }
 .btn-danger { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); color: var(--danger); }
 .btn-link { min-height: 44px; padding: 0 6px; border: 0; border-radius: 10px; background: none; cursor: pointer; color: var(--accent-ink); font: 500 13px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
-.btn-icon { width: 48px; padding: 0; }
-.btn-row { display: flex; gap: 10px; }
+.btn-icon { width: 50px; padding: 0; font-size: 22px; }
+.btn-row { display: flex; gap: 10px; align-items: stretch; }
 .btn-row > .btn { flex: 1; }
+.btn-row > input, .btn-row > select { flex: 1 1 auto; width: auto; min-width: 0; }
+.btn-row > .btn-icon { flex: 0 0 50px; }
 
 /* forms */
 .field { display: block; margin-bottom: 14px; }
