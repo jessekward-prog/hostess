@@ -192,3 +192,30 @@ document.addEventListener('DOMContentLoaded', () => setTimeout(() => {
     c.after(note);
   }
 }, 1800));
+
+// One-line replacements for prompt() and confirm(): the same shape models already write, shown as an
+// in-page sheet in the design system instead of the browser's pop-up.
+//   const name = await ask('Rename task', task.name);   // new text, or null if cancelled
+//   if (await confirmBox('Reset all stars?')) { ... }   // true / false
+(() => {
+  function sheet(question, value, withField) {
+    return new Promise((resolve) => {
+      const back = document.createElement('div');
+      back.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.35);display:flex;align-items:flex-end;justify-content:center;padding:16px;padding-bottom:max(16px,env(safe-area-inset-bottom))';
+      back.innerHTML = `<form class="card" style="width:100%;max-width:520px;margin:0;display:flex;flex-direction:column;gap:14px">
+        <span class="label"></span>${withField ? '<input>' : ''}
+        <div class="btn-row"><button type="button" class="btn" data-x>Cancel</button><button class="btn btn-primary center" style="min-height:48px">${withField ? 'Save' : 'Yes'}</button></div></form>`;
+      back.querySelector('.label').textContent = question || '';
+      const field = back.querySelector('input');
+      if (field) field.value = value == null ? '' : String(value);
+      const done = (v) => { back.remove(); resolve(v); };
+      back.querySelector('form').addEventListener('submit', (e) => { e.preventDefault(); done(field ? field.value.trim() : true); });
+      back.querySelector('[data-x]').addEventListener('click', () => done(field ? null : false));
+      back.addEventListener('click', (e) => { if (e.target === back) done(field ? null : false); });
+      document.body.appendChild(back);
+      (field || back.querySelector('.btn-primary')).focus();
+    });
+  }
+  window.ask = (question, value) => sheet(question, value, true);
+  window.confirmBox = (question) => sheet(question, null, false);
+})();
