@@ -247,6 +247,14 @@ document.addEventListener('DOMContentLoaded', () => setTimeout(() => {
       const id = typeof file === 'string' ? file : file && file.id;
       if (id) await fetch('/api/files/' + id, { method: 'DELETE' }).catch(() => {});
     },
+    // The right markup for whatever was saved: a photo for an image, a tappable link for a document,
+    // '' for nothing. size: 'photo' (large), 'thumb' (in a row) or 'gallery'.
+    view(file, size = 'photo') {
+      if (!file || !file.url) return '';
+      const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+      if (/^image\//.test(file.type || '') || /\.(png|jpe?g|webp|gif|heic)$/i.test(file.name || '')) return `<img class="${size === 'thumb' ? 'thumb' : 'photo'}" src="${esc(file.url)}" alt="${esc(file.name || '')}">`;
+      return size === 'thumb' ? `<span class="tile">DOC</span>` : `<a class="doc" href="${esc(file.url)}" target="_blank" rel="noopener">${esc(file.name || 'Document')}</a>`;
+    },
     pick(accept = 'image/*') {
       return new Promise((resolve) => {
         const input = Object.assign(document.createElement('input'), { type: 'file', accept });
