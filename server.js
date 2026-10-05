@@ -18,7 +18,7 @@ const marketplace = require('./lib/marketplace');
 const forge = require('./lib/forge');
 
 const app = express();
-const PORT = 5300;
+const PORT = Number(process.env.HOSTESS_PORT) || 5300;
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -344,17 +344,21 @@ function sse(res) {
   return (event) => res.write(`data: ${JSON.stringify(event)}\n\n`);
 }
 
-app.get('/api/forge/settings', (req, res) => res.json({ vault: settings.get('forgeVault') || '' }));
+app.get('/api/forge/settings', (req, res) => res.json({ vault: settings.get('forgeVault') || '', style: settings.get('forgeStyle') || '' }));
 
 app.put('/api/forge/settings', (req, res) => {
-  const vault = String((req.body && req.body.vault) || '').trim();
-  if (vault && !fs.existsSync(vault)) return res.status(400).json({ error: `No folder at ${vault}` });
-  settings.set('forgeVault', vault);
-  res.json({ vault });
+  const body = req.body || {};
+  if (typeof body.vault === 'string') {
+    const vault = body.vault.trim();
+    if (vault && !fs.existsSync(vault)) return res.status(400).json({ error: `No folder at ${vault}` });
+    settings.set('forgeVault', vault);
+  }
+  if (typeof body.style === 'string') settings.set('forgeStyle', body.style.trim().slice(0, 500));
+  res.json({ vault: settings.get('forgeVault') || '', style: settings.get('forgeStyle') || '' });
 });
 
 app.post('/api/forge/generate', async (req, res) => {
-  const { requests, html, model, think, fix } = req.body || {};
+  const { requests, html, model, think, fix, stage, spec, plan, step, style } = req.body || {};
   if (!Array.isArray(requests) || !requests.length || !requests.every((r) => typeof r === 'string')) {
     return res.status(400).json({ error: 'Describe the app first.' });
   }
@@ -362,7 +366,8 @@ app.post('/api/forge/generate', async (req, res) => {
   const ctrl = new AbortController();
   res.on('close', () => ctrl.abort());
   try {
-    await forge.generate({ requests, html: typeof html === 'string' ? html : '', model, think: think === true, fix: fix === true }, emit, ctrl.signal);
+    if (stage === 'step' && !(spec && Array.isArray(plan) && Number.isInteger(step) && plan[step])) throw new Error('A build step needs the spec, the plan and a step number.');
+    await forge.generate({ requests, html: typeof html === 'string' ? html : '', model, think: think === true, fix: fix === true, stage, spec, plan, step, style }, emit, ctrl.signal);
     emit({ type: 'done' });
   } catch (err) {
     if (!ctrl.signal.aborted) emit({ type: 'error', error: err.message });
@@ -407,8 +412,12 @@ app.post('/api/forge/projects/:name/install', async (req, res) => {
 
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`hostess dashboard: http://localhost:${PORT}`);
-  autoupdate.start(console.log);
-  selfupdate.start(console.log);
+  // A lab copy (a second checkout used for testing, e.g. Forge experiments) must not pull
+  // itself up to main or redeploy anyone's apps.
+  if (!process.env.HOSTESS_LAB) {
+    autoupdate.start(console.log);
+    selfupdate.start(console.log);
+  }
 });
 
 process.on('SIGTERM', () => { tunnel.stopAll(); process.exit(0); });

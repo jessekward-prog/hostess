@@ -131,6 +131,26 @@
   .install-log pre { margin: 0; padding: 10px 12px; overflow-y: auto; font-size: var(--fs-xs); white-space: pre-wrap; }
   .install-log .done-row { display: flex; gap: 10px; align-items: center; padding: 10px 12px; border-top: 1px solid var(--s-border); font-size: var(--fs-sm); color: var(--ok); }
 
+  .msg.spec { white-space: normal; max-width: 100%; display: flex; flex-direction: column; gap: 6px; }
+  .msg.spec ul { margin: 0; padding-left: 18px; color: var(--s-text-1); }
+  .spec-title { color: var(--s-text-0); font-size: var(--fs-lg); font-weight: 600; }
+  .opt { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; min-height: 44px; border: 1px solid var(--s-border); border-radius: 8px; cursor: pointer; }
+  .opt:has(input:checked) { border-color: rgba(var(--crt-green-rgb),0.55); background: rgba(var(--crt-green-rgb),0.05); }
+  .opt input { margin-top: 3px; accent-color: var(--crt-green); }
+  .opt .ol { display: block; color: var(--s-text-0); }
+  .opt .ow, .plan .ow { display: block; color: var(--s-text-3); font-size: var(--fs-xs); }
+  .sw { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: middle; }
+  .sw i { width: 12px; height: 12px; border-radius: 3px; box-shadow: 0 0 0 1px var(--s-border); }
+  .spec-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 6px; }
+  .plan { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .plan li { display: flex; gap: 10px; align-items: flex-start; color: var(--s-text-3); }
+  .plan li b { color: var(--s-text-1); font-weight: 500; }
+  .pdot { width: 8px; height: 8px; margin-top: 6px; border-radius: 50%; background: var(--s-border); flex-shrink: 0; }
+  .plan li.now b { color: var(--s-text-0); }
+  .plan li.now .pdot { background: var(--crt-green); box-shadow: 0 0 8px rgba(var(--crt-green-rgb),0.7); animation: pulse 1s ease-in-out infinite; }
+  .plan li.done .pdot { background: var(--ok); }
+  .plan li.warn .pdot { background: var(--warn); }
+  .plan li.fail .pdot { background: var(--danger); }
   .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); transform: translate(-50%, 20px); opacity: 0; z-index: 100; padding: 10px 16px; border-radius: 10px; background: var(--s-surface-2); border: 1px solid var(--s-border); color: var(--s-text-0); font-size: var(--fs-md); transition: transform 0.3s var(--ease), opacity 0.3s; max-width: calc(100vw - 32px); pointer-events: none; }
   .toast.show { transform: translate(-50%, 0); opacity: 1; }
 
@@ -170,6 +190,9 @@
     <div style="color:var(--s-text-0)">Notes folder</div>
     <div style="color:var(--s-text-3)">A folder of Markdown notes on this machine, such as an Obsidian vault. Before writing, Forge picks the notes that best match your request and shows you which ones it read.</div>
     <input class="name-input" id="vaultInput" placeholder="/home/you/Obsidian/MyVault" autocomplete="off" spellcheck="false">
+    <div style="color:var(--s-text-0); margin-top:4px">My style</div>
+    <div style="color:var(--s-text-3)">Optional. Describe the look you like and Step by step offers it next to a look picked for each app.</div>
+    <textarea class="name-input" id="styleInput" rows="3" style="height:auto; padding:8px 10px; resize:vertical" placeholder="e.g. dark background, warm amber accent, monospace type, sharp corners"></textarea>
     <div style="display:flex; gap:8px; justify-content:flex-end;">
       <button class="btn ghost" id="vaultCancel" type="button">Cancel</button>
       <button class="btn" id="vaultSave" type="button">Save</button>
@@ -188,7 +211,8 @@
       <div class="composer">
         <textarea id="prompt" placeholder="Describe the app you want…" rows="3"></textarea>
         <div class="composer-row">
-          <span class="hint" id="hint">Enter to send · Shift+Enter for a new line</span>
+          <select class="ctl" id="mode" title="Step by step plans first and builds in stages; Quick writes it in one go"><option value="steps">Step by step</option><option value="quick">Quick</option></select>
+          <span class="hint" id="hint">Enter to send</span>
           <button class="btn ghost" id="stopBtn" type="button" hidden>Stop</button>
           <button class="btn" id="sendBtn" type="button">Build</button>
         </div>
@@ -238,7 +262,8 @@ const EXAMPLES = [
   'A recipe box where I paste a recipe and the AI tidies it into ingredients and steps',
 ];
 
-const state = { name: '', requests: [], html: '', busy: false, ctrl: null, previewData: {}, fixes: 0 };
+const state = { name: '', requests: [], html: '', busy: false, ctrl: null, previewData: {}, spec: null };
+let myStyle = '';
 
 async function api(path, opts = {}) {
   const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
@@ -319,7 +344,7 @@ async function renderEmpty() {
 async function openProject(name) {
   try {
     const p = await api(`/api/forge/projects/${encodeURIComponent(name)}`);
-    Object.assign(state, { name: p.name, requests: p.requests || [], html: p.html, summary: p.description || '', previewData: {} });
+    Object.assign(state, { name: p.name, requests: p.requests || [], html: p.html, summary: p.description || '', spec: p.spec || null, previewData: {} });
     $('appName').value = p.name;
     $('chat').innerHTML = '';
     $('work').innerHTML = '';
@@ -329,13 +354,15 @@ async function openProject(name) {
     $('installBtn').disabled = false;
     $('installBtn').textContent = p.installed ? 'Update' : 'Install';
     renderPreview(p.html, true);
+    setBusy(false);
     if (narrow()) showPane('preview');
   } catch (err) { toast(err.message); }
 }
 
 function newApp() {
   if (state.busy) return;
-  Object.assign(state, { name: '', requests: [], html: '', summary: '', previewData: {} });
+  Object.assign(state, { name: '', requests: [], html: '', summary: '', spec: null, previewData: {} });
+  setBusy(false);
   $('appName').value = '';
   $('installBtn').disabled = true;
   $('installBtn').textContent = 'Install';
@@ -406,8 +433,11 @@ parent.postMessage({__forge:'req',id,path:'/'+m[1],method:(init.method||(typeof 
 addEventListener('error',e=>parent.postMessage({__forge:'err',msg:String(e.message)},'*'));
 addEventListener('unhandledrejection',e=>parent.postMessage({__forge:'err',msg:'Unhandled: '+String(e.reason&&e.reason.message||e.reason)},'*'));})();<\/script>`;
 
+// The same kit the installed page gets (lib/forge.js adds it at save time), so store.get etc. exist here too.
+let KIT = '';
+fetch('/forge-kit.js').then((r) => r.text()).then((t) => { KIT = `<script>${t}<\/script>`; });
 function withShim(html) {
-  return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + SHIM) : SHIM + html;
+  return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + SHIM + KIT) : SHIM + KIT + html;
 }
 
 let front = $('frameA'), back = $('frameB'), pendingSwap = false;
@@ -432,7 +462,7 @@ function renderPreview(html, force = false) {
 window.addEventListener('message', async (e) => {
   if (e.source !== front.contentWindow && e.source !== back.contentWindow) return;
   const d = e.data;
-  if (d && d.__forge === 'err' && !state.busy) return showPreviewError(d.msg);
+  if (d && d.__forge === 'err') { if (collecting) collecting.push(d.msg); else if (!state.busy) showPreviewError(d.msg); return; }
   if (!d || d.__forge !== 'req') return;
   const reply = (status, body) => e.source.postMessage({ __forge: 'res', id: d.id, status, body: JSON.stringify(body) }, '*');
   try {
@@ -457,6 +487,7 @@ window.addEventListener('message', async (e) => {
 
 // Errors thrown while someone uses the preview, shown once each with a one-click fix.
 const previewErrors = new Set();
+let collecting = null;
 function showPreviewError(msg) {
   if (!msg || previewErrors.has(msg)) return;
   previewErrors.add(msg);
@@ -484,6 +515,7 @@ function extract(text) {
   return { html, summary, complete: endIdx >= 0 };
 }
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'my-app';
+const thinkOn = () => $('thinkBtn').getAttribute('aria-pressed') === 'true';
 
 // Compiles each inline classic script without running it (new Function parses, never executes),
 // so a page that can't run at all is caught before the user ever sees a blank preview.
@@ -497,67 +529,71 @@ function scriptError(html) {
 }
 const MAX_AUTO_FIXES = 2;
 
-async function send(autoFix) {
-  const auto = typeof autoFix === 'string';
-  const text = auto ? autoFix : $('prompt').value.trim();
-  if (!text || state.busy) return;
-  if (!auto) { $('prompt').value = ''; state.fixes = 0; }
-  state.requests.push(text);
-  addMsg('user', auto ? `Auto-fix: ${text}` : text);
-  const bot = addMsg('bot', 'Working on it…');
-  setBusy(true);
-  if (!auto) $('work').innerHTML = '';
+// Renders the page as a first launch (no saved data) and collects whatever it throws.
+async function loadError(html) {
+  state.previewData = {};
+  collecting = [];
+  renderPreview(html, true);
+  await new Promise((r) => setTimeout(r, 2200));
+  const found = collecting[0] || null;
+  collecting = null;
+  return found;
+}
+
+// A job is one thing the user asked for (a build, a change); it may make several model calls.
+let job = null;
+function startJob(clear = true) {
+  if (clear) $('work').innerHTML = '';
+  $('work').querySelector('.stats')?.remove();
   previewErrors.clear();
-  if (narrow()) showPane('work');
+  job = { t0: performance.now(), tokens: 0, stat: statBox() };
+  job.tick = setInterval(() => job.stat('time', `${((performance.now() - job.t0) / 1000).toFixed(1)}s`), 500);
+}
+function endJob() {
+  if (!job) return;
+  clearInterval(job.tick);
+  job.stat('time', `${((performance.now() - job.t0) / 1000).toFixed(1)}s`);
+}
+// Keep the stats row last as steps are added above it.
+function addStepEl(s) {
+  const st = $('work').querySelector('.stats');
+  if (st) $('work').insertBefore(s.el, st);
+  s.el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  return s;
+}
 
-  const notes = step('Reading your notes');
-  const prompt = step('Putting the prompt together', { open: false });
-  let think = null;
-  const write = step('Writing the app', { cls: 'code-step' });
-  write.body.innerHTML = '<pre class="stream code cursor"></pre>';
-  const codeEl = write.body.querySelector('pre');
-  const stat = statBox();
-
-  let raw = '', reasoning = '', inThink = false, tokens = 0, firstAt = 0, usage = null, failed = null;
+// One streamed model call shown in Workings. Returns { raw, failed }.
+async function callModel(body, label, { code = true } = {}) {
+  let notes = null, think = null, reasoning = '', raw = '', inThink = false, firstAt = 0, n = 0, usage = null, failed = null;
+  const prompt = addStepEl(step('Putting the prompt together', { open: false }));
+  const write = addStepEl(step(label, { cls: code ? 'code-step' : '' }));
+  write.body.innerHTML = `<pre class="stream ${code ? 'code' : ''} cursor"></pre>`;
+  const out = write.body.querySelector('pre');
   const t0 = performance.now();
-  const tick = setInterval(() => {
-    const secs = (performance.now() - t0) / 1000;
-    stat('time', `${secs.toFixed(1)}s`);
-    if (firstAt) stat('speed', `${(tokens / ((performance.now() - firstAt) / 1000)).toFixed(1)} t/s`);
-    const { html } = extract(raw);
-    if (html.length > 200) { renderPreview(html); $('building').hidden = false; }
-  }, 700);
-
+  const tick = code ? setInterval(() => { const { html } = extract(raw); if (html.length > 200) { renderPreview(html); $('building').hidden = false; } }, 700) : null;
   const onThinking = (t) => {
-    if (!think) {
-      think = step('Thinking');
-      think.body.innerHTML = '<pre class="stream cursor"></pre>';
-      $('work').insertBefore(think.el, write.el);
-    }
+    if (!think) { think = step('Thinking'); think.body.innerHTML = '<pre class="stream cursor"></pre>'; $('work').insertBefore(think.el, write.el); }
     reasoning += t;
     const pre = think.body.querySelector('pre');
     pre.textContent = reasoning;
     pre.scrollTop = pre.scrollHeight;
     think.meta(`${reasoning.length} chars`);
   };
-
+  const firstToken = () => { if (!firstAt) { firstAt = performance.now(); job.stat('first token', `${((firstAt - t0) / 1000).toFixed(1)}s`); } n++; job.stat('speed', `${(n / Math.max(0.1, (performance.now() - firstAt) / 1000)).toFixed(1)} t/s`); };
   try {
     state.ctrl = new AbortController();
-    await streamPost('/api/forge/generate', { requests: state.requests, html: state.html, fix: auto, model: $('model').value, think: $('thinkBtn').getAttribute('aria-pressed') === 'true' }, (ev) => {
+    await streamPost('/api/forge/generate', { ...body, model: $('model').value, think: thinkOn() }, (ev) => {
       if (ev.type === 'context') {
-        renderNotes(notes, ev);
-        notes.finish();
+        if (!ev.skippedNotes) { notes = step('Reading your notes'); $('work').insertBefore(notes.el, prompt.el); renderNotes(notes, ev); notes.finish(); }
         prompt.body.innerHTML = `<pre class="stream">${esc(ev.system)}\n\n──── request ────\n\n${esc(ev.user.length > 4000 ? ev.user.slice(0, 1500) + '\n…\n' + ev.user.slice(-1500) : ev.user)}</pre>`;
         prompt.meta(`${ev.model || 'default model'} · ${Math.round((ev.system.length + ev.user.length) / 4)} tokens`);
         prompt.finish();
         write.meta('waiting for first token…');
       } else if (ev.type === 'reasoning') {
-        if (!firstAt) { firstAt = performance.now(); stat('first token', `${((firstAt - t0) / 1000).toFixed(1)}s`); }
-        tokens++;
+        firstToken();
         onThinking(ev.text);
       } else if (ev.type === 'content') {
-        if (!firstAt) { firstAt = performance.now(); stat('first token', `${((firstAt - t0) / 1000).toFixed(1)}s`); }
-        tokens++;
+        firstToken();
         // Some models put their reasoning inline in <think> tags instead of a separate field.
         let chunk = ev.text;
         while (chunk) {
@@ -570,92 +606,250 @@ async function send(autoFix) {
           }
         }
         if (think && !inThink && !think.el.classList.contains('done')) { think.finish(); think.body.querySelector('pre').classList.remove('cursor'); think.collapse(); }
-        codeEl.textContent = raw;
+        out.textContent = raw;
         write.body.scrollTop = write.body.scrollHeight;
         write.meta(`${raw.split('\n').length} lines`);
-      } else if (ev.type === 'usage') {
-        usage = ev.usage;
-      } else if (ev.type === 'error') {
-        failed = ev.error;
-      }
+      } else if (ev.type === 'usage') usage = ev.usage;
+      else if (ev.type === 'error') failed = ev.error;
     }, state.ctrl.signal);
   } catch (err) {
     failed = err.name === 'AbortError' ? 'Stopped.' : err.message;
   }
-  clearInterval(tick);
-  codeEl.classList.remove('cursor');
+  if (tick) clearInterval(tick);
   $('building').hidden = true;
+  out.classList.remove('cursor');
   if (think && !think.el.classList.contains('done')) think.finish();
-  const elapsed = (performance.now() - t0) / 1000;
-  stat('time', `${elapsed.toFixed(1)}s`);
-  if (usage) {
-    stat('tokens', String(usage.completion_tokens));
-    if (firstAt) stat('speed', `${(usage.completion_tokens / ((performance.now() - firstAt) / 1000)).toFixed(1)} t/s`);
-  } else stat('tokens', String(tokens));
+  const toks = usage ? usage.completion_tokens : n;
+  job.tokens += toks;
+  job.stat('tokens', String(job.tokens));
+  write.meta(`${toks} tokens · ${((performance.now() - t0) / 1000).toFixed(1)}s`);
+  write.finish(!failed);
+  return { raw, failed };
+}
 
-  const { html, summary, complete } = extract(raw);
-  if (failed || !complete) {
-    write.finish(false);
-    bot.classList.add('err');
-    bot.textContent = failed || (html ? 'The model stopped before finishing the page. Try again, or pick a bigger model.' : 'The model answered without writing a page. Try rephrasing, or pick another model.');
-    state.requests.pop();
-    if (state.html) renderPreview(state.html, true);
-    setBusy(false);
-    return;
+// Writes or rewrites the page, then checks it: a script that won't parse, or an error on first
+// launch, goes back to the model with the error, up to MAX_AUTO_FIXES rounds.
+async function pagePass(body, label) {
+  let { raw, failed } = await callModel(body, label);
+  for (let round = 0; ; round++) {
+    const ex = extract(raw);
+    if (failed || !ex.complete) {
+      return { failed: failed || (ex.html ? 'The model stopped before finishing the page. Try again, or pick a bigger model.' : 'The model answered without writing a page. Try rephrasing, or pick another model.') };
+    }
+    const check = addStepEl(step('Checking the code', { live: true, open: false }));
+    const err = scriptError(ex.html) || await loadError(ex.html);
+    if (!err) {
+      check.finish();
+      check.meta('parses · no errors on first launch');
+      state.html = ex.html;
+      return { html: ex.html, summary: ex.summary };
+    }
+    check.finish(false);
+    check.body.hidden = false;
+    if (round >= MAX_AUTO_FIXES) {
+      check.body.textContent = `Still failing: ${err}. Kept the page so you can see it; describe the fix, or try another model.`;
+      state.html = ex.html;
+      return { html: ex.html, summary: ex.summary, warning: err };
+    }
+    check.body.textContent = `${err}. Sending it back to the model (fix ${round + 1} of ${MAX_AUTO_FIXES}).`;
+    ({ raw, failed } = await callModel({
+      requests: [...state.requests, `The page fails with this error: "${err}". Fix that error and keep everything else the same.`],
+      html: ex.html, fix: true,
+    }, `Fixing: ${err.slice(0, 60)}`));
   }
-  write.finish();
-  state.html = html;
-  state.summary = summary;
-  renderPreview(html, true);
-  bot.textContent = summary || 'Done. Try it in the preview, or describe a change.';
+}
+
+function finishApp(res, bot) {
+  if (!res.html) {
+    bot.classList.add('err');
+    bot.textContent = res.failed;
+    return false;
+  }
+  renderPreview(res.html, true);
+  state.summary = res.summary || state.summary;
+  bot.textContent = res.warning ? `Built, but it still has an error: ${res.warning}` : (res.summary || 'Done. Try it in the preview, or describe a change.');
+  if (res.warning) bot.classList.add('err');
   if (!state.name) {
-    const title = (html.match(/<title>([^<]*)<\/title>/i) || [])[1] || state.requests[0];
-    state.name = slug(title);
+    state.name = slug((res.html.match(/<title>([^<]*)<\/title>/i) || [])[1] || (state.spec && state.spec.title) || state.requests[0]);
     $('appName').value = state.name;
   }
-  $('installBtn').disabled = false;
-  setBusy(false);
-  save(summary);
-  const syntax = scriptError(html);
-  if (syntax) {
-    const check = step('Checking the code', { live: false });
-    check.finish(false);
-    if (state.fixes < MAX_AUTO_FIXES) {
-      state.fixes++;
-      check.body.textContent = `The script won't run: ${syntax}. Sending it back to the model to fix (round ${state.fixes} of ${MAX_AUTO_FIXES}).`;
-      return send(`The page's JavaScript fails to parse with "${syntax}". Fix that error and keep everything else the same.`);
-    }
-    check.body.textContent = `The script still won't run: ${syntax}. Describe the fix yourself, or try another model.`;
-  } else {
-    step('Checking the code', { live: false, open: false }).meta('scripts parse');
-  }
+  save(state.summary);
   if (narrow()) showPane('preview');
+  return true;
+}
+
+// Quick build (one pass) or a change to the current app. `fixText` comes from a preview error's Fix button.
+async function send(fixText) {
+  const text = fixText || $('prompt').value.trim();
+  if (!text || state.busy) return;
+  if (!fixText) $('prompt').value = '';
+  if (!state.html && !fixText && $('mode').value === 'steps') return startBuild(text);
+  if (!fixText) state.requests.push(text);
+  addMsg('user', fixText ? `Fix: ${text}` : text);
+  const bot = addMsg('bot', 'Working on it…');
+  setBusy(true);
+  startJob();
+  if (narrow()) showPane('work');
+  const res = await pagePass(
+    fixText ? { requests: [...state.requests, text], html: state.html, fix: true } : { requests: state.requests, html: state.html },
+    fixText ? 'Fixing the app' : state.html ? 'Changing the app' : 'Writing the app',
+  );
+  if (!finishApp(res, bot) && !fixText) state.requests.pop();
+  if (!res.html && state.html) renderPreview(state.html, true);
+  endJob();
+  setBusy(false);
+}
+
+/* ---------- step by step ---------- */
+// Pulls the first JSON object out of a reply that may have a code fence or stray words around it.
+function parseJSON(text) {
+  const start = text.indexOf('{'), end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  try { return JSON.parse(text.slice(start, end + 1)); } catch { return null; }
+}
+function cleanSpec(raw) {
+  const arr = (v) => (Array.isArray(v) ? v : []);
+  const str = (v) => (typeof v === 'string' ? v.trim() : '');
+  const spec = {
+    title: str(raw.title) || 'My app',
+    summary: str(raw.summary),
+    assumptions: arr(raw.assumptions).map(str).filter(Boolean).slice(0, 4),
+    data: arr(raw.data).filter((d) => d && /^[a-zA-Z0-9_-]{1,64}$/.test(d.key)).map((d) => ({ key: d.key, holds: str(d.holds) })).slice(0, 6),
+    screens: arr(raw.screens).map(str).filter(Boolean).slice(0, 6),
+    core: arr(raw.core).map(str).filter(Boolean).slice(0, 8),
+    extras: arr(raw.extras).map((e) => (typeof e === 'string' ? { label: e, why: '' } : { label: str(e && e.label), why: str(e && e.why) })).filter((e) => e.label).slice(0, 6),
+    style: raw.style && typeof raw.style === 'object' ? raw.style : {},
+  };
+  const hex = (v, d) => (/^#[0-9a-f]{3,8}$/i.test(v || '') ? v : d);
+  spec.style = { mood: str(spec.style.mood) || 'clean and calm', background: hex(spec.style.background, '#f7f7f5'), surface: hex(spec.style.surface, '#ffffff'), text: hex(spec.style.text, '#1d1d1f'), accent: hex(spec.style.accent, '#3b82f6') };
+  return spec.core.length ? spec : null;
+}
+
+// Fixed, not model-written: the plan has no JSON to get wrong, and every app starts from a
+// working skeleton that already loads and saves.
+function makePlan(spec, extras) {
+  const pairs = (a) => a.reduce((acc, x, i) => (i % 2 ? acc[acc.length - 1].push(x) : acc.push([x]), acc), []);
+  const plan = [{
+    title: 'Layout and saving',
+    does: `Lay out every screen (${spec.screens.join(', ') || 'the main screen'}) with the colour variables, and load and save all the data (${spec.data.map((d) => `${d.key}: ${d.holds}`).join('; ') || 'what the user enters'}) with store.get/store.set. Show the empty state on first launch. Controls for later steps can be placeholders.`,
+  }];
+  for (const p of pairs(spec.core)) plan.push({ title: p.join(' + '), does: `Make this fully work, saving with store.set: ${p.join('; ')}.` });
+  for (const p of pairs(extras)) plan.push({ title: p.join(' + '), does: `Add: ${p.join('; ')}.` });
+  plan.push({ title: 'Polish', does: 'Go over every screen: empty, loading and error states, hover and press feedback, smooth transitions, nothing unstyled, works at 375px wide. Fix anything that does not work.' });
+  return plan;
+}
+
+// The decision card: what Forge understood, which extras to add, which look. Resolves on "Build it".
+function specCard(spec) {
+  return new Promise((resolve) => {
+    const el = addMsg('bot', '');
+    el.classList.add('spec');
+    const st = spec.style;
+    el.innerHTML = `
+      <div class="spec-title">${esc(spec.title)}</div>
+      <div>${esc(spec.summary)}</div>
+      ${spec.assumptions.length ? `<div class="section-label">Assuming</div><ul>${spec.assumptions.map((a) => `<li>${esc(a)}</li>`).join('')}</ul>` : ''}
+      <div class="section-label">It will</div><ul>${spec.core.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>
+      ${spec.extras.length ? `<div class="section-label">Add any of these?</div>${spec.extras.map((e, i) => `
+        <label class="opt"><input type="checkbox" value="${i}"><span><span class="ol">${esc(e.label)}</span>${e.why ? `<span class="ow">${esc(e.why)}</span>` : ''}</span></label>`).join('')}` : ''}
+      <div class="section-label">Look</div>
+      <label class="opt"><input type="radio" name="look" value="task" checked><span><span class="ol">Suited to this app <span class="sw">${[st.background, st.surface, st.accent, st.text].map((c) => `<i style="background:${c}"></i>`).join('')}</span></span><span class="ow">${esc(st.mood)}</span></span></label>
+      ${myStyle ? `<label class="opt"><input type="radio" name="look" value="mine"><span><span class="ol">My style</span><span class="ow">${esc(myStyle)}</span></span></label>` : ''}
+      <div class="spec-actions"><button class="btn ghost" type="button" data-a="over">Start over</button><button class="btn go" type="button" data-a="build">Build it</button></div>`;
+    el.querySelector('[data-a="build"]').addEventListener('click', () => {
+      const extras = [...el.querySelectorAll('input[type=checkbox]:checked')].map((c) => spec.extras[+c.value].label);
+      const mine = el.querySelector('input[name=look]:checked').value === 'mine';
+      el.querySelectorAll('input, button').forEach((x) => { x.disabled = true; });
+      resolve({ extras, style: mine ? { custom: myStyle } : null });
+    });
+    el.querySelector('[data-a="over"]').addEventListener('click', () => { resolve(null); newApp(); });
+    $('chat').scrollTop = $('chat').scrollHeight;
+  });
+}
+
+async function startBuild(text) {
+  state.requests = [text];
+  state.spec = null;
+  addMsg('user', text);
+  setBusy(true);
+  startJob();
+  if (narrow()) showPane('work');
+
+  let spec = null;
+  for (let attempt = 0; attempt < 2 && !spec; attempt++) {
+    const req = attempt ? `${text}\n\n(Answer with only the JSON object.)` : text;
+    const { raw, failed } = await callModel({ stage: 'spec', requests: [req] }, attempt ? 'Understanding your request (again)' : 'Understanding your request', { code: false });
+    if (failed) { addMsg('bot err', failed); endJob(); setBusy(false); state.requests = []; return; }
+    const parsed = parseJSON(raw);
+    spec = parsed && cleanSpec(parsed);
+  }
+  endJob();
+  if (!spec) {
+    addMsg('bot err', "The model couldn't turn that into a plan. Try Quick mode, or another model.");
+    setBusy(false);
+    state.requests = [];
+    return;
+  }
+  state.spec = spec;
+  state.name = slug(spec.title);
+  $('appName').value = state.name;
+  setBusy(false, true);
+  if (narrow()) showPane('chat');
+  const choice = await specCard(spec);
+  if (!choice) return;
+
+  const plan = makePlan(spec, choice.extras);
+  const bot = addMsg('bot', `Building in ${plan.length} steps…`);
+  setBusy(true);
+  startJob(false);
+  if (narrow()) showPane('preview');
+  const list = addStepEl(step(`Plan: ${plan.length} steps`, { live: false }));
+  list.body.innerHTML = `<ol class="plan">${plan.map((p) => `<li><span class="pdot"></span><span><b>${esc(p.title)}</b><br><span class="ow">${esc(p.does)}</span></span></li>`).join('')}</ol>`;
+  const items = list.body.querySelectorAll('li');
+  let res = null;
+  for (let i = 0; i < plan.length; i++) {
+    items[i].className = 'now';
+    bot.textContent = `Step ${i + 1} of ${plan.length}: ${plan[i].title}…`;
+    res = await pagePass({ stage: 'step', spec, plan, step: i, style: choice.style, requests: state.requests, html: state.html }, `Step ${i + 1}/${plan.length}: ${plan[i].title}`);
+    items[i].className = res.html ? (res.warning ? 'warn' : 'done') : 'fail';
+    // Earlier steps' code is history now; fold it away so the live step stays in view.
+    $('work').querySelectorAll('.step.code-step').forEach((el, k, all) => { if (k < all.length - 1) el.querySelector('.step-body').hidden = true; });
+    if (!res.html) break;
+    renderPreview(res.html, true);
+    save(spec.summary);
+  }
+  if (res && res.html) res.summary = spec.summary;
+  finishApp(res && res.html ? res : { failed: (res && res.failed) || 'Stopped.' }, bot);
+  endJob();
+  setBusy(false);
 }
 
 async function save(description) {
+  if (!($('appName').value || state.name)) return;
   const name = slug($('appName').value || state.name);
   try {
-    await api(`/api/forge/projects/${name}`, { method: 'PUT', body: JSON.stringify({ html: state.html, requests: state.requests, description: description || undefined }) });
+    await api(`/api/forge/projects/${name}`, { method: 'PUT', body: JSON.stringify({ html: state.html, requests: state.requests, spec: state.spec || undefined, description: description || undefined }) });
     state.name = name;
   } catch (err) { toast(`Not saved: ${err.message}`); }
 }
 
-function setBusy(busy) {
+function setBusy(busy, waiting = false) {
   state.busy = busy;
-  $('sendBtn').disabled = busy;
+  $('sendBtn').disabled = busy || waiting;
   $('stopBtn').hidden = !busy;
   $('installBtn').disabled = busy || !state.html;
   $('workStatus').textContent = busy ? 'live' : '';
   $('workStatus').style.color = busy ? 'var(--crt-green)' : '';
-  $('sendBtn').textContent = state.requests.length > (busy ? 1 : 0) ? 'Change' : 'Build';
-  $('prompt').placeholder = state.html || busy ? 'Describe a change…' : 'Describe the app you want…';
+  $('mode').hidden = !!state.html || busy || waiting;
+  $('sendBtn').textContent = state.html ? 'Change' : 'Build';
+  $('prompt').placeholder = waiting ? 'Pick what to build in the card above…' : state.html || busy ? 'Describe a change…' : 'Describe the app you want…';
 }
 
 $('sendBtn').addEventListener('click', () => send());
 $('stopBtn').addEventListener('click', () => state.ctrl?.abort());
 $('newBtn').addEventListener('click', newApp);
 $('prompt').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); }
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); if (!$('sendBtn').disabled) send(); }
 });
 
 /* ---------- install ---------- */
@@ -710,8 +904,10 @@ $('model').addEventListener('change', () => { try { localStorage.setItem('forge.
 
 async function loadVault() {
   try {
-    const { vault } = await api('/api/forge/settings');
+    const { vault, style } = await api('/api/forge/settings');
     $('vaultInput').value = vault;
+    $('styleInput').value = style;
+    myStyle = style;
     $('notesLabel').textContent = vault ? vault.split('/').filter(Boolean).pop() : 'Notes';
   } catch { /* shown on save */ }
 }
@@ -719,10 +915,10 @@ $('notesBtn').addEventListener('click', () => { $('notesPop').hidden = !$('notes
 $('vaultCancel').addEventListener('click', () => { $('notesPop').hidden = true; loadVault(); });
 $('vaultSave').addEventListener('click', async () => {
   try {
-    await api('/api/forge/settings', { method: 'PUT', body: JSON.stringify({ vault: $('vaultInput').value }) });
+    await api('/api/forge/settings', { method: 'PUT', body: JSON.stringify({ vault: $('vaultInput').value, style: $('styleInput').value }) });
     $('notesPop').hidden = true;
     loadVault();
-    toast('Notes folder saved.');
+    toast('Saved.');
   } catch (err) { toast(err.message); }
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('notesPop').hidden = true; });
