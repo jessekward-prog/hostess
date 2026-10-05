@@ -733,7 +733,8 @@ async function callModel(body, label, { code = true } = {}) {
     state.ctrl = new AbortController();
     // forge.seed is only ever set by the test harness: the same seed makes two versions of Forge
     // draw the same samples, so a comparison measures the change instead of the dice.
-    const seed = (() => { try { return Number(localStorage.getItem('forge.seed')) || undefined; } catch { return undefined; } })();
+    // A fresh attempt needs a different sample even under a test seed.
+    const seed = (() => { try { const v = Number(localStorage.getItem('forge.seed')); return v ? v + (body.attempt || 0) * 7919 : undefined; } catch { return undefined; } })();
     await streamPost('/api/forge/generate', { ...body, model: $('model').value, think: thinkOn(), seed }, (ev) => {
       if (ev.type === 'context') {
         if (!ev.skippedNotes) { notes = step('Reading your notes'); $('work').insertBefore(notes.el, prompt.el); renderNotes(notes, ev); notes.finish(); }
@@ -780,40 +781,33 @@ async function callModel(body, label, { code = true } = {}) {
 }
 
 // Writes or rewrites the page, then checks it: broken markup, a script that won't parse, an error on
-// first launch, or (with the use test) an app that can't add, save and reopen goes back to the model
-// with the problem, up to MAX_AUTO_FIXES rounds. A fix can make things worse, so the best attempt
-// wins, not the last one.
+// first launch, or (with the use test) an app that can't add, save and reopen. A failing page gets a
+// fresh attempt, up to MAX_ATTEMPTS, and the best attempt wins. Measured: asking the model to fix its
+// own page was break-even (fixes broke as much as they mended); a fresh sample checked by the same
+// tests is the test-time-compute recipe that works for small models.
+const MAX_ATTEMPTS = 3;
 async function pagePass(body, label, { use = true } = {}) {
-  let { raw, failed } = await callModel(body, label);
-  let best = null;
-  for (let round = 0; ; round++) {
+  let best = null, lastFailure = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const { raw, failed } = await callModel({ ...body, attempt }, attempt ? `${label} (fresh try ${attempt + 1} of ${MAX_ATTEMPTS})` : label);
+    if (failed === 'Stopped.') { lastFailure = failed; break; }
     const ex = extract(raw);
-    if (!failed && ex.complete) {
-      const renamed = repairIds(ex.html);
-      if (renamed) { ex.html = renamed; addStepEl(step('Fixed automatically: an element the script looks for had been renamed', { live: false, open: false })); }
+    if (failed || !ex.complete) {
+      lastFailure = failed || (ex.html ? 'The model stopped before finishing the page. Try again, or pick a bigger model.' : 'The model answered without writing a page. Try rephrasing, or pick another model.');
+      continue;
     }
-    if (!failed && ex.complete && /await/.test(scriptError(ex.html) || '')) {
+    // Repairs that are safe to make in code, on every attempt.
+    const renamed = repairIds(ex.html);
+    if (renamed) { ex.html = renamed; addStepEl(step('Fixed automatically: an element the script looks for had been renamed', { live: false, open: false })); }
+    if (/await/.test(scriptError(ex.html) || '')) {
       const repaired = autoRepair(ex.html);
       if (repaired) { ex.html = repaired; addStepEl(step('Fixed automatically: made the functions that use await async', { live: false, open: false })); }
-    }
-    if (failed || !ex.complete) {
-      if (best) break;
-      return { failed: failed || (ex.html ? 'The model stopped before finishing the page. Try again, or pick a bigger model.' : 'The model answered without writing a page. Try rephrasing, or pick another model.') };
     }
     const check = addStepEl(step(use ? 'Checking and test-driving the app' : 'Checking the code', { live: true, open: false }));
     let err = markupError(ex.html) || scriptError(ex.html), sev = err ? 3 : 0;
     if (!err) { err = await loadError(ex.html); sev = err ? 2 : 0; }
     if (!err && use) { err = await useTest(ex.html); sev = err ? 1 : 0; }
     if (!best || sev < best.sev) best = { html: ex.html, summary: ex.summary, sev, err };
-    // Measured: rewriting for a use-test complaint fixed as many apps as it broke, at 60% more time.
-    // So the use test only reports (with the Fix button); broken code and launch errors still get fixed.
-    if (err && sev === 1) {
-      check.finish(false);
-      check.body.hidden = false;
-      check.body.textContent = err;
-      showPreviewError(err);
-      break;
-    }
     if (!err) {
       check.finish();
       check.meta(use ? 'parses · loads · adds, saves and reopens' : 'parses · no errors on first launch');
@@ -821,18 +815,14 @@ async function pagePass(body, label, { use = true } = {}) {
     }
     check.finish(false);
     check.body.hidden = false;
-    if (round >= MAX_AUTO_FIXES) {
-      check.body.textContent = `Still failing: ${err}`;
-      break;
-    }
-    check.body.textContent = `${err} Sending it back to the model (fix ${round + 1} of ${MAX_AUTO_FIXES}).`;
-    ({ raw, failed } = await callModel({
-      requests: [...state.requests, `Testing the page found a problem: ${err} Fix it and keep everything else the same.`],
-      html: ex.html, fix: true,
-    }, `Fixing: ${err.slice(0, 60)}`));
+    check.body.textContent = attempt + 1 < MAX_ATTEMPTS ? `${err} Trying a fresh build.` : `Still failing: ${err}`;
   }
+  if (!best) return { failed: lastFailure || 'The model did not write a page.' };
   state.html = best.html;
-  if (best.sev) addStepEl(step(`Kept the best attempt: ${['', 'works but failed the use test', 'errors on launch', 'broken code'][best.sev]}`, { live: false, open: false })).finish(false);
+  if (best.sev) {
+    addStepEl(step(`Kept the best attempt: ${['', 'works but failed the use test', 'errors on launch', 'broken code'][best.sev]}`, { live: false, open: false })).finish(false);
+    showPreviewError(best.err);
+  }
   return { html: best.html, summary: best.summary, warning: best.err || undefined };
 }
 
