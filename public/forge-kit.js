@@ -96,3 +96,9 @@ window.showError = (err) => {
   }
   toast.textContent = msg;
 };
+// Models also use a bare `today` as a value (s.day === today): a live getter for the day string.
+Object.defineProperty(window, 'today', {
+  get: () => dates.today(),
+  set: (v) => Object.defineProperty(window, 'today', { value: v, writable: true, configurable: true }), // `var today = x` keeps x
+  configurable: true,
+});
