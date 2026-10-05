@@ -435,7 +435,7 @@ addEventListener('unhandledrejection',e=>parent.postMessage({__forge:'err',msg:'
 
 // The same kit the installed page gets (lib/forge.js adds it at save time), so store.get etc. exist here too.
 let KIT = '';
-fetch('/forge-kit.js').then((r) => r.text()).then((t) => { KIT = `<script>${t}<\/script>`; });
+fetch('/api/forge/kit').then((r) => r.json()).then((d) => { KIT = d.head || ''; });
 function withShim(html) {
   return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + SHIM + KIT) : SHIM + KIT + html;
 }
@@ -735,7 +735,7 @@ function cleanSpec(raw) {
     style: raw.style && typeof raw.style === 'object' ? raw.style : {},
   };
   const hex = (v, d) => (/^#[0-9a-f]{3,8}$/i.test(v || '') ? v : d);
-  spec.style = { mood: str(spec.style.mood) || 'clean and calm', background: hex(spec.style.background, '#f7f7f5'), surface: hex(spec.style.surface, '#ffffff'), text: hex(spec.style.text, '#1d1d1f'), accent: hex(spec.style.accent, '#3b82f6') };
+  spec.style = { mood: str(spec.style.mood) || 'calm and clear', accent: hex(spec.style.accent, '#2f6fed'), theme: spec.style.theme === 'dark' ? 'dark' : 'light' };
   return spec.core.length ? spec : null;
 }
 
@@ -767,7 +767,7 @@ function specCard(spec) {
       ${spec.extras.length ? `<div class="section-label">Add any of these?</div>${spec.extras.map((e, i) => `
         <label class="opt"><input type="checkbox" value="${i}"><span><span class="ol">${esc(e.label)}</span>${e.why ? `<span class="ow">${esc(e.why)}</span>` : ''}</span></label>`).join('')}` : ''}
       <div class="section-label">Look</div>
-      <label class="opt"><input type="radio" name="look" value="task" checked><span><span class="ol">Suited to this app <span class="sw">${[st.background, st.surface, st.accent, st.text].map((c) => `<i style="background:${c}"></i>`).join('')}</span></span><span class="ow">${esc(st.mood)}</span></span></label>
+      <label class="opt"><input type="radio" name="look" value="task" checked><span><span class="ol">Suited to this app <span class="sw">${[st.theme === 'dark' ? '#121212' : '#f6f6f3', st.accent].map((c) => `<i style="background:${c}"></i>`).join('')}</span></span><span class="ow">${esc(st.mood)}</span></span></label>
       ${myStyle ? `<label class="opt"><input type="radio" name="look" value="mine"><span><span class="ol">My style</span><span class="ow">${esc(myStyle)}</span></span></label>` : ''}
       <div class="spec-actions"><button class="btn ghost" type="button" data-a="over">Start over</button><button class="btn go" type="button" data-a="build">Build it</button></div>`;
     el.querySelector('[data-a="build"]').addEventListener('click', () => {

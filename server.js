@@ -380,6 +380,8 @@ app.post('/api/forge/ai', async (req, res) => {
   catch (err) { res.status(502).json({ error: err.message }); }
 });
 
+app.get('/api/forge/kit', (req, res) => res.json({ head: forge.kitHead() }));
+
 app.get('/api/forge/projects', (req, res) => res.json(forge.listProjects()));
 
 app.get('/api/forge/projects/:name', (req, res) => {

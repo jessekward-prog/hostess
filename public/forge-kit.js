@@ -22,3 +22,18 @@ window.notify = async (title, message) => {
   const r = await fetch('/api/push', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, message }) });
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'Could not send the notification.');
 };
+// Days are 'YYYY-MM-DD' strings in local time (toISOString is UTC, which makes "today" yesterday
+// for half the day east of Greenwich).
+window.dates = (() => {
+  const pad = (n) => String(n).padStart(2, '0');
+  const key = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const parse = (k) => { const [y, m, d] = String(k).split('-').map(Number); return new Date(y, (m || 1) - 1, d || 1); };
+  return {
+    today: () => key(new Date()),
+    addDays: (day, n) => { const d = parse(day); d.setDate(d.getDate() + n); return key(d); },
+    daysBetween: (from, to) => Math.round((parse(to) - parse(from)) / 864e5),
+    weekStart: (day = key(new Date())) => { const d = parse(day); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return key(d); },
+    monthOf: (day = key(new Date())) => String(day).slice(0, 7),
+    label: (day) => parse(day).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }),
+  };
+})();
