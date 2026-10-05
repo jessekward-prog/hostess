@@ -541,6 +541,55 @@ function withLine(js, msg) {
   }
   return msg;
 }
+// Fixed in code, not by the model: adds `async` to the function that directly contains an illegal await, repeatedly, until the
+// script parses. Returns the fixed script, or null when it isn't an await problem it can fix.
+function fixAwaits(js) {
+  for (let tries = 0; tries < 12; tries++) {
+    let msg;
+    try { new Function(js); return tries ? js : null; } catch (e) { msg = e.message; }
+    if (!/await/.test(msg)) return null;
+    const lines = js.split('\n');
+    let k = -1;
+    for (let i = 1; i <= lines.length && k < 0; i++) { try { new Function(lines.slice(0, i).join('\n')); } catch (e) { if (e.message === msg) k = i - 1; } }
+    if (k < 0) return null;
+    const col = lines[k].search(/\bawait\b/);
+    const upto = lines.slice(0, k).join('\n') + (k ? '\n' : '') + lines[k].slice(0, col);
+    // Walk back to the innermost unclosed "{" whose header is a function; skip if/for/try blocks.
+    let depth = 0, at = -1;
+    for (let p = upto.length - 1; p >= 0 && at < 0; p--) {
+      const c = upto[p];
+      if (c === '}') depth++;
+      else if (c === '{') {
+        if (depth > 0) { depth--; continue; }
+        const before = upto.slice(Math.max(0, p - 300), p);
+        let m;
+        if ((m = before.match(/\bfunction\b\s*[\w$]*\s*\([^()]*\)\s*$/))) at = p - before.length + m.index;
+        else if ((m = before.match(/(?:\([^()]*\)|[\w$]+)\s*=>\s*$/))) at = p - before.length + m.index;
+        else if ((m = before.match(/\b([\w$]+)\s*\([^()]*\)\s*$/)) && !/^(if|for|while|switch|catch|with)$/.test(m[1])) at = p - before.length + m.index;
+      }
+    }
+    // An arrow with an expression body on the await's own line: `x => await f()`.
+    if (at < 0) {
+      const m = lines[k].slice(0, col).match(/(?:\([^()]*\)|[\w$]+)\s*=>\s*$/);
+      if (!m) return null;
+      at = upto.length - lines[k].slice(0, col).length + m.index;
+    }
+    if (/\basync\s*$/.test(upto.slice(Math.max(0, at - 8), at))) return null; // already async: something else is wrong
+    js = js.slice(0, at) + 'async ' + js.slice(at);
+  }
+  return null;
+}
+
+// Applies fixAwaits to every inline script of the page; returns the repaired page or null.
+function autoRepair(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  let out = html, changed = false;
+  for (const el of doc.querySelectorAll('script:not([src])')) {
+    const fixed = fixAwaits(el.textContent);
+    if (fixed && out.includes(el.textContent)) { out = out.replace(el.textContent, () => fixed); changed = true; }
+  }
+  return changed ? out : null;
+}
 const MAX_AUTO_FIXES = 2;
 
 // Renders the page as a first launch (no saved data) and collects whatever it throws.
@@ -647,6 +696,10 @@ async function pagePass(body, label) {
   let { raw, failed } = await callModel(body, label);
   for (let round = 0; ; round++) {
     const ex = extract(raw);
+    if (!failed && ex.complete && /await/.test(scriptError(ex.html) || '')) {
+      const repaired = autoRepair(ex.html);
+      if (repaired) { ex.html = repaired; addStepEl(step('Fixed automatically: made the functions that use await async', { live: false, open: false })); }
+    }
     if (failed || !ex.complete) {
       return { failed: failed || (ex.html ? 'The model stopped before finishing the page. Try again, or pick a bigger model.' : 'The model answered without writing a page. Try rephrasing, or pick another model.') };
     }
