@@ -28,6 +28,10 @@
       if (el.tagName === 'SELECT') { if (el.options.length > 1) { el.selectedIndex = 1; el.dispatchEvent(new Event('change', { bubbles: true })); } }
       else if (type === 'number' || type === 'range') setValue(el, '25');
       else if (type === 'date') setValue(el, today);
+      else if (type === 'time') setValue(el, '22:30');
+      else if (type === 'datetime-local') setValue(el, `${today}T22:30`);
+      else if (type === 'month') setValue(el, today.slice(0, 7));
+      else if (type === 'week') setValue(el, '2026-W41');
       else if (/^(text|search|email|url|tel)$/.test(type) || el.tagName === 'TEXTAREA') setValue(el, d.mark);
       else continue;
       res.inputs++;

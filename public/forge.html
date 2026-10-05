@@ -654,12 +654,12 @@ async function useTest(html) {
   if (collecting.length) problems.push(`Using the app (typing into its form and pressing its main button) throws: "${collecting[0]}".`);
   if (r) {
     if (r.stuckLoading) problems.push('Before anyone touches it, the page still says "Loading" after loading finished. Replace or hide the loading text once data has loaded, including on first launch when nothing is saved.');
-    if (!r.inputs) problems.push('There is no way to add anything: the page has no input. Add a visible form (an input and an Add button) for what the app keeps.');
-    else if (!r.puts && !collecting.length) problems.push('Filling in the form and pressing the main button saved nothing (store.set was never called). Make the main button add the entry, save it with store.set and re-render.');
+    if (!r.inputs && !r.buttons) problems.push('There is no way to add anything: the page has no input or button. Add a visible form (an input and an Add button) for what the app keeps.');
+    else if (!r.puts && !collecting.length) problems.push(r.inputs ? 'Filling in the form and pressing the main button saved nothing (store.set was never called). Make the main button add the entry, save it with store.set and re-render.' : 'Pressing the main button saved nothing (store.set was never called). Make it save with store.set and re-render.');
     else if (r.puts) {
       await showAndSettle(html); // previewData kept: like reopening the app
       const t = await askFrame({ __forge: 'text' }, 'text-done', 5000);
-      if (t && !t.text.toLowerCase().includes(MARK.toLowerCase()) && !/\b25\b/.test(t.text)) problems.push('After saving and reopening the page, what was entered does not appear. On start, load the saved data with store.get and show it.');
+      if (t && !t.text.toLowerCase().includes(MARK.toLowerCase()) && !/\b25\b/.test(t.text) && r.inputs) problems.push('After saving and reopening the page, what was entered does not appear. On start, load the saved data with store.get and show it.');
     }
   }
   collecting = null;

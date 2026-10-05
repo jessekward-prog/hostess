@@ -120,3 +120,52 @@ Object.defineProperty(window, 'today', {
     new MutationObserver((ms) => ms.forEach((m) => m.addedNodes.forEach((n) => n.nodeType === 1 && (fixStep(n), n.matches && n.matches('input[type=number]:not([step])') && fixStep(n.parentNode))))).observe(document.body, { childList: true, subtree: true });
   });
 })();
+
+// Models asked for a chart reach for Chart.js, which isn't loaded. This covers the part they use:
+// new Chart(canvasOrCtx, { type: 'bar' | 'line', data: { labels, datasets: [{ data, label }] } }),
+// chart.data / chart.update() / chart.destroy(), drawn as a themed SVG in place of the canvas.
+window.Chart = class {
+  constructor(target, config = {}) {
+    const canvas = target && target.canvas ? target.canvas : (typeof target === 'string' ? document.getElementById(target) : target);
+    this.type = config.type || 'bar';
+    this.data = config.data || { labels: [], datasets: [] };
+    this.options = config.options || {};
+    // The canvas stays in the page (hidden) so code that looks it up again keeps working; one chart
+    // per canvas, so a page that makes a new Chart on every render doesn't stack copies.
+    if (canvas && canvas._forgeChart) { this.box = canvas._forgeChart.box; }
+    else {
+      this.box = document.createElement('div');
+      this.box.className = 'forge-chart';
+      this.box.style.cssText = 'width:100%;margin:8px 0';
+      if (canvas && canvas.parentNode) { canvas.style.display = 'none'; canvas.after(this.box); }
+    }
+    if (canvas) canvas._forgeChart = this;
+    this.update();
+  }
+  update() {
+    const labels = (this.data.labels || []).map(String);
+    const sets = (this.data.datasets || []).filter((d) => d && Array.isArray(d.data));
+    const values = sets.flatMap((d) => d.data.map((v) => Number((v && typeof v === 'object') ? v.y : v) || 0));
+    if (!labels.length || !values.length) { this.box.innerHTML = '<div class="empty" style="padding:16px 0">Nothing to chart yet.</div>'; return; }
+    const W = 340, H = 180, top = 14, bottom = 26, left = 8, right = 8;
+    const max = Math.max(1, ...values), n = labels.length, slot = (W - left - right) / n;
+    const y = (v) => top + (H - top - bottom) * (1 - v / max);
+    let marks = '';
+    sets.forEach((set, si) => {
+      const vals = set.data.map((v) => Number((v && typeof v === 'object') ? v.y : v) || 0);
+      const op = sets.length > 1 ? 1 - si * 0.35 : 1;
+      if (this.type === 'line') {
+        const pts = vals.map((v, i) => `${left + slot * (i + 0.5)},${y(v)}`).join(' ');
+        marks += `<polyline points="${pts}" fill="none" stroke="var(--accent)" stroke-opacity="${op}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>`;
+        marks += vals.map((v, i) => `<circle cx="${left + slot * (i + 0.5)}" cy="${y(v)}" r="3.5" fill="var(--accent)" fill-opacity="${op}"/>`).join('');
+      } else {
+        const bw = Math.max(4, (slot * 0.62) / sets.length);
+        marks += vals.map((v, i) => `<rect x="${left + slot * i + (slot - bw * sets.length) / 2 + bw * si}" y="${y(v)}" width="${bw}" height="${Math.max(0, H - bottom - y(v))}" rx="${Math.min(6, bw / 3)}" fill="var(--accent)" fill-opacity="${op}"><title>${labels[i]}: ${v}</title></rect>`).join('');
+      }
+    });
+    const ticks = labels.map((l, i) => `<text x="${left + slot * (i + 0.5)}" y="${H - 8}" text-anchor="middle" font-size="10" font-family="var(--mono)" fill="var(--muted)">${l.length > 6 ? l.slice(0, 5) + '…' : l}</text>`).join('');
+    const maxLabel = `<text x="${W - right}" y="${top - 2}" text-anchor="end" font-size="10" font-family="var(--mono)" fill="var(--muted)">${Math.round(max * 10) / 10}</text>`;
+    this.box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="chart"><line x1="${left}" x2="${W - right}" y1="${H - bottom}" y2="${H - bottom}" stroke="var(--line)"/>${marks}${ticks}${maxLabel}</svg>`;
+  }
+  destroy() { this.box.innerHTML = ''; }
+};
