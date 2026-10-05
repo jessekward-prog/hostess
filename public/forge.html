@@ -431,7 +431,8 @@ if(!m||/^[a-z]+:\\/\\//i.test(u)&&!u.startsWith(location.origin))return of(input
 const id=++n;return new Promise(r=>{w.set(id,d=>r(new Response(d.body,{status:d.status,headers:{'Content-Type':'application/json'}})));
 parent.postMessage({__forge:'req',id,path:'/'+m[1],method:(init.method||(typeof input==='object'&&input.method)||'GET').toUpperCase(),body:init.body??null},'*');});};
 addEventListener('error',e=>parent.postMessage({__forge:'err',msg:String(e.message)},'*'));
-addEventListener('unhandledrejection',e=>parent.postMessage({__forge:'err',msg:'Unhandled: '+String(e.reason&&e.reason.message||e.reason)},'*'));})();<\/script>`;
+addEventListener('unhandledrejection',e=>parent.postMessage({__forge:'err',msg:'Unhandled: '+String(e.reason&&e.reason.message||e.reason)},'*'));
+document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('a[href^="#"]');if(!a||e.defaultPrevented)return;e.preventDefault();location.hash=a.getAttribute('href');});})();<\/script>`;
 
 // The same kit the installed page gets (lib/forge.js adds it at save time), so store.get etc. exist here too.
 let KIT = '', SELFTEST = '';
@@ -474,6 +475,12 @@ window.addEventListener('message', async (e) => {
       if (d.method === 'PUT') { state.previewData[dm[1]] = d.body ? JSON.parse(d.body) : null; return reply(200, { ok: true }); }
       if (d.method === 'DELETE') { delete state.previewData[dm[1]]; return reply(200, { ok: true }); }
     }
+    if (d.path.startsWith('/api/files') && d.method === 'POST') {
+      const name = new URLSearchParams(d.path.split('?')[1] || '').get('name') || 'file';
+      const r = await fetch('/api/forge/files?name=' + encodeURIComponent(name), { method: 'POST', headers: { 'Content-Type': (d.body && d.body.type) || 'application/octet-stream' }, body: d.body });
+      return reply(r.status, await r.json().catch(() => ({ error: 'Could not save the file.' })));
+    }
+    if (d.path.startsWith('/api/files/') && d.method === 'DELETE') return reply(200, { ok: true });
     if (d.path === '/api/ai' && d.method === 'POST') {
       const body = d.body ? JSON.parse(d.body) : {};
       return reply(200, await api('/api/forge/ai', { method: 'POST', body: JSON.stringify({ ...body, model: $('model').value }) }));

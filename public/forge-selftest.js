@@ -33,6 +33,17 @@
       else if (type === 'datetime-local') setValue(el, `${today}T22:30`);
       else if (type === 'month') setValue(el, today.slice(0, 7));
       else if (type === 'week') setValue(el, '2026-W41');
+      else if (type === 'file') {
+        // A real 1x1 PNG (or a tiny PDF when the field wants documents), as if picked from the phone.
+        const wantsDoc = /pdf|document|\.doc/i.test(el.accept || '') && !/image/i.test(el.accept || '');
+        const file = wantsDoc
+          ? new File(['%PDF-1.1\n%Forge check\n'], 'check.pdf', { type: 'application/pdf' })
+          : new File([Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='), (c) => c.charCodeAt(0))], 'check.png', { type: 'image/png' });
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        el.files = dt.files;
+        el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
       else if (/^(text|search|email|url|tel)$/.test(type) || el.tagName === 'TEXTAREA') setValue(el, d.mark);
       else continue;
       res.inputs++;

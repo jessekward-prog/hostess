@@ -219,3 +219,77 @@ document.addEventListener('DOMContentLoaded', () => setTimeout(() => {
   window.ask = (question, value) => sheet(question, value, true);
   window.confirmBox = (question) => sheet(question, null, false);
 })();
+
+// Photos and documents. files.add(file) saves one and returns { id, url, name, type, size }: keep that
+// object in your saved data and use its url for <img src> or <a href>. Big photos are shrunk first
+// (longest side 1600px), so they load fast on a phone. files.pick('image/*') opens the picker itself.
+(() => {
+  async function shrink(file) {
+    const img = await createImageBitmap(file);
+    const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+    const c = Object.assign(document.createElement('canvas'), { width: Math.round(img.width * scale), height: Math.round(img.height * scale) });
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    return new Promise((ok, no) => c.toBlob((b) => (b ? ok(b) : no(new Error('shrink failed'))), 'image/jpeg', 0.85));
+  }
+  window.files = {
+    async add(file) {
+      if (!file) return null;
+      let body = file, type = file.type || 'application/octet-stream', name = file.name || 'file';
+      if (/^image\/(jpeg|png|webp|heic)$/.test(type) && file.size > 400e3) {
+        try { body = await shrink(file); type = 'image/jpeg'; name = name.replace(/\.\w+$/, '') + '.jpg'; } catch { /* keep the original */ }
+      }
+      const r = await fetch('/api/files?name=' + encodeURIComponent(name), { method: 'POST', headers: { 'Content-Type': type }, body });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'Could not save the file.');
+      return data;
+    },
+    async remove(file) {
+      const id = typeof file === 'string' ? file : file && file.id;
+      if (id) await fetch('/api/files/' + id, { method: 'DELETE' }).catch(() => {});
+    },
+    pick(accept = 'image/*') {
+      return new Promise((resolve) => {
+        const input = Object.assign(document.createElement('input'), { type: 'file', accept });
+        input.addEventListener('change', () => resolve(input.files[0] || null));
+        input.click();
+      });
+    },
+  };
+})();
+
+// Pages in one app: <section data-page="home">, <section data-page="detail">. Links href="#/detail/42"
+// (or data-go="detail" data-param="42", or pages.go('detail', 42)) switch pages; the page shown follows
+// the address, so the phone's Back button works. Before a page shows, a 'pagechange' event fires on
+// window with e.detail = { name, param }: fill the page there. pages.current() gives the same.
+(() => {
+  const read = () => {
+    const parts = (location.hash || '').replace(/^#\/?/, '').split('/');
+    const els = [...document.querySelectorAll('[data-page]')];
+    const name = els.some((p) => p.dataset.page === parts[0]) ? parts[0] : (els[0] && els[0].dataset.page);
+    return { name, param: parts.length > 1 && parts[1] !== '' ? decodeURIComponent(parts.slice(1).join('/')) : null };
+  };
+  const show = () => {
+    const els = document.querySelectorAll('[data-page]');
+    if (!els.length) return;
+    const cur = read();
+    window.dispatchEvent(new CustomEvent('pagechange', { detail: cur }));
+    els.forEach((p) => { p.hidden = p.dataset.page !== cur.name; });
+    document.querySelectorAll('a[href^="#/"], [data-go]').forEach((a) => {
+      const target = a.dataset.go || (a.getAttribute('href') || '').replace(/^#\/?/, '').split('/')[0];
+      a.classList.toggle('on', target === cur.name);
+    });
+    window.scrollTo(0, 0);
+  };
+  window.pages = {
+    go(name, param) { location.hash = '#/' + name + (param != null ? '/' + encodeURIComponent(param) : ''); },
+    back() { history.length > 1 ? history.back() : pages.go(''); },
+    current: read,
+    refresh: show,
+  };
+  addEventListener('hashchange', show);
+  document.addEventListener('DOMContentLoaded', show);
+  document.addEventListener('click', (e) => {
+    const go = e.target.closest('[data-go]');
+    if (go) { e.preventDefault(); pages.go(go.dataset.go, go.dataset.param); }
+  });
+})();

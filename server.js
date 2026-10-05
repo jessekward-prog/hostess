@@ -382,6 +382,28 @@ app.post('/api/forge/ai', async (req, res) => {
 
 app.get('/api/forge/kit', (req, res) => res.json({ head: forge.kitHead() }));
 
+// Photos and documents picked in the Forge preview. The preview can't reach a built app's own
+// /api/files, so they live here: in memory, oldest dropped past 200 MB, readable without login under
+// an unguessable id (the sandboxed preview sends no cookie), writable only when logged in.
+const previewFiles = new Map();
+let previewBytes = 0;
+app.post('/api/forge/files', express.raw({ type: () => true, limit: '25mb' }), (req, res) => {
+  const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  if (!body.length) return res.status(400).json({ error: 'The file was empty.' });
+  const id = require('crypto').randomBytes(12).toString('hex');
+  const name = String(req.query.name || 'file').replace(/[^\w.\- ]+/g, '_').slice(0, 120);
+  const type = String(req.headers['content-type'] || 'application/octet-stream').slice(0, 100);
+  previewFiles.set(id, { body, type, name });
+  previewBytes += body.length;
+  for (const [k, v] of previewFiles) { if (previewBytes <= 200e6) break; previewFiles.delete(k); previewBytes -= v.body.length; }
+  res.json({ id, url: `/forge-files/${id}`, name, type, size: body.length });
+});
+app.get('/forge-files/:id', (req, res) => {
+  const f = previewFiles.get(req.params.id);
+  if (!f) return res.status(404).end();
+  res.set({ 'Content-Type': f.type, 'Content-Disposition': `inline; filename="${f.name.replace(/"/g, '')}"` }).send(f.body);
+});
+
 app.get('/api/forge/projects', (req, res) => res.json(forge.listProjects()));
 
 app.get('/api/forge/projects/:name', (req, res) => {
