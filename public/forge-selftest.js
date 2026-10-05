@@ -22,13 +22,14 @@
     const res = { stuckLoading: /\bloading\b/i.test(document.body.innerText), inputs: 0, buttons: 0, puts: 0 };
     const startPuts = puts;
     const today = window.dates ? dates.today() : new Date().toISOString().slice(0, 10);
+    let timeN = 0;
     for (const el of document.querySelectorAll('input, textarea, select')) {
       if (!visible(el) || el.disabled || el.readOnly) continue;
       const type = (el.getAttribute('type') || 'text').toLowerCase();
       if (el.tagName === 'SELECT') { if (el.options.length > 1) { el.selectedIndex = 1; el.dispatchEvent(new Event('change', { bubbles: true })); } }
       else if (type === 'number' || type === 'range') setValue(el, '25');
       else if (type === 'date') setValue(el, today);
-      else if (type === 'time') setValue(el, '22:30');
+      else if (type === 'time') setValue(el, ['22:30', '06:30', '07:15'][timeN++ % 3]); // bedtime, then wake time
       else if (type === 'datetime-local') setValue(el, `${today}T22:30`);
       else if (type === 'month') setValue(el, today.slice(0, 7));
       else if (type === 'week') setValue(el, '2026-W41');
