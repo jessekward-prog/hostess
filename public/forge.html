@@ -434,10 +434,12 @@ addEventListener('error',e=>parent.postMessage({__forge:'err',msg:String(e.messa
 addEventListener('unhandledrejection',e=>parent.postMessage({__forge:'err',msg:'Unhandled: '+String(e.reason&&e.reason.message||e.reason)},'*'));})();<\/script>`;
 
 // The same kit the installed page gets (lib/forge.js adds it at save time), so store.get etc. exist here too.
-let KIT = '';
+let KIT = '', SELFTEST = '';
 fetch('/api/forge/kit').then((r) => r.json()).then((d) => { KIT = d.head || ''; });
+fetch('/forge-selftest.js').then((r) => r.text()).then((t) => { SELFTEST = `<script>${t}<\/script>`; });
 function withShim(html) {
-  return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + SHIM + KIT) : SHIM + KIT + html;
+  const pre = SHIM + KIT + SELFTEST;
+  return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + pre) : pre + html;
 }
 
 let front = $('frameA'), back = $('frameB'), pendingSwap = false;
@@ -590,17 +592,78 @@ function autoRepair(html) {
   }
   return changed ? out : null;
 }
+
+// Broken markup (usually a quote that never closes, often a curly ” typed for ") makes the browser
+// swallow the rest of the page into a text box or an attribute, so buttons silently disappear.
+function markupError(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  for (const el of doc.querySelectorAll('textarea, title')) {
+    if (/<\/?[a-z][^>]*>/i.test(el.textContent)) return `The HTML is broken: a <${el.tagName.toLowerCase()}> swallowed page markup ("${el.textContent.trim().slice(0, 80)}"). A quote or tag before it is probably not closed; check for curly quotes (” or “) used instead of ".`;
+  }
+  for (const el of doc.body ? doc.body.querySelectorAll('*') : []) {
+    for (const a of el.attributes) if (/<[a-z/]/i.test(a.value) && /[“”]|>/.test(a.value)) return `The HTML is broken: the ${a.name} attribute of a <${el.tagName.toLowerCase()}> swallowed page markup ("${a.value.slice(0, 80)}"). Close that attribute with a straight " quote.`;
+  }
+  return null;
+}
 const MAX_AUTO_FIXES = 2;
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+// Renders into the preview and waits until that render is the one on screen, plus time to start up.
+async function showAndSettle(html) {
+  renderPreview(html, true);
+  for (let i = 0; i < 60 && pendingSwap; i++) await wait(100);
+  await wait(1200);
+}
 
 // Renders the page as a first launch (no saved data) and collects whatever it throws.
 async function loadError(html) {
   state.previewData = {};
   collecting = [];
-  renderPreview(html, true);
-  await new Promise((r) => setTimeout(r, 2200));
+  await showAndSettle(html);
   const found = collecting[0] || null;
   collecting = null;
   return found;
+}
+
+function askFrame(msg, doneType, timeout) {
+  return new Promise((resolve) => {
+    const win = front.contentWindow;
+    const timer = setTimeout(() => { removeEventListener('message', on); resolve(null); }, timeout);
+    function on(e) {
+      if (e.source !== win || !e.data || e.data.__forge !== doneType) return;
+      clearTimeout(timer);
+      removeEventListener('message', on);
+      resolve(e.data);
+    }
+    addEventListener('message', on);
+    win.postMessage(msg, '*');
+  });
+}
+
+// Uses the app like a person (public/forge-selftest.js does the clicking inside the preview):
+// type into the form, press the main button, check it saved, reopen, check it is still there.
+// Returns the problems in words the model can act on, or null.
+async function useTest(html) {
+  const MARK = 'Forge Check';
+  state.previewData = {};
+  collecting = [];
+  await showAndSettle(html);
+  const r = await askFrame({ __forge: 'usetest', mark: MARK }, 'usetest-done', 10000);
+  await wait(300);
+  const problems = [];
+  if (collecting.length) problems.push(`Using the app (typing into its form and pressing its main button) throws: "${collecting[0]}".`);
+  if (r) {
+    if (r.stuckLoading) problems.push('Before anyone touches it, the page still says "Loading" after loading finished. Replace or hide the loading text once data has loaded, including on first launch when nothing is saved.');
+    if (!r.inputs) problems.push('There is no way to add anything: the page has no input. Add a visible form (an input and an Add button) for what the app keeps.');
+    else if (!r.puts && !collecting.length) problems.push('Filling in the form and pressing the main button saved nothing (store.set was never called). Make the main button add the entry, save it with store.set and re-render.');
+    else if (r.puts) {
+      await showAndSettle(html); // previewData kept: like reopening the app
+      const t = await askFrame({ __forge: 'text' }, 'text-done', 5000);
+      if (t && !t.text.toLowerCase().includes(MARK.toLowerCase()) && !/\b25\b/.test(t.text)) problems.push('After saving and reopening the page, what was entered does not appear. On start, load the saved data with store.get and show it.');
+    }
+  }
+  collecting = null;
+  return problems.length ? problems.join(' ') : null;
 }
 
 // A job is one thing the user asked for (a build, a change); it may make several model calls.
@@ -695,7 +758,7 @@ async function callModel(body, label, { code = true } = {}) {
 
 // Writes or rewrites the page, then checks it: a script that won't parse, or an error on first
 // launch, goes back to the model with the error, up to MAX_AUTO_FIXES rounds.
-async function pagePass(body, label) {
+async function pagePass(body, label, { use = true } = {}) {
   let { raw, failed } = await callModel(body, label);
   for (let round = 0; ; round++) {
     const ex = extract(raw);
@@ -706,11 +769,11 @@ async function pagePass(body, label) {
     if (failed || !ex.complete) {
       return { failed: failed || (ex.html ? 'The model stopped before finishing the page. Try again, or pick a bigger model.' : 'The model answered without writing a page. Try rephrasing, or pick another model.') };
     }
-    const check = addStepEl(step('Checking the code', { live: true, open: false }));
-    const err = scriptError(ex.html) || await loadError(ex.html);
+    const check = addStepEl(step(use ? 'Checking and test-driving the app' : 'Checking the code', { live: true, open: false }));
+    const err = markupError(ex.html) || scriptError(ex.html) || await loadError(ex.html) || (use ? await useTest(ex.html) : null);
     if (!err) {
       check.finish();
-      check.meta('parses · no errors on first launch');
+      check.meta(use ? 'parses · loads · adds, saves and reopens' : 'parses · no errors on first launch');
       state.html = ex.html;
       return { html: ex.html, summary: ex.summary };
     }
@@ -723,7 +786,7 @@ async function pagePass(body, label) {
     }
     check.body.textContent = `${err}. Sending it back to the model (fix ${round + 1} of ${MAX_AUTO_FIXES}).`;
     ({ raw, failed } = await callModel({
-      requests: [...state.requests, `The page fails with this error: "${err}". Fix that error and keep everything else the same.`],
+      requests: [...state.requests, `Testing the page found a problem: ${err} Fix it and keep everything else the same.`],
       html: ex.html, fix: true,
     }, `Fixing: ${err.slice(0, 60)}`));
   }
@@ -880,7 +943,8 @@ async function startBuild(text) {
   for (let i = 0; i < plan.length; i++) {
     items[i].className = 'now';
     bot.textContent = `Step ${i + 1} of ${plan.length}: ${plan[i].title}…`;
-    res = await pagePass({ stage: 'step', spec, plan, step: i, style: choice.style, requests: state.requests, html: state.html }, `Step ${i + 1}/${plan.length}: ${plan[i].title}`);
+    // Early steps may leave placeholder buttons, so only the finished app gets the use test.
+    res = await pagePass({ stage: 'step', spec, plan, step: i, style: choice.style, requests: state.requests, html: state.html }, `Step ${i + 1}/${plan.length}: ${plan[i].title}`, { use: i === plan.length - 1 });
     items[i].className = res.html ? (res.warning ? 'warn' : 'done') : 'fail';
     // Earlier steps' code is history now; fold it away so the live step stays in view.
     $('work').querySelectorAll('.step.code-step').forEach((el, k, all) => { if (k < all.length - 1) el.querySelector('.step-body').hidden = true; });
