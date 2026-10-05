@@ -778,6 +778,15 @@ async function pagePass(body, label, { use = true } = {}) {
     if (!err) { err = await loadError(ex.html); sev = err ? 2 : 0; }
     if (!err && use) { err = await useTest(ex.html); sev = err ? 1 : 0; }
     if (!best || sev < best.sev) best = { html: ex.html, summary: ex.summary, sev, err };
+    // Measured: rewriting for a use-test complaint fixed as many apps as it broke, at 60% more time.
+    // So the use test only reports (with the Fix button); broken code and launch errors still get fixed.
+    if (err && sev === 1) {
+      check.finish(false);
+      check.body.hidden = false;
+      check.body.textContent = err;
+      showPreviewError(err);
+      break;
+    }
     if (!err) {
       check.finish();
       check.meta(use ? 'parses · loads · adds, saves and reopens' : 'parses · no errors on first launch');
