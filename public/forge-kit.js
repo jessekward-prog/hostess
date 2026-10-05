@@ -36,6 +36,12 @@ window.dates = (() => {
     monthOf: (day = key(new Date())) => String(day).slice(0, 7),
     label: (day) => parse(day).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }),
     parse, // models reach for it; returns a local Date
+    // More names models reach for. All take and return 'YYYY-MM-DD' strings unless named otherwise.
+    monthStart: (day = key(new Date())) => `${String(day).slice(0, 7)}-01`,
+    monthEnd: (day = key(new Date())) => { const d = parse(day); return key(new Date(d.getFullYear(), d.getMonth() + 1, 0)); },
+    weekEnd: (day = key(new Date())) => { const d = parse(day); d.setDate(d.getDate() + (7 - d.getDay()) % 7); return key(d); },
+    isToday: (day) => day === key(new Date()),
+    dayName: (day) => parse(day).toLocaleDateString(undefined, { weekday: 'long' }),
   };
 })();
 
