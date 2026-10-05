@@ -80,3 +80,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 })();
+
+// Names models reach for without the dates. prefix, and the showError the worked example defines.
+// A page's own definitions of any of these win.
+Object.assign(window, { addDays: dates.addDays, daysBetween: dates.daysBetween, weekStart: dates.weekStart, monthOf: dates.monthOf });
+window.showError = (err) => {
+  const msg = (err && err.message) || String(err);
+  const status = document.querySelector('.status');
+  if (status) { status.className = 'status error'; status.textContent = msg; return; }
+  let toast = document.getElementById('forge-error');
+  if (!toast) {
+    toast = Object.assign(document.createElement('div'), { id: 'forge-error', className: 'status error' });
+    Object.assign(toast.style, { position: 'fixed', left: '16px', right: '16px', bottom: 'max(16px, env(safe-area-inset-bottom))', padding: '12px 16px', borderRadius: '14px', background: 'var(--surface)', boxShadow: '0 6px 24px rgba(0,0,0,.15)', zIndex: 9999 });
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+};
