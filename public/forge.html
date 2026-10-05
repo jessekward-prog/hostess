@@ -645,7 +645,10 @@ async function callModel(body, label, { code = true } = {}) {
   const firstToken = () => { if (!firstAt) { firstAt = performance.now(); job.stat('first token', `${((firstAt - t0) / 1000).toFixed(1)}s`); } n++; job.stat('speed', `${(n / Math.max(0.1, (performance.now() - firstAt) / 1000)).toFixed(1)} t/s`); };
   try {
     state.ctrl = new AbortController();
-    await streamPost('/api/forge/generate', { ...body, model: $('model').value, think: thinkOn() }, (ev) => {
+    // forge.seed is only ever set by the test harness: the same seed makes two versions of Forge
+    // draw the same samples, so a comparison measures the change instead of the dice.
+    const seed = (() => { try { return Number(localStorage.getItem('forge.seed')) || undefined; } catch { return undefined; } })();
+    await streamPost('/api/forge/generate', { ...body, model: $('model').value, think: thinkOn(), seed }, (ev) => {
       if (ev.type === 'context') {
         if (!ev.skippedNotes) { notes = step('Reading your notes'); $('work').insertBefore(notes.el, prompt.el); renderNotes(notes, ev); notes.finish(); }
         prompt.body.innerHTML = `<pre class="stream">${esc(ev.system)}\n\n──── request ────\n\n${esc(ev.user.length > 4000 ? ev.user.slice(0, 1500) + '\n…\n' + ev.user.slice(-1500) : ev.user)}</pre>`;

@@ -358,7 +358,7 @@ app.put('/api/forge/settings', (req, res) => {
 });
 
 app.post('/api/forge/generate', async (req, res) => {
-  const { requests, html, model, think, fix, stage, spec, plan, step, style } = req.body || {};
+  const { requests, html, model, think, fix, stage, spec, plan, step, style, seed } = req.body || {};
   if (!Array.isArray(requests) || !requests.length || !requests.every((r) => typeof r === 'string')) {
     return res.status(400).json({ error: 'Describe the app first.' });
   }
@@ -367,7 +367,7 @@ app.post('/api/forge/generate', async (req, res) => {
   res.on('close', () => ctrl.abort());
   try {
     if (stage === 'step' && !(spec && Array.isArray(plan) && Number.isInteger(step) && plan[step])) throw new Error('A build step needs the spec, the plan and a step number.');
-    await forge.generate({ requests, html: typeof html === 'string' ? html : '', model, think: think === true, fix: fix === true, stage, spec, plan, step, style }, emit, ctrl.signal);
+    await forge.generate({ requests, html: typeof html === 'string' ? html : '', model, think: think === true, fix: fix === true, stage, spec, plan, step, style, seed: Number.isInteger(seed) ? seed : undefined }, emit, ctrl.signal);
     emit({ type: 'done' });
   } catch (err) {
     if (!ctrl.signal.aborted) emit({ type: 'error', error: err.message });
