@@ -1041,7 +1041,11 @@ async function loadModels() {
     const remembered = (() => { try { return localStorage.getItem('forge.model'); } catch { return null; } })();
     const models = lm.models.filter((m) => !/embed/i.test(m));
     sel.innerHTML = models.map((m) => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
-    sel.value = models.includes(remembered) ? remembered : (lm.selected || models[0] || '');
+    // Measured on Forge's own test apps (forge-lab, 2026-10-06): best first. Matched by pattern so an
+    // Ollama-style name (qwen2.5-coder:7b) counts too. A model the person picked always wins.
+    const PREFERRED = [/qwen2\.5-coder.*7b/i, /qwen3-vl-8b/i, /bonsai/i];
+    const best = PREFERRED.map((re) => models.find((m) => re.test(m))).find(Boolean);
+    sel.value = models.includes(remembered) ? remembered : (best || lm.selected || models[0] || '');
   } catch (err) { toast(err.message); }
 }
 function setThink(on) { $('thinkBtn').setAttribute('aria-pressed', String(on)); $('thinkBtn').textContent = on ? 'Think: on' : 'Think: off'; }
