@@ -58,9 +58,9 @@ button:not([class]):disabled, .btn:disabled { opacity: 0.45; cursor: default; tr
 .btn-danger { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); color: var(--danger); }
 .btn-link { min-height: 44px; padding: 0 6px; border: 0; border-radius: 10px; background: none; cursor: pointer; color: var(--accent-ink); font: 500 13px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
 .btn-icon { width: 50px; padding: 0; font-size: 22px; }
-.btn-row { display: flex; gap: 10px; align-items: stretch; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: stretch; }
 .btn-row > .btn { flex: 1; }
-.btn-row > input, .btn-row > select { flex: 1 1 auto; width: auto; min-width: 0; }
+.btn-row > input, .btn-row > select { flex: 1 1 140px; width: auto; min-width: 0; } /* wraps rather than squeezing a field below ~140px */
 .btn-row > .btn-icon { flex: 0 0 50px; }
 
 /* forms */
@@ -85,7 +85,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.8; }
 .row-main { flex: 1; min-width: 0; }
 .row-title { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; overflow: hidden; text-overflow: ellipsis; }
 .row.done .row-title { color: var(--muted); text-decoration: line-through; }
-.tile { width: 46px; height: 46px; flex-shrink: 0; display: grid; place-items: center; border-radius: 14px; background: var(--surface-2); font: 500 13px/1 var(--mono); letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; }
+.tile { width: 46px; height: 46px; flex-shrink: 0; display: grid; place-items: center; border-radius: 14px; background: var(--surface-2); font: 500 13px/1 var(--mono); letter-spacing: 0.06em; color: var(--muted); text-transform: uppercase; overflow: hidden; white-space: nowrap; text-overflow: clip; padding: 0 4px; text-align: center; }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--surface-2); color: var(--text); font: 500 13px/1 var(--mono); cursor: pointer; transition: background-color 0.2s, color 0.2s; }
 .chip.on { background: var(--accent); color: var(--accent-text); }
@@ -108,3 +108,6 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.8; }
 
 @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; } }
+/* A list the page forgot to give an empty state still says something (never two empty states). */
+.card:not(:has(.empty)) .list:empty::after, .card:not(:has(.empty)) > ul:empty::after { content: 'Nothing here yet.'; display: block; padding: 18px 0; text-align: center; color: var(--muted); font-size: 15px; }
+.card:empty::after { content: 'Nothing here yet.'; display: block; text-align: center; color: var(--muted); font-size: 15px; }
