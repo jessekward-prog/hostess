@@ -756,10 +756,13 @@ async function callModel(body, label, { code = true } = {}) {
   return { raw, failed };
 }
 
-// Writes or rewrites the page, then checks it: a script that won't parse, or an error on first
-// launch, goes back to the model with the error, up to MAX_AUTO_FIXES rounds.
+// Writes or rewrites the page, then checks it: broken markup, a script that won't parse, an error on
+// first launch, or (with the use test) an app that can't add, save and reopen goes back to the model
+// with the problem, up to MAX_AUTO_FIXES rounds. A fix can make things worse, so the best attempt
+// wins, not the last one.
 async function pagePass(body, label, { use = true } = {}) {
   let { raw, failed } = await callModel(body, label);
+  let best = null;
   for (let round = 0; ; round++) {
     const ex = extract(raw);
     if (!failed && ex.complete && /await/.test(scriptError(ex.html) || '')) {
@@ -767,29 +770,34 @@ async function pagePass(body, label, { use = true } = {}) {
       if (repaired) { ex.html = repaired; addStepEl(step('Fixed automatically: made the functions that use await async', { live: false, open: false })); }
     }
     if (failed || !ex.complete) {
+      if (best) break;
       return { failed: failed || (ex.html ? 'The model stopped before finishing the page. Try again, or pick a bigger model.' : 'The model answered without writing a page. Try rephrasing, or pick another model.') };
     }
     const check = addStepEl(step(use ? 'Checking and test-driving the app' : 'Checking the code', { live: true, open: false }));
-    const err = markupError(ex.html) || scriptError(ex.html) || await loadError(ex.html) || (use ? await useTest(ex.html) : null);
+    let err = markupError(ex.html) || scriptError(ex.html), sev = err ? 3 : 0;
+    if (!err) { err = await loadError(ex.html); sev = err ? 2 : 0; }
+    if (!err && use) { err = await useTest(ex.html); sev = err ? 1 : 0; }
+    if (!best || sev < best.sev) best = { html: ex.html, summary: ex.summary, sev, err };
     if (!err) {
       check.finish();
       check.meta(use ? 'parses · loads · adds, saves and reopens' : 'parses · no errors on first launch');
-      state.html = ex.html;
-      return { html: ex.html, summary: ex.summary };
+      break;
     }
     check.finish(false);
     check.body.hidden = false;
     if (round >= MAX_AUTO_FIXES) {
-      check.body.textContent = `Still failing: ${err}. Kept the page so you can see it; describe the fix, or try another model.`;
-      state.html = ex.html;
-      return { html: ex.html, summary: ex.summary, warning: err };
+      check.body.textContent = `Still failing: ${err}`;
+      break;
     }
-    check.body.textContent = `${err}. Sending it back to the model (fix ${round + 1} of ${MAX_AUTO_FIXES}).`;
+    check.body.textContent = `${err} Sending it back to the model (fix ${round + 1} of ${MAX_AUTO_FIXES}).`;
     ({ raw, failed } = await callModel({
       requests: [...state.requests, `Testing the page found a problem: ${err} Fix it and keep everything else the same.`],
       html: ex.html, fix: true,
     }, `Fixing: ${err.slice(0, 60)}`));
   }
+  state.html = best.html;
+  if (best.sev) addStepEl(step(`Kept the best attempt: ${['', 'works but failed the use test', 'errors on launch', 'broken code'][best.sev]}`, { live: false, open: false })).finish(false);
+  return { html: best.html, summary: best.summary, warning: best.err || undefined };
 }
 
 function finishApp(res, bot) {
