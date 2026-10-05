@@ -37,3 +37,23 @@ window.dates = (() => {
     label: (day) => parse(day).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }),
   };
 })();
+
+// Whatever accent the page picks stays readable: dark text on a pale accent button, and a deeper
+// (or, on dark pages, lighter) "ink" shade wherever the accent is used as text.
+document.addEventListener('DOMContentLoaded', () => {
+  const root = document.documentElement;
+  const probe = document.createElement('i');
+  document.body.appendChild(probe);
+  const rgbOf = (value) => { probe.style.color = ''; probe.style.color = value; return (getComputedStyle(probe).color.match(/[\d.]+/g) || [0, 0, 0]).slice(0, 3).map(Number); };
+  const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+  const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  const css = getComputedStyle(root);
+  const accent = rgbOf(css.getPropertyValue('--accent').trim() || '#2f6fed');
+  const bg = rgbOf(css.getPropertyValue('--surface').trim() || '#fff');
+  probe.remove();
+  if (ratio(accent, [255, 255, 255]) < 3) root.style.setProperty('--accent-text', '#111111');
+  const dark = lum(bg) < 0.2;
+  let ink = accent.slice();
+  for (let i = 0; i < 20 && ratio(ink, bg) < 4.5; i++) ink = ink.map((v) => Math.round(dark ? v + (255 - v) * 0.15 : v * 0.85));
+  root.style.setProperty('--accent-ink', `rgb(${ink.join(',')})`);
+});

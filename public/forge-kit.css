@@ -4,7 +4,7 @@
    and builds with these classes, so a small model never has to invent the craft itself. */
 :root {
   --bg: #f6f6f3; --surface: #ffffff; --surface-2: #efefeb; --line: #e4e4df;
-  --text: #141414; --muted: #5f5f5b; --accent: #2f6fed; --accent-text: #ffffff;
+  --text: #141414; --muted: #5f5f5b; --accent: #2f6fed; --accent-text: #ffffff; --accent-ink: var(--accent);
   --danger: #c93a2e; --ok: #23875a;
   --radius-lg: 26px; --radius: 18px; --radius-sm: 12px;
   --font: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
@@ -26,7 +26,7 @@ body {
 
 /* type */
 .topbar { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 18px; }
-.brand { font: 500 12px/1 var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); }
+.brand { font: 500 12px/1 var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent-ink); }
 h1, .title { font: 700 42px/1.02 var(--font); letter-spacing: -0.035em; margin: 0 0 6px; }
 .subtitle { font-size: 18px; color: var(--muted); margin: 0 0 24px; letter-spacing: -0.01em; }
 h2, .section { font: 500 11px/1 var(--mono); letter-spacing: 0.2em; text-transform: uppercase; color: var(--muted); margin: 30px 4px 12px; }
@@ -56,7 +56,7 @@ button:not([class]):disabled, .btn:disabled { opacity: 0.45; cursor: default; tr
 .btn-primary { width: 100%; min-height: 58px; justify-content: space-between; padding: 0 24px; border-radius: 20px; background: var(--accent); color: var(--accent-text); font-size: 18px; }
 .btn-primary.center { justify-content: center; }
 .btn-danger { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); color: var(--danger); }
-.btn-link { min-height: 44px; padding: 0 6px; border: 0; border-radius: 10px; background: none; cursor: pointer; color: var(--accent); font: 500 13px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
+.btn-link { min-height: 44px; padding: 0 6px; border: 0; border-radius: 10px; background: none; cursor: pointer; color: var(--accent-ink); font: 500 13px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; }
 .btn-icon { width: 48px; padding: 0; }
 .btn-row { display: flex; gap: 10px; }
 .btn-row > .btn { flex: 1; }
@@ -92,7 +92,7 @@ input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.8; }
 .seg > button.on { background: var(--surface); color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); }
 .progress { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
 .progress > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); transition: width 0.6s var(--ease); }
-.badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent); font: 500 12px/1 var(--mono); }
+.badge { display: inline-flex; align-items: center; min-height: 24px; padding: 0 10px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 14%, var(--surface)); color: var(--accent-ink); font: 500 12px/1 var(--mono); }
 .badge.warn { background: color-mix(in srgb, var(--danger) 14%, var(--surface)); color: var(--danger); }
 .badge.ok { background: color-mix(in srgb, var(--ok) 14%, var(--surface)); color: var(--ok); }
 
