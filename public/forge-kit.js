@@ -154,7 +154,7 @@ window.Chart = class {
     const labels = (this.data.labels || []).map(String);
     const sets = (this.data.datasets || []).filter((d) => d && Array.isArray(d.data));
     const values = sets.flatMap((d) => d.data.map((v) => Number((v && typeof v === 'object') ? v.y : v) || 0));
-    if (!labels.length || !values.length) { this.box.innerHTML = '<div class="empty" style="padding:16px 0">Nothing to chart yet.</div>'; return; }
+    if (!labels.length || !values.length || values.every((v) => !v)) { this.box.innerHTML = '<div class="empty" style="padding:16px 0">Nothing to chart yet.</div>'; return; }
     const W = 340, H = 180, top = 14, bottom = 26, left = 8, right = 8;
     const max = Math.max(1, ...values), n = labels.length, slot = (W - left - right) / n;
     const y = (v) => top + (H - top - bottom) * (1 - v / max);
@@ -177,3 +177,18 @@ window.Chart = class {
   }
   destroy() { this.box.innerHTML = ''; }
 };
+
+// A <canvas> the page set up but never drew on (no chart, nothing painted) shows as an empty box.
+// Shortly after load, such a canvas gives way to a quiet empty state.
+document.addEventListener('DOMContentLoaded', () => setTimeout(() => {
+  for (const c of document.querySelectorAll('canvas')) {
+    if (c._forgeChart || c.style.display === 'none' || !c.width || !c.height) continue;
+    let blank = true;
+    try { blank = !c.getContext('2d').getImageData(0, 0, c.width, c.height).data.some((v) => v); } catch { blank = false; }
+    if (!blank) continue;
+    const note = Object.assign(document.createElement('div'), { className: 'empty', textContent: 'Nothing to chart yet.' });
+    note.style.padding = '16px 0';
+    c.style.display = 'none';
+    c.after(note);
+  }
+}, 1800));
