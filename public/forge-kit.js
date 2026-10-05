@@ -35,6 +35,7 @@ window.dates = (() => {
     weekStart: (day = key(new Date())) => { const d = parse(day); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return key(d); },
     monthOf: (day = key(new Date())) => String(day).slice(0, 7),
     label: (day) => parse(day).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' }),
+    parse, // models reach for it; returns a local Date
   };
 })();
 
