@@ -44,6 +44,7 @@
   .ctl { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 10px; border: 1px solid var(--s-border); border-radius: 8px; background: var(--s-bg); font-size: var(--fs-sm); color: var(--s-text-1); }
   .ctl:hover:not(:disabled) { border-color: var(--s-text-3); color: var(--s-text-0); }
   select.ctl { max-width: 220px; }
+  .ctl[aria-pressed="true"] { border-color: rgba(var(--crt-green-rgb),0.6); color: var(--crt-green); }
 
   .panes { display: grid; grid-template-columns: 320px minmax(320px, 1fr) minmax(360px, 1.25fr); min-height: 0; }
   .pane { display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--s-border); }
@@ -159,6 +160,7 @@
     <span class="brand">Forge<span class="caret">_</span></span>
     <span class="top-spacer"></span>
     <select class="ctl" id="model" title="Which model writes the app"></select>
+    <button class="ctl" id="thinkBtn" type="button" aria-pressed="false" title="Let the model reason before writing. Slower; shows its thinking in Workings.">Think: off</button>
     <button class="ctl" id="notesBtn" type="button" title="Notes folder the model reads from">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5v15z"/><path d="M6.5 17A2.5 2.5 0 0 0 4 19.5 2.5 2.5 0 0 0 6.5 22H20v-5"/></svg>
       <span id="notesLabel">Notes</span>
@@ -236,7 +238,7 @@ const EXAMPLES = [
   'A recipe box where I paste a recipe and the AI tidies it into ingredients and steps',
 ];
 
-const state = { name: '', requests: [], html: '', busy: false, ctrl: null, previewData: {} };
+const state = { name: '', requests: [], html: '', busy: false, ctrl: null, previewData: {}, fixes: 0 };
 
 async function api(path, opts = {}) {
   const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) } });
@@ -320,6 +322,8 @@ async function openProject(name) {
     Object.assign(state, { name: p.name, requests: p.requests || [], html: p.html, summary: p.description || '', previewData: {} });
     $('appName').value = p.name;
     $('chat').innerHTML = '';
+    $('work').innerHTML = '';
+    previewErrors.clear();
     state.requests.forEach((r) => addMsg('user', r));
     addMsg('bot', p.description || 'Loaded. Describe a change to keep going.');
     $('installBtn').disabled = false;
@@ -399,7 +403,8 @@ window.fetch=(input,init={})=>{const u=typeof input==='string'?input:input.url;c
 if(!m||/^[a-z]+:\\/\\//i.test(u)&&!u.startsWith(location.origin))return of(input,init);
 const id=++n;return new Promise(r=>{w.set(id,d=>r(new Response(d.body,{status:d.status,headers:{'Content-Type':'application/json'}})));
 parent.postMessage({__forge:'req',id,path:'/'+m[1],method:(init.method||(typeof input==='object'&&input.method)||'GET').toUpperCase(),body:init.body??null},'*');});};
-addEventListener('error',e=>parent.postMessage({__forge:'err',msg:String(e.message)},'*'));})();<\/script>`;
+addEventListener('error',e=>parent.postMessage({__forge:'err',msg:String(e.message)},'*'));
+addEventListener('unhandledrejection',e=>parent.postMessage({__forge:'err',msg:'Unhandled: '+String(e.reason&&e.reason.message||e.reason)},'*'));})();<\/script>`;
 
 function withShim(html) {
   return /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (m) => m + SHIM) : SHIM + html;
@@ -427,6 +432,7 @@ function renderPreview(html, force = false) {
 window.addEventListener('message', async (e) => {
   if (e.source !== front.contentWindow && e.source !== back.contentWindow) return;
   const d = e.data;
+  if (d && d.__forge === 'err' && !state.busy) return showPreviewError(d.msg);
   if (!d || d.__forge !== 'req') return;
   const reply = (status, body) => e.source.postMessage({ __forge: 'res', id: d.id, status, body: JSON.stringify(body) }, '*');
   try {
@@ -449,6 +455,18 @@ window.addEventListener('message', async (e) => {
   } catch (err) { reply(500, { error: err.message }); }
 });
 
+// Errors thrown while someone uses the preview, shown once each with a one-click fix.
+const previewErrors = new Set();
+function showPreviewError(msg) {
+  if (!msg || previewErrors.has(msg)) return;
+  previewErrors.add(msg);
+  const s = step('Preview error', { live: false });
+  s.finish(false);
+  s.body.innerHTML = `<div style="margin-bottom:8px">${esc(msg)}</div><button class="btn ghost" type="button">Fix this</button>`;
+  s.body.querySelector('button').addEventListener('click', () => send(`The page throws this error in the browser: "${msg}". Fix it and keep everything else the same.`));
+  $('work').scrollTop = $('work').scrollHeight;
+}
+
 $('deviceBtn').addEventListener('click', () => {
   const phone = $('stage').classList.toggle('phone');
   $('deviceBtn').textContent = phone ? 'Phone' : 'Full';
@@ -467,15 +485,29 @@ function extract(text) {
 }
 const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'my-app';
 
-async function send() {
-  const text = $('prompt').value.trim();
+// Compiles each inline classic script without running it (new Function parses, never executes),
+// so a page that can't run at all is caught before the user ever sees a blank preview.
+function scriptError(html) {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  for (const el of doc.querySelectorAll('script:not([src])')) {
+    if (el.type && !/javascript/i.test(el.type)) continue;
+    try { new Function(el.textContent); } catch (err) { return err.message; }
+  }
+  return null;
+}
+const MAX_AUTO_FIXES = 2;
+
+async function send(autoFix) {
+  const auto = typeof autoFix === 'string';
+  const text = auto ? autoFix : $('prompt').value.trim();
   if (!text || state.busy) return;
-  $('prompt').value = '';
+  if (!auto) { $('prompt').value = ''; state.fixes = 0; }
   state.requests.push(text);
-  addMsg('user', text);
+  addMsg('user', auto ? `Auto-fix: ${text}` : text);
   const bot = addMsg('bot', 'Working on it…');
   setBusy(true);
-  $('work').innerHTML = '';
+  if (!auto) $('work').innerHTML = '';
+  previewErrors.clear();
   if (narrow()) showPane('work');
 
   const notes = step('Reading your notes');
@@ -511,7 +543,7 @@ async function send() {
 
   try {
     state.ctrl = new AbortController();
-    await streamPost('/api/forge/generate', { requests: state.requests, html: state.html, model: $('model').value }, (ev) => {
+    await streamPost('/api/forge/generate', { requests: state.requests, html: state.html, fix: auto, model: $('model').value, think: $('thinkBtn').getAttribute('aria-pressed') === 'true' }, (ev) => {
       if (ev.type === 'context') {
         renderNotes(notes, ev);
         notes.finish();
@@ -584,6 +616,19 @@ async function send() {
   $('installBtn').disabled = false;
   setBusy(false);
   save(summary);
+  const syntax = scriptError(html);
+  if (syntax) {
+    const check = step('Checking the code', { live: false });
+    check.finish(false);
+    if (state.fixes < MAX_AUTO_FIXES) {
+      state.fixes++;
+      check.body.textContent = `The script won't run: ${syntax}. Sending it back to the model to fix (round ${state.fixes} of ${MAX_AUTO_FIXES}).`;
+      return send(`The page's JavaScript fails to parse with "${syntax}". Fix that error and keep everything else the same.`);
+    }
+    check.body.textContent = `The script still won't run: ${syntax}. Describe the fix yourself, or try another model.`;
+  } else {
+    step('Checking the code', { live: false, open: false }).meta('scripts parse');
+  }
   if (narrow()) showPane('preview');
 }
 
@@ -606,7 +651,7 @@ function setBusy(busy) {
   $('prompt').placeholder = state.html || busy ? 'Describe a change…' : 'Describe the app you want…';
 }
 
-$('sendBtn').addEventListener('click', send);
+$('sendBtn').addEventListener('click', () => send());
 $('stopBtn').addEventListener('click', () => state.ctrl?.abort());
 $('newBtn').addEventListener('click', newApp);
 $('prompt').addEventListener('keydown', (e) => {
@@ -654,6 +699,13 @@ async function loadModels() {
     sel.value = models.includes(remembered) ? remembered : (lm.selected || models[0] || '');
   } catch (err) { toast(err.message); }
 }
+function setThink(on) { $('thinkBtn').setAttribute('aria-pressed', String(on)); $('thinkBtn').textContent = on ? 'Think: on' : 'Think: off'; }
+try { setThink(localStorage.getItem('forge.think') === '1'); } catch { /* private mode */ }
+$('thinkBtn').addEventListener('click', () => {
+  const on = $('thinkBtn').getAttribute('aria-pressed') !== 'true';
+  setThink(on);
+  try { localStorage.setItem('forge.think', on ? '1' : '0'); } catch { /* private mode */ }
+});
 $('model').addEventListener('change', () => { try { localStorage.setItem('forge.model', $('model').value); } catch { /* private mode */ } });
 
 async function loadVault() {

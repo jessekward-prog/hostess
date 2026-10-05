@@ -354,7 +354,7 @@ app.put('/api/forge/settings', (req, res) => {
 });
 
 app.post('/api/forge/generate', async (req, res) => {
-  const { requests, html, model } = req.body || {};
+  const { requests, html, model, think, fix } = req.body || {};
   if (!Array.isArray(requests) || !requests.length || !requests.every((r) => typeof r === 'string')) {
     return res.status(400).json({ error: 'Describe the app first.' });
   }
@@ -362,7 +362,7 @@ app.post('/api/forge/generate', async (req, res) => {
   const ctrl = new AbortController();
   res.on('close', () => ctrl.abort());
   try {
-    await forge.generate({ requests, html: typeof html === 'string' ? html : '', model }, emit, ctrl.signal);
+    await forge.generate({ requests, html: typeof html === 'string' ? html : '', model, think: think === true, fix: fix === true }, emit, ctrl.signal);
     emit({ type: 'done' });
   } catch (err) {
     if (!ctrl.signal.aborted) emit({ type: 'error', error: err.message });
