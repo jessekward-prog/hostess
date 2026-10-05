@@ -60,3 +60,23 @@ document.addEventListener('DOMContentLoaded', () => {
   for (let i = 0; i < 24 && Math.min(...grounds.map((g) => ratio(ink, g))) < 4.6; i++) ink = ink.map((v) => Math.round(dark ? v + (255 - v) * 0.15 : v * 0.85));
   document.body.style.setProperty('--accent-ink', `rgb(${ink.join(',')})`);
 });
+
+// A "Loading…" line still showing after the data has loaded is always a bug (the page forgot to
+// replace it), so once the first store.get has answered, any element that still says only that goes.
+(() => {
+  const realGet = window.store.get;
+  let cleared = false;
+  window.store.get = async (...args) => {
+    try { return await realGet(...args); }
+    finally {
+      if (!cleared) {
+        cleared = true;
+        setTimeout(() => {
+          for (const el of document.querySelectorAll('body *')) {
+            if (!el.children.length && /^\s*loading(\.\.\.|…)?\s*$/i.test(el.textContent)) el.textContent = '';
+          }
+        }, 1200);
+      }
+    }
+  };
+})();
