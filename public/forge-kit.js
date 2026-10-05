@@ -42,6 +42,14 @@ window.dates = (() => {
     weekEnd: (day = key(new Date())) => { const d = parse(day); d.setDate(d.getDate() + (7 - d.getDay()) % 7); return key(d); },
     isToday: (day) => day === key(new Date()),
     dayName: (day) => parse(day).toLocaleDateString(undefined, { weekday: 'long' }),
+    diff: (from, to) => Math.round((parse(to) - parse(from)) / 864e5), // = daysBetween
+    // Times are 'HH:MM'. An end before the start means the next day (22:30 -> 06:30 is 8 hours).
+    hoursBetween: (start, end) => {
+      const mins = (t) => { const [h, m] = String(t).split(':').map(Number); return (h || 0) * 60 + (m || 0); };
+      let d = mins(end) - mins(start);
+      if (d < 0) d += 1440;
+      return Math.round((d / 60) * 100) / 100;
+    },
   };
 })();
 
