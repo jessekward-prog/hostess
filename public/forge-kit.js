@@ -315,7 +315,9 @@ document.addEventListener('DOMContentLoaded', () => setTimeout(() => {
 window.Forge = window.Forge || {};
 Forge.app = function ({ key = 'app', state = {}, pages: views = {}, actions = {}, forms = {}, start } = {}) {
   const api = { state: JSON.parse(JSON.stringify(state)) };
-  const fail = (err) => (window.showError || console.error)(err);
+  // Show the error in the page, and raise it too: swallowed, it would hide a broken app from Forge's
+  // checks (and from best-of-N), which only see errors that reach the window.
+  const fail = (err) => { try { (window.showError || console.error)(err); } catch { /* no status line */ } setTimeout(() => { throw err; }); };
   api.save = async () => { try { await store.set(key, api.state); } catch (err) { fail(err); } };
   api.render = () => { const cur = pages.current(); const view = views[cur.name]; if (view) { try { view(api.state, cur.param); } catch (err) { fail(err); } } };
   addEventListener('pagechange', (e) => { const view = views[e.detail.name]; if (view) { try { view(api.state, e.detail.param); } catch (err) { fail(err); } } });
