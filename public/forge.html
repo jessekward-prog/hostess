@@ -804,9 +804,13 @@ async function callModel(body, label, { code = true } = {}) {
 // tests is the test-time-compute recipe that works for small models.
 const MAX_ATTEMPTS = 3;
 async function pagePass(body, label, { use = true } = {}) {
-  let best = null, lastFailure = null;
+  let best = null, lastFailure = null, lastProblem = null;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const { raw, failed } = await callModel({ ...body, attempt }, attempt ? `${label} (fresh try ${attempt + 1} of ${MAX_ATTEMPTS})` : label);
+    // A fresh attempt is a full rebuild, never a patch of the old page (measured break-even), but it
+    // carries why the last one was rejected: with the same prompt, a dropped feature stays dropped.
+    const reqs = body.requests || state.requests;
+    const tried = attempt && lastProblem ? { requests: [...reqs.slice(0, -1), `${reqs[reqs.length - 1]}\n\n(A previous try was rejected: ${lastProblem} Build it again from scratch and make sure of that.)`] } : {};
+    const { raw, failed } = await callModel({ ...body, ...tried, attempt }, attempt ? `${label} (fresh try ${attempt + 1} of ${MAX_ATTEMPTS})` : label);
     if (failed === 'Stopped.') { lastFailure = failed; break; }
     const ex = extract(raw);
     if (failed || !ex.complete) {
@@ -830,6 +834,7 @@ async function pagePass(body, label, { use = true } = {}) {
       check.meta(use ? 'parses · loads · adds, saves and reopens' : 'parses · no errors on first launch');
       break;
     }
+    lastProblem = err;
     check.finish(false);
     check.body.hidden = false;
     check.body.textContent = attempt + 1 < MAX_ATTEMPTS ? `${err} Trying a fresh build.` : `Still failing: ${err}`;
