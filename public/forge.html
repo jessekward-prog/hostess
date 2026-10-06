@@ -250,6 +250,7 @@
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<script src="/forge-coverage.js"></script>
 
 <script>
 const $ = (id) => document.getElementById(id);
@@ -696,6 +697,8 @@ async function useTest(html) {
         await showAndSettle(html);
       }
     }
+    // Everything the request named that a page must visibly have (public/forge-coverage.js).
+    for (const gap of coverageGaps(state.requests.join(' '), html)) problems.push(`The request asks for ${gap}.`);
     const pg = await askFrame({ __forge: 'pagecheck' }, 'pagecheck-done', 6000);
     if (pg && pg.ok === false) problems.push(pg.switched ? "The page links work but the phone's Back button doesn't return to the page before." : 'The app has several pages but tapping its links does not switch between them. Use <a href="#/NAME"> links and <section data-page="NAME">.');
   }
