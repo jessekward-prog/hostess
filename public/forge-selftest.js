@@ -18,8 +18,28 @@
     const d = e.data;
     if (!d) return;
     if (d.__forge === 'text') return parent.postMessage({ __forge: 'text-done', text: pageText() }, '*');
+    // After a reopen: is the uploaded file shown (or linked), here or one tap into a detail page?
+    if (d.__forge === 'filecheck') {
+      const seen = () => [...document.querySelectorAll('img')].some((i) => /\/(forge-files|api\/files)\//.test(i.src) && i.complete && i.naturalWidth > 0)
+        || [...document.querySelectorAll('a[href]')].some((a) => /\/(forge-files|api\/files)\//.test(a.getAttribute('href') || ''));
+      let ok = seen();
+      if (!ok) { const link = [...document.querySelectorAll('a[href^="#/"], [data-go], .row')].find(visible); if (link) { link.click(); await wait(700); ok = seen(); } }
+      return parent.postMessage({ __forge: 'filecheck-done', ok }, '*');
+    }
+    // Pages: links switch the visible page, and Back returns.
+    if (d.__forge === 'pagecheck') {
+      const pagesEls = [...document.querySelectorAll('[data-page]')];
+      if (pagesEls.length < 2) return parent.postMessage({ __forge: 'pagecheck-done', ok: null }, '*');
+      const shown = () => { const v = pagesEls.find((p) => !p.hidden && p.offsetParent !== null); return v ? v.dataset.page : null; };
+      const start = shown();
+      let switched = false;
+      for (const a of [...document.querySelectorAll('a[href^="#/"], [data-go]')].filter(visible).slice(0, 6)) { a.click(); await wait(400); if (shown() !== start) { switched = true; break; } }
+      let back = false;
+      if (switched) { history.back(); await wait(500); back = shown() === start; }
+      return parent.postMessage({ __forge: 'pagecheck-done', ok: switched && back, switched }, '*');
+    }
     if (d.__forge !== 'usetest') return;
-    const res = { stuckLoading: /\bloading\b/i.test(document.body.innerText), inputs: 0, buttons: 0, puts: 0 };
+    const res = { stuckLoading: /\bloading\b/i.test(document.body.innerText), inputs: 0, buttons: 0, puts: 0, hadFile: false };
     const startPuts = puts;
     const today = window.dates ? dates.today() : new Date().toISOString().slice(0, 10);
     let timeN = 0;
@@ -43,6 +63,7 @@
         dt.items.add(file);
         el.files = dt.files;
         el.dispatchEvent(new Event('change', { bubbles: true }));
+        res.hadFile = true;
       }
       else if (/^(text|search|email|url|tel)$/.test(type) || el.tagName === 'TEXTAREA') setValue(el, d.mark);
       else continue;

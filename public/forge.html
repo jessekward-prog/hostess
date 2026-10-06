@@ -689,7 +689,15 @@ async function useTest(html) {
       await showAndSettle(html); // previewData kept: like reopening the app
       const t = await askFrame({ __forge: 'text' }, 'text-done', 5000);
       if (t && !t.text.toLowerCase().includes(MARK.toLowerCase()) && !/\b25\b/.test(t.text) && r.inputs) problems.push('After saving and reopening the page, what was entered does not appear. On start, load the saved data with store.get and show it.');
+      // The features the app was asked for: a picked file must show again, pages must switch.
+      if (r.hadFile) {
+        const f = await askFrame({ __forge: 'filecheck' }, 'filecheck-done', 5000);
+        if (f && !f.ok) problems.push('A photo or document was picked and saved, but after reopening it is not shown anywhere. Save files.add(file) with the item and show it with files.view(item.file).');
+        await showAndSettle(html);
+      }
     }
+    const pg = await askFrame({ __forge: 'pagecheck' }, 'pagecheck-done', 6000);
+    if (pg && pg.ok === false) problems.push(pg.switched ? "The page links work but the phone's Back button doesn't return to the page before." : 'The app has several pages but tapping its links does not switch between them. Use <a href="#/NAME"> links and <section data-page="NAME">.');
   }
   collecting = null;
   return problems.length ? problems.join(' ') : null;
