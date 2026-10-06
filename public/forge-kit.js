@@ -340,3 +340,27 @@ Forge.app = function ({ key = 'app', state = {}, pages: views = {}, actions = {}
   })();
   return api;
 };
+
+// Finding things in nested state without writing lookup helpers: every item has a unique id, so
+// Forge.find(state, id) returns it wherever it is, and Forge.parent(state, id) the item holding it
+// (the program a workout belongs to). Measured: hand-written finders were where models broke.
+Forge.find = function (root, id) {
+  const want = String(id);
+  const walk = (v) => {
+    if (!v || typeof v !== 'object') return null;
+    if (!Array.isArray(v) && v.id != null && String(v.id) === want) return v;
+    for (const k of Object.keys(v)) { const hit = walk(v[k]); if (hit) return hit; }
+    return null;
+  };
+  return walk(root);
+};
+Forge.parent = function (root, id) {
+  const want = String(id);
+  const walk = (v, owner) => {
+    if (!v || typeof v !== 'object') return null;
+    if (Array.isArray(v)) { for (const x of v) { if (x && x.id != null && String(x.id) === want) return owner; const hit = walk(x, x); if (hit) return hit; } return null; }
+    for (const k of Object.keys(v)) { const hit = walk(v[k], v.id != null ? v : owner); if (hit) return hit; }
+    return null;
+  };
+  return walk(root, null);
+};
