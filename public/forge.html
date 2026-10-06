@@ -708,6 +708,15 @@ async function useTest(html) {
     }
     // Everything the request named that a page must visibly have (public/forge-coverage.js).
     for (const gap of coverageGaps(state.requests.join(' '), html)) problems.push(`The request asks for ${gap}.`);
+    // Buttons the request names must be reachable by using the app, not just present somewhere.
+    const named = namedButtons(state.requests.join(' '));
+    if (named.length) {
+      state.previewData = {};
+      await showAndSettle(html);
+      const ex = await askFrame({ __forge: 'explore', labels: named }, 'explore-done', 40000);
+      if (ex) for (const l of named) if (!ex.seen.includes(l.toLowerCase())) problems.push(`The request asks for a "${l}" button, but using the app (adding things, opening them, pressing the buttons it names) never shows one. Put it where the request says and make it work.`);
+      await showAndSettle(html);
+    }
     const pg = await askFrame({ __forge: 'pagecheck' }, 'pagecheck-done', 6000);
     if (pg && pg.ok === false) problems.push(pg.switched ? "The page links work but the phone's Back button doesn't return to the page before." : 'The app has several pages but tapping its links does not switch between them. Use <a href="#/NAME"> links and <section data-page="NAME">.');
   }

@@ -42,6 +42,42 @@
       await wait(600);
       return parent.postMessage({ __forge: 'editcheck-done', ok: true }, '*');
     }
+    // Explore like a person: add something at each level and open it (up to 4 deep), then press the
+    // buttons the request names, in order (Complete set only appears after Start). Reports which named
+    // buttons were ever reachable.
+    if (d.__forge === 'explore') {
+      const want = d.labels.map((l) => l.toLowerCase());
+      const seen = new Set(), pressed = new Set();
+      const NAMES = ['Alpha One', 'Bravo Two', 'Charlie Three', 'Delta Four'];
+      const note = () => { for (const b of [...document.querySelectorAll('button, a, [role=button], input[type=submit]')].filter(visible)) { const t = (b.textContent || b.value || '').toLowerCase(); for (const w of want) if (t.includes(w)) seen.add(w); } };
+      note();
+      for (let level = 0; level < 4; level++) {
+        for (const el of [...document.querySelectorAll('input, textarea, select')].filter(visible)) {
+          if (el.disabled || el.readOnly || (el.value && el.tagName !== 'SELECT')) continue;
+          const type = (el.getAttribute('type') || 'text').toLowerCase();
+          const label = `${el.placeholder || ''} ${el.id || ''} ${el.name || ''}`;
+          if (el.tagName === 'SELECT') { if (el.options.length > 1) { el.selectedIndex = 1; el.dispatchEvent(new Event('change', { bubbles: true })); } }
+          else if (type === 'number') setValue(el, /rep/i.test(label) ? '10' : /set/i.test(label) ? '3' : /kg|weight/i.test(label) ? '60' : '3');
+          else if (/^(text|search)$/.test(type) || el.tagName === 'TEXTAREA') setValue(el, NAMES[level]);
+        }
+        const add = [...document.querySelectorAll('button, input[type=submit]')].filter(visible).find((b) => /add|save|create|new|\+/i.test(`${b.textContent} ${b.value || ''} ${b.getAttribute('aria-label') || ''}`));
+        if (add) { add.click(); await wait(500); }
+        note();
+        const into = [...document.querySelectorAll('a[href^="#/"], [data-go], .row, li a')].filter(visible).filter((r) => r.textContent.includes(NAMES[level].split(' ')[0])).pop();
+        if (into) { into.click(); await wait(500); note(); }
+      }
+      for (let round = 0; round < want.length + 2; round++) {
+        const next = [...document.querySelectorAll('button, a, [role=button]')].filter(visible).find((b) => want.some((w) => !pressed.has(w) && (b.textContent || '').toLowerCase().includes(w)));
+        if (!next) break;
+        for (const w of want) if ((next.textContent || '').toLowerCase().includes(w)) pressed.add(w);
+        next.click();
+        await wait(600);
+        const yes = [...document.querySelectorAll('button')].filter(visible).reverse().find((b) => /^\s*(yes|confirm|ok)\b/i.test(b.textContent));
+        if (yes) { yes.click(); await wait(400); }
+        note();
+      }
+      return parent.postMessage({ __forge: 'explore-done', seen: [...seen] }, '*');
+    }
     // Pages: links switch the visible page, and Back returns.
     if (d.__forge === 'pagecheck') {
       const pagesEls = [...document.querySelectorAll('[data-page]')];

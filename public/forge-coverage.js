@@ -16,3 +16,16 @@ function coverageGaps(request, html) {
   return COVERAGE.filter((c) => c.need.test(request) && !c.has(html)).map((c) => c.say);
 }
 if (typeof module !== 'undefined') module.exports = { coverageGaps, COVERAGE };
+
+// Buttons the request names ("a Start button", "a Complete set button"). Forge's test-drive explores
+// the app like a person (add something, open it, add inside it…) and each named button must be
+// reachable that way: a feature that exists but that nothing leads to is not done.
+function namedButtons(request) {
+  const out = new Set();
+  for (const m of String(request).matchAll(/\b(?:an?|the)\s+([A-Za-z][\w']*(?:\s+[A-Za-z][\w']*){0,2}?)\s+button\b/gi)) {
+    const label = m[1].trim();
+    if (!/^(this|that|each|every|one|big|small|main|new|back|close)$/i.test(label)) out.add(label);
+  }
+  return [...out];
+}
+if (typeof module !== 'undefined') module.exports.namedButtons = namedButtons;
