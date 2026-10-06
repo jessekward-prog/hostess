@@ -821,7 +821,16 @@ async function callModel(body, label, { code = true } = {}) {
 // own page was break-even (fixes broke as much as they mended); a fresh sample checked by the same
 // tests is the test-time-compute recipe that works for small models.
 const MAX_ATTEMPTS = 3;
-async function pagePass(body, label, { use = true } = {}) {
+// A module answer becomes a page: the module (templates + a Forge.extend script) goes before </body>.
+function assembleModule(base, raw) {
+  const block = (raw.match(/```(?:html)?\s*\n([\s\S]*?)```/) || [])[1] || raw;
+  if (/<!doctype html/i.test(block)) return extract(block);
+  if (!/Forge\.extend\(|data-into=/.test(block)) return { html: '', summary: '', complete: false };
+  const summary = raw.slice(raw.lastIndexOf('```') + 3).replace(/\*\*/g, '').trim();
+  return { html: base.replace(/<\/body>/i, () => block.trim() + '\n</body>'), summary, complete: true };
+}
+
+async function pagePass(body, label, { use = true, assemble = null } = {}) {
   let best = null, lastFailure = null, lastProblem = null;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     // A fresh attempt is a full rebuild, never a patch of the old page (measured break-even), but it
@@ -830,7 +839,7 @@ async function pagePass(body, label, { use = true } = {}) {
     const tried = attempt && lastProblem ? { requests: [...reqs.slice(0, -1), `${reqs[reqs.length - 1]}\n\n(A previous try was rejected: ${lastProblem} Build it again from scratch and make sure of that.)`] } : {};
     const { raw, failed } = await callModel({ ...body, ...tried, attempt }, attempt ? `${label} (fresh try ${attempt + 1} of ${MAX_ATTEMPTS})` : label);
     if (failed === 'Stopped.') { lastFailure = failed; break; }
-    const ex = extract(raw);
+    const ex = assemble ? assemble(raw) : extract(raw);
     if (failed || !ex.complete) {
       lastFailure = failed || (ex.html ? 'The model stopped before finishing the page. Try again, or pick a bigger model.' : 'The model answered without writing a page. Try rephrasing, or pick another model.');
       continue;
@@ -897,10 +906,25 @@ async function send(fixText) {
   setBusy(true);
   startJob();
   if (narrow()) showPane('work');
+  const before = state.html;
+  // An app built on Forge.app grows by modules: the model writes only the new part and Forge merges it.
+  const asModule = !fixText && before && /Forge\.app\(/.test(before);
   const res = await pagePass(
-    fixText ? { requests: [...state.requests, text], html: state.html, fix: true } : { requests: state.requests, html: state.html },
-    fixText ? 'Fixing the app' : state.html ? 'Changing the app' : 'Writing the app',
+    fixText ? { requests: [...state.requests, text], html: state.html, fix: true }
+      : asModule ? { stage: 'module', requests: state.requests, html: state.html }
+      : { requests: state.requests, html: state.html },
+    fixText ? 'Fixing the app' : asModule ? 'Writing a module for the app' : state.html ? 'Changing the app' : 'Writing the app',
+    asModule ? { assemble: (raw) => assembleModule(before, raw) } : {},
   );
+  // A module that still fails its checks is dropped whole: the app stays as it was (a clean rollback),
+  // and its request leaves the history so later steps aren't held to a feature that was never added.
+  if (asModule && res.html && res.warning) {
+    state.html = before;
+    res.html = before;
+    res.summary = '';
+    res.warning = `Couldn't add that cleanly (${res.warning.slice(0, 160)}…), so the app is unchanged. Try asking for it differently.`;
+    state.requests.pop();
+  }
   if (!finishApp(res, bot) && !fixText) state.requests.pop();
   if (!res.html && state.html) renderPreview(state.html, true);
   endJob();
