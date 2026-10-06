@@ -408,3 +408,7 @@ Forge.mount = function () {
     t.remove();
   }
 };
+
+// $(id) is the shorthand the structured example uses; models copy it without defining it. A page's
+// own const $ still wins.
+if (!window.$) window.$ = (id) => document.getElementById(id);
