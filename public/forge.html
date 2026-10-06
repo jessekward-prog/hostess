@@ -827,7 +827,10 @@ function assembleModule(base, raw) {
   if (/<!doctype html/i.test(block)) return extract(block);
   if (!/Forge\.extend\(|data-into=/.test(block)) return { html: '', summary: '', complete: false };
   const summary = raw.slice(raw.lastIndexOf('```') + 3).replace(/\*\*/g, '').trim();
-  return { html: base.replace(/<\/body>/i, () => block.trim() + '\n</body>'), summary, complete: true };
+  // Small models often mark the spot with a comment (<!-- data-into="app" -->) instead of a template: wrap what follows it.
+  const fixed = block.replace(/<!--\s*data-into\s*=\s*"([^"]+)"\s*-->([\s\S]*?)(?=<!--\s*data-into|<script|<\/body>|$)/gi,
+    (_, into, body) => `<template data-into="${into}">\n${body.trim()}\n</template>\n`);
+  return { html: base.replace(/<\/body>/i, () => fixed.trim() + '\n</body>'), summary, complete: true };
 }
 
 async function pagePass(body, label, { use = true, assemble = null } = {}) {
