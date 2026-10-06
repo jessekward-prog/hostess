@@ -301,3 +301,40 @@ document.addEventListener('DOMContentLoaded', () => setTimeout(() => {
     if (go) { e.preventDefault(); pages.go(go.dataset.go, go.dataset.param); }
   });
 })();
+
+// Forge.app: the structure for bigger apps. One state object (loaded on start, saved after every
+// action), one function per page (called before it shows and after every action), one function per
+// button (data-action="name") and per form (data-form="name"). Adding a feature means adding entries
+// here, never rewiring the app, so an app can grow step by step without breaking what it has.
+//   Forge.app({
+//     key: 'gains', state: { programs: [] },
+//     pages: { home(state, param) { ...fill the page... } },
+//     actions: { start(state, el) { ... } },          // return false to skip the save and re-render
+//     forms: { addProgram(state, data, form) { ... } } // data = the form's fields by name
+//   });
+window.Forge = window.Forge || {};
+Forge.app = function ({ key = 'app', state = {}, pages: views = {}, actions = {}, forms = {}, start } = {}) {
+  const api = { state: JSON.parse(JSON.stringify(state)) };
+  const fail = (err) => (window.showError || console.error)(err);
+  api.save = async () => { try { await store.set(key, api.state); } catch (err) { fail(err); } };
+  api.render = () => { const cur = pages.current(); const view = views[cur.name]; if (view) { try { view(api.state, cur.param); } catch (err) { fail(err); } } };
+  addEventListener('pagechange', (e) => { const view = views[e.detail.name]; if (view) { try { view(api.state, e.detail.param); } catch (err) { fail(err); } } });
+  document.addEventListener('click', async (e) => {
+    const el = e.target.closest('[data-action]');
+    if (!el || !actions[el.dataset.action]) return;
+    e.preventDefault();
+    try { if ((await actions[el.dataset.action](api.state, el)) !== false) { await api.save(); api.render(); } } catch (err) { fail(err); }
+  });
+  document.addEventListener('submit', async (e) => {
+    const form = e.target.closest('[data-form]');
+    if (!form || !forms[form.dataset.form]) return;
+    e.preventDefault();
+    try { if ((await forms[form.dataset.form](api.state, Object.fromEntries(new FormData(form)), form)) !== false) { form.reset(); await api.save(); api.render(); } } catch (err) { fail(err); }
+  });
+  (async () => {
+    try { api.state = { ...api.state, ...(await store.get(key, {})) }; } catch (err) { fail(err); }
+    if (start) { try { start(api.state); } catch (err) { fail(err); } }
+    pages.refresh();
+  })();
+  return api;
+};
