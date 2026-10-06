@@ -690,6 +690,15 @@ async function useTest(html) {
       await showAndSettle(html); // previewData kept: like reopening the app
       const t = await askFrame({ __forge: 'text' }, 'text-done', 5000);
       if (t && !t.text.toLowerCase().includes(MARK.toLowerCase()) && !/\b25\b/.test(t.text) && r.inputs) problems.push('After saving and reopening the page, what was entered does not appear. On start, load the saved data with store.get and show it.');
+      // Editing: change the item through its Edit control, reopen, and the change must be there.
+      const ed = await askFrame({ __forge: 'editcheck', mark: MARK }, 'editcheck-done', 8000);
+      if (ed && ed.ok === false) problems.push("The Edit button doesn't offer the item's current text to change. Use const v = await ask('Rename', item.name); then save it.");
+      else if (ed && ed.ok) {
+        await showAndSettle(html);
+        const t2 = await askFrame({ __forge: 'text' }, 'text-done', 5000);
+        if (t2 && !t2.text.toLowerCase().includes('edited beta')) problems.push("Changing an item with its Edit button doesn't stick: after reopening, the old text is back. Save the change with store.set.");
+        await showAndSettle(html);
+      }
       // The features the app was asked for: a picked file must show again, pages must switch.
       if (r.hadFile) {
         const f = await askFrame({ __forge: 'filecheck' }, 'filecheck-done', 5000);

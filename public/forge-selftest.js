@@ -26,6 +26,22 @@
       if (!ok) { const link = [...document.querySelectorAll('a[href^="#/"], [data-go], .row')].find(visible); if (link) { link.click(); await wait(700); ok = seen(); } }
       return parent.postMessage({ __forge: 'filecheck-done', ok }, '*');
     }
+    // Edit: an Edit control leads to a field holding the item's text; change it and save there.
+    if (d.__forge === 'editcheck') {
+      const edit = [...document.querySelectorAll('button, a')].filter(visible).find((b) => /^\s*edit\b/i.test(b.textContent));
+      if (!edit) return parent.postMessage({ __forge: 'editcheck-done', ok: null }, '*');
+      edit.click();
+      await wait(500);
+      const field = [...document.querySelectorAll('input:not([type=checkbox]):not([type=file]), textarea')].filter(visible).find((f) => (f.value || '').toLowerCase().includes(String(d.mark).toLowerCase()));
+      if (!field) return parent.postMessage({ __forge: 'editcheck-done', ok: false, why: 'nofield' }, '*');
+      setValue(field, 'Edited Beta');
+      const form = field.closest('form');
+      if (form && form.requestSubmit) form.requestSubmit();
+      else { const save = [...document.querySelectorAll('button')].filter(visible).reverse().find((b) => /save|update|done|ok/i.test(b.textContent)); if (save) save.click(); }
+      for (let i = 0; i < 3; i++) { await wait(350); const more = document.activeElement; if (more && more.closest && more.closest('form') && /INPUT|TEXTAREA/.test(more.tagName)) more.closest('form').requestSubmit(); else break; }
+      await wait(600);
+      return parent.postMessage({ __forge: 'editcheck-done', ok: true }, '*');
+    }
     // Pages: links switch the visible page, and Back returns.
     if (d.__forge === 'pagecheck') {
       const pagesEls = [...document.querySelectorAll('[data-page]')];
