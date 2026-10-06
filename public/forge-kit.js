@@ -277,6 +277,7 @@ document.addEventListener('DOMContentLoaded', () => setTimeout(() => {
     return { name, param: parts.length > 1 && parts[1] !== '' ? decodeURIComponent(parts.slice(1).join('/')) : null };
   };
   const show = () => {
+    if (window.Forge && Forge.mount) Forge.mount();
     const els = document.querySelectorAll('[data-page]');
     if (!els.length) return;
     const cur = read();
@@ -315,6 +316,7 @@ document.addEventListener('DOMContentLoaded', () => setTimeout(() => {
 window.Forge = window.Forge || {};
 Forge.app = function ({ key = 'app', state = {}, pages: views = {}, actions = {}, forms = {}, start } = {}) {
   const api = { state: JSON.parse(JSON.stringify(state)) };
+  Forge._app = { api, views, actions, forms, starts: start ? [start] : [] };
   // Show the error in the page, and raise it too: swallowed, it would hide a broken app from Forge's
   // checks (and from best-of-N), which only see errors that reach the window.
   const fail = (err) => { try { (window.showError || console.error)(err); } catch { /* no status line */ } setTimeout(() => { throw err; }); };
@@ -334,8 +336,10 @@ Forge.app = function ({ key = 'app', state = {}, pages: views = {}, actions = {}
     try { if ((await forms[form.dataset.form](api.state, Object.fromEntries(new FormData(form)), form)) !== false) { form.reset(); await api.save(); api.render(); } } catch (err) { fail(err); }
   });
   (async () => {
-    try { api.state = { ...api.state, ...(await store.get(key, {})) }; } catch (err) { fail(err); }
-    if (start) { try { start(api.state); } catch (err) { fail(err); } }
+    // Await first: a spread written before the await would snapshot the state before modules add to it.
+    try { const saved = await store.get(key, {}); api.state = { ...api.state, ...saved }; Forge._app.api = api; } catch (err) { fail(err); }
+    Forge.mount();
+    for (const fn of Forge._app.starts) { try { fn(api.state); } catch (err) { fail(err); } }
     pages.refresh();
   })();
   return api;
@@ -363,4 +367,44 @@ Forge.parent = function (root, id) {
     return null;
   };
   return walk(root, null);
+};
+
+// Forge.extend: grow a Forge.app app by adding a module instead of rewriting it. A module brings
+//   <template data-into="app">…</template>      new <section data-page> pages, into main.app
+//   <template data-into="PAGE">…</template>     elements added to the end of an existing page
+//   <template data-into="tabbar">…</template>   more tab links (data-into="body" adds a whole new bar)
+//   a script tag calling Forge.extend({ state, pages, actions, forms, start })
+// New state keys get their defaults (saved data wins), a page function for an existing page runs
+// after the existing one, actions and forms are added. Measured reason (gains ladder): small models
+// broke a growing app when they had to rewrite all of it for each new feature.
+Forge.extend = function ({ state = {}, pages: views = {}, actions = {}, forms = {}, start } = {}) {
+  const a = Forge._app;
+  if (!a) throw new Error('Forge.extend needs Forge.app first');
+  for (const [k, v] of Object.entries(state)) if (!(k in a.api.state)) a.api.state[k] = JSON.parse(JSON.stringify(v));
+  for (const [name, fn] of Object.entries(views)) {
+    const before = a.views[name];
+    a.views[name] = before ? (s, param) => { before(s, param); fn(s, param); } : fn;
+  }
+  // An action or form a module defines again runs after the existing one ("after a set is completed,
+  // start the rest timer"); either returning false skips the save and redraw.
+  const compose = (table, extra) => {
+    for (const [name, fn] of Object.entries(extra)) {
+      const before = table[name];
+      table[name] = before ? async (s, ...rest) => { const r1 = await before(s, ...rest); const r2 = await fn(s, ...rest); return r1 === false || r2 === false ? false : undefined; } : fn;
+    }
+  };
+  compose(a.actions, actions);
+  compose(a.forms, forms);
+  if (start) a.starts.push(start);
+};
+Forge.mount = function () {
+  for (const t of [...document.querySelectorAll('template[data-into]')]) {
+    const into = t.dataset.into;
+    const target = into === 'app' ? document.querySelector('main.app, main') : into === 'tabbar' ? document.querySelector('nav.tabbar') : into === 'body' ? document.body : document.querySelector(`[data-page="${into}"]`) || document.getElementById(into);
+    if (!target) continue;
+    const frag = t.content.cloneNode(true);
+    for (const sec of frag.querySelectorAll('section[data-page]')) sec.hidden = true;
+    target.appendChild(frag);
+    t.remove();
+  }
 };
