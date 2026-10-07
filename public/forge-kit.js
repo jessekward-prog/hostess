@@ -354,7 +354,12 @@ Forge.app = function ({ key = 'app', state = {}, pages: views = {}, actions = {}
   (async () => {
     // Await first: a spread written before the await would snapshot the state before modules add to it.
     try { const saved = await store.get(key, {}); api.state = { ...api.state, ...saved }; Forge._app.api = api; } catch (err) { fail(err); }
+    const lost = [...document.querySelectorAll('template[data-into]')].map((t) => t.dataset.into);
     Forge.mount();
+    // A control nothing answers is a dead button the model can't see; name it so a retry can wire it.
+    for (const into of lost.filter((x) => document.querySelector(`template[data-into="${x}"]`))) fail(new Error(`A template has data-into="${into}" but there is no page or element called ${into}`));
+    for (const el of document.querySelectorAll('[data-action]')) if (!actions[el.dataset.action]) fail(new Error(`The "${el.textContent.trim().slice(0, 30)}" button has data-action="${el.dataset.action}" but no action called ${el.dataset.action}`));
+    for (const el of document.querySelectorAll('form[data-form]')) if (!forms[el.dataset.form]) fail(new Error(`A form has data-form="${el.dataset.form}" but no form handler called ${el.dataset.form}`));
     for (const fn of Forge._app.starts) { try { fn(api.state); } catch (err) { fail(err); } }
     pages.refresh();
   })();
