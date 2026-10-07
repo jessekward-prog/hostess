@@ -320,20 +320,36 @@ Forge.app = function ({ key = 'app', state = {}, pages: views = {}, actions = {}
   // Show the error in the page, and raise it too: swallowed, it would hide a broken app from Forge's
   // checks (and from best-of-N), which only see errors that reach the window.
   const fail = (err) => { try { (window.showError || console.error)(err); } catch { /* no status line */ } setTimeout(() => { throw err; }); };
+  // A new item made without its child list (a program with no workouts: []) breaks the first push or map
+  // on it, the most common small-model bug measured. Any name the app's code uses as a list starts as [].
+  let lists = null, seen = -1;
+  const fillLists = () => {
+    const src = [...document.scripts].map((x) => x.textContent).join('\n');
+    if (src.length !== seen) {
+      seen = src.length;
+      lists = new Set([...src.matchAll(/\.(\w+)\??\.(?:push|map|filter|forEach|reduce|find|findIndex|some|every|unshift|splice|slice|sort|includes|length)\b/g)].map((m) => m[1]));
+    }
+    const walk = (v) => {
+      if (!v || typeof v !== 'object') return;
+      if (!Array.isArray(v) && v.id != null) for (const k of lists) if (v[k] === undefined) v[k] = [];
+      for (const k of Object.keys(v)) walk(v[k]);
+    };
+    walk(api.state);
+  };
   api.save = async () => { try { await store.set(key, api.state); } catch (err) { fail(err); } };
-  api.render = () => { const cur = pages.current(); const view = views[cur.name]; if (view) { try { view(api.state, cur.param); } catch (err) { fail(err); } } };
-  addEventListener('pagechange', (e) => { const view = views[e.detail.name]; if (view) { try { view(api.state, e.detail.param); } catch (err) { fail(err); } } });
+  api.render = () => { const cur = pages.current(); const view = views[cur.name]; if (view) { try { fillLists(); view(api.state, cur.param); } catch (err) { fail(err); } } };
+  addEventListener('pagechange', (e) => { const view = views[e.detail.name]; if (view) { try { fillLists(); view(api.state, e.detail.param); } catch (err) { fail(err); } } });
   document.addEventListener('click', async (e) => {
     const el = e.target.closest('[data-action]');
     if (!el || !actions[el.dataset.action]) return;
     e.preventDefault();
-    try { if ((await actions[el.dataset.action](api.state, el)) !== false) { await api.save(); api.render(); } } catch (err) { fail(err); }
+    try { fillLists(); if ((await actions[el.dataset.action](api.state, el)) !== false) { await api.save(); api.render(); } } catch (err) { fail(err); }
   });
   document.addEventListener('submit', async (e) => {
     const form = e.target.closest('[data-form]');
     if (!form || !forms[form.dataset.form]) return;
     e.preventDefault();
-    try { if ((await forms[form.dataset.form](api.state, Object.fromEntries(new FormData(form)), form)) !== false) { form.reset(); await api.save(); api.render(); } } catch (err) { fail(err); }
+    try { fillLists(); if ((await forms[form.dataset.form](api.state, Object.fromEntries(new FormData(form)), form)) !== false) { form.reset(); await api.save(); api.render(); } } catch (err) { fail(err); }
   });
   (async () => {
     // Await first: a spread written before the await would snapshot the state before modules add to it.
