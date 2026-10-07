@@ -402,18 +402,24 @@ Forge.extend = function ({ state = {}, pages: views = {}, actions = {}, forms = 
   const a = Forge._app;
   if (!a) throw new Error('Forge.extend needs Forge.app first');
   for (const [k, v] of Object.entries(state)) if (!(k in a.api.state)) a.api.state[k] = JSON.parse(JSON.stringify(v));
-  for (const [name, fn] of Object.entries(views)) {
-    const before = a.views[name];
-    a.views[name] = before ? (s, param) => { before(s, param); fn(s, param); } : fn;
-  }
-  // An action or form a module defines again runs after the existing one ("after a set is completed,
-  // start the rest timer"); either returning false skips the save and redraw.
-  const compose = (table, extra) => {
+  // A page, action or form a module defines again runs after the existing one ("after a set is completed,
+  // start the rest timer"); for actions and forms either returning false skips the save and redraw.
+  // Small models often rewrite the whole function instead: when the new one holds most of the old one's
+  // words it replaces it, or the old code would run twice (every set counted twice).
+  const src = Forge._src || (Forge._src = new WeakMap());
+  const words = (t) => new Set(String(t).match(/[A-Za-z_$][\w$]{2,}/g) || []);
+  const rewrites = (old, fn) => { const o = words(src.get(old) || old), n = words(fn); let hit = 0; for (const w of o) if (n.has(w)) hit++; return o.size > 3 && hit / o.size >= 0.7; };
+  const compose = (table, extra, page) => {
     for (const [name, fn] of Object.entries(extra)) {
       const before = table[name];
-      table[name] = before ? async (s, ...rest) => { const r1 = await before(s, ...rest); const r2 = await fn(s, ...rest); return r1 === false || r2 === false ? false : undefined; } : fn;
+      if (!before || rewrites(before, fn)) { table[name] = fn; continue; }
+      const both = page ? (s, param) => { before(s, param); fn(s, param); }
+        : async (s, ...rest) => { const r1 = await before(s, ...rest); const r2 = await fn(s, ...rest); return r1 === false || r2 === false ? false : undefined; };
+      src.set(both, String(src.get(before) || before) + '\n' + String(fn));
+      table[name] = both;
     }
   };
+  compose(a.views, views, true);
   compose(a.actions, actions);
   compose(a.forms, forms);
   if (start) a.starts.push(start);

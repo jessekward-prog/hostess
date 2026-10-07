@@ -850,6 +850,9 @@ async function pagePass(body, label, { use = true, assemble = null } = {}) {
     // Repairs that are safe to make in code, on every attempt.
     const renamed = repairIds(ex.html);
     if (renamed) { ex.html = renamed; addStepEl(step('Fixed automatically: an element the script looks for had been renamed', { live: false, open: false })); }
+    // list[Forge.parent(s, id)] indexes an array with an item, always undefined; the item meant is the one with that id.
+    const indexed = ex.html.replace(/(?:Forge\.find\([^()]*\)|[\w$.]+)\.\w+\[Forge\.(?:parent|find)\((\w+),\s*([^()]+)\)\]/g, 'Forge.find($1, $2)');
+    if (indexed !== ex.html) { ex.html = indexed; addStepEl(step('Fixed automatically: a list was indexed with an item instead of finding it', { live: false, open: false })); }
     if (/await/.test(scriptError(ex.html) || '')) {
       const repaired = autoRepair(ex.html);
       if (repaired) { ex.html = repaired; addStepEl(step('Fixed automatically: made the functions that use await async', { live: false, open: false })); }
