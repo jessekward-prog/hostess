@@ -922,6 +922,7 @@ async function send(fixText) {
   // A module that still fails its checks is dropped whole: the app stays as it was (a clean rollback),
   // and its request leaves the history so later steps aren't held to a feature that was never added.
   if (asModule && res.html && res.warning) {
+    state.rejected = res.html;
     state.html = before;
     res.html = before;
     res.summary = '';
