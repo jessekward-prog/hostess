@@ -324,17 +324,18 @@ Forge.app = function ({ key = 'app', state = {}, pages: views = {}, actions = {}
   // on it, the most common small-model bug measured. Any name the app's code uses as a list starts as [].
   let lists = null, seen = -1;
   const fillLists = () => {
-    const src = [...document.scripts].map((x) => x.textContent).join('\n');
+    const src = [...document.scripts].map((x) => x.textContent).filter((t) => /Forge\.(app|extend)\(/.test(t) && !/Forge\.mount = function/.test(t)).join('\n');
     if (src.length !== seen) {
       seen = src.length;
       lists = new Set([...src.matchAll(/\.(\w+)\??\.(?:push|map|filter|forEach|reduce|find|findIndex|some|every|unshift|splice|slice|sort|includes|length)\b/g)].map((m) => m[1]));
     }
-    const walk = (v) => {
+    // Never a top-level list (programs) or a list the item already sits in (no workouts inside a workout).
+    const walk = (v, above) => {
       if (!v || typeof v !== 'object') return;
-      if (!Array.isArray(v) && v.id != null) for (const k of lists) if (v[k] === undefined) v[k] = [];
-      for (const k of Object.keys(v)) walk(v[k]);
+      if (!Array.isArray(v) && v.id != null) for (const k of lists) if (v[k] === undefined && !above.has(k)) v[k] = [];
+      for (const k of Object.keys(v)) walk(v[k], Array.isArray(v[k]) ? new Set([...above, k]) : above);
     };
-    walk(api.state);
+    walk(api.state, new Set(Object.keys(api.state)));
   };
   api.save = async () => { try { await store.set(key, api.state); } catch (err) { fail(err); } };
   api.render = () => { const cur = pages.current(); const view = views[cur.name]; if (view) { try { fillLists(); view(api.state, cur.param); } catch (err) { fail(err); } } };
@@ -431,6 +432,14 @@ Forge.mount = function () {
     if (!target) continue;
     const frag = t.content.cloneNode(true);
     for (const sec of frag.querySelectorAll('section[data-page]')) sec.hidden = true;
+    // A module that brings a whole new tab bar would stack a second one over the first (covering its
+    // buttons): only the links the bar doesn't have yet move into the existing one.
+    const bar = document.querySelector('nav.tabbar');
+    for (const nav of bar ? frag.querySelectorAll('nav.tabbar') : []) {
+      const have = new Set([...bar.querySelectorAll('a, button')].map((x) => x.textContent.trim().toLowerCase()));
+      for (const link of [...nav.querySelectorAll('a, button')]) if (!have.has(link.textContent.trim().toLowerCase())) bar.appendChild(link);
+      nav.remove();
+    }
     target.appendChild(frag);
     t.remove();
   }
