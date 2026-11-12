@@ -10,13 +10,12 @@ Full walkthrough with copy-paste commands for every option: **[hostess.cmdward.x
 
 **Linux** (Debian/Ubuntu-family):
 ```
-git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || git -C ~/hostess pull --ff-only; ~/hostess/install.sh
+(command -v git >/dev/null 2>&1 || (sudo apt-get update -y && sudo apt-get install -y git)) && (git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || git -C ~/hostess pull --ff-only) && ~/hostess/install.sh
 ```
 
 **macOS:**
 ```
-xcode-select -p >/dev/null 2>&1 || { xcode-select --install; echo "Approve the Command Line Tools dialog, then re-run this command."; }
-git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || git -C ~/hostess pull --ff-only; ~/hostess/install-macos.sh
+if ! xcode-select -p >/dev/null 2>&1; then xcode-select --install; echo "Approve the Command Line Tools dialog, then re-run this command."; else (git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || git -C ~/hostess pull --ff-only) && ~/hostess/install-macos.sh; fi
 ```
 (On a brand-new Mac without Command Line Tools, `git clone` pops an installer dialog instead of running — the first line catches that up front.)
 

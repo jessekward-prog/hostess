@@ -17,7 +17,7 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
     } else {
         # running via `iex` (no file on disk), re-download and run elevated
         $tmp = Join-Path $env:TEMP "hostess-install.ps1"
-        Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.ps1" -OutFile $tmp
+        Invoke-WebRequest -UseBasicParsing -Uri ("https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.ps1?t=" + [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()) -OutFile $tmp
         Start-Process powershell -Verb RunAs -ArgumentList "-NoExit -NoProfile -ExecutionPolicy Bypass -File `"$tmp`""
     }
     Write-Host "Continuing in the new elevated window, check your taskbar for the UAC prompt / PowerShell icon."
@@ -27,10 +27,29 @@ if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administra
 function Refresh-Path {
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
                 [System.Environment]::GetEnvironmentVariable("Path", "User")
+    $winApps = Join-Path $env:LOCALAPPDATA "Microsoft\WindowsApps"
+    if ((Test-Path $winApps) -and ($env:Path -notlike "*$winApps*")) {
+        $env:Path += ";$winApps"
+    }
 }
 
+function Test-DockerRunning {
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        docker info *>$null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    } finally {
+        $ErrorActionPreference = $prev
+    }
+}
+
+Refresh-Path
+
 if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
-    Write-Error "winget not found. Install 'App Installer' from the Microsoft Store, then re-run this script."
+    Write-Host -ForegroundColor Red "winget not found. Install 'App Installer' from the Microsoft Store, then re-run this script."
     exit 1
 }
 
@@ -41,7 +60,11 @@ if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
     Refresh-Path
 }
 
-if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+$nodeMajor = 0
+if (Get-Command node -ErrorAction SilentlyContinue) {
+    try { $nodeMajor = [int]((node -v) -replace '^v(\d+)\..*','$1') } catch { $nodeMajor = 0 }
+}
+if ($nodeMajor -lt 18) {
     Write-Host "Installing Node.js LTS..."
     winget install --id OpenJS.NodeJS.LTS -e --source winget --accept-package-agreements --accept-source-agreements
     Refresh-Path
@@ -69,16 +92,19 @@ try {
     }
 } catch {}
 
-$wslStatus = wsl --status 2>&1
-if ($LASTEXITCODE -ne 0) {
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
+wsl --status *>$null
+$wslExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+if ($wslExit -ne 0) {
     Write-Host "Enabling WSL2 (required by Docker Desktop)..."
     wsl --install --no-distribution
     Write-Warning "WSL2 was just installed, reboot Windows, then re-run this script to finish setup."
     exit 0
 }
 
-$dockerRunning = $false
-try { docker info *>$null; $dockerRunning = $true } catch {}
+$dockerRunning = Test-DockerRunning
 if (-not $dockerRunning) {
     Write-Host "Starting Docker Desktop..."
     Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"
@@ -87,12 +113,12 @@ if (-not $dockerRunning) {
     do {
         Start-Sleep -Seconds 3
         Write-Host -NoNewline "."
-        try { docker info *>$null; $dockerRunning = $true } catch {}
+        $dockerRunning = Test-DockerRunning
         $attempts++
     } until ($dockerRunning -or $attempts -ge 100)
     if (-not $dockerRunning) {
         Write-Host ""
-        Write-Error "Docker still isn't responding after 5 minutes. Open Docker Desktop, finish its first-run setup (accept the license, skip sign-in if asked), wait for the whale icon in the tray to say 'running', then re-run this script."
+        Write-Host -ForegroundColor Red "Docker still isn't responding after 5 minutes. Open Docker Desktop, finish its first-run setup (accept the license, skip sign-in if asked), wait for the whale icon in the tray to say 'running', then re-run this script."
         exit 1
     }
     Write-Host " ready."
@@ -119,10 +145,10 @@ if ($pkgJson -and (Test-Path $pkgJson) -and (Select-String -Path $pkgJson -Patte
 Set-Location $InstallDir
 npm install --omit=dev
 
-# --- scheduled task (survives logoff/reboot, runs hidden) ---
+# --- scheduled task (survives logoff/reboot, runs hidden, auto-restarts on non-zero exit) ---
 $TaskName = "hostess"
 $action = New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-NoProfile -WindowStyle Hidden -Command `"Set-Location '$InstallDir'; node server.js`""
+    -Argument "-NoProfile -WindowStyle Hidden -Command `"Set-Location '$InstallDir'; while (`$true) { node server.js; if (`$LASTEXITCODE -eq 0) { break }; Start-Sleep -Seconds 2 }`""
 $trigger = New-ScheduledTaskTrigger -AtLogOn
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
@@ -135,7 +161,7 @@ Start-ScheduledTask -TaskName $TaskName
 # --- hourly self-update scheduled task ---
 $UpdateTaskName = "hostess-update"
 $updateAction = New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-NoProfile -WindowStyle Hidden -Command `"git -C '$InstallDir' pull --ff-only; npm --prefix '$InstallDir' install --omit=dev; Stop-ScheduledTask -TaskName hostess; Start-ScheduledTask -TaskName hostess`""
+    -Argument "-NoProfile -WindowStyle Hidden -Command `"`$old = git -C '$InstallDir' rev-parse HEAD; git -C '$InstallDir' pull --ff-only; if (`$LASTEXITCODE -eq 0 -and (git -C '$InstallDir' rev-parse HEAD) -ne `$old) { npm --prefix '$InstallDir' install --omit=dev; Get-CimInstance Win32_Process -Filter \`"Name = 'node.exe'\`" | Where-Object { `$_.CommandLine -like '*server.js*' } | ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -ErrorAction SilentlyContinue }; Start-ScheduledTask -TaskName hostess }`""
 $updateTrigger = New-ScheduledTaskTrigger -RepetitionInterval (New-TimeSpan -Hours 1) -Once -At (Get-Date)
 $updateSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 10)

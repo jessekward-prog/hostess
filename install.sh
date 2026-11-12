@@ -11,9 +11,9 @@ SUDO=""
 if command -v sudo >/dev/null 2>&1; then SUDO="sudo"; fi
 
 # --- prerequisites ---
-if ! command -v git >/dev/null 2>&1; then
-  echo "Installing git..."
-  $SUDO apt-get update -y && $SUDO apt-get install -y git
+if ! command -v git >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+  echo "Installing git and curl..."
+  $SUDO apt-get update -y && $SUDO apt-get install -y git curl ca-certificates
 fi
 
 NODE_MAJOR=0
@@ -74,7 +74,7 @@ After=network.target
 [Service]
 Type=oneshot
 WorkingDirectory=$INSTALL_DIR
-ExecStart=/bin/bash -c 'git pull --ff-only && npm install --omit=dev && systemctl --user restart ${SERVICE_NAME}'
+ExecStart=/bin/bash -c 'old=\$(git rev-parse HEAD); git pull --ff-only && if [ "\$(git rev-parse HEAD)" != "\$old" ]; then npm install --omit=dev && systemctl --user restart ${SERVICE_NAME}; fi'
 EOF
 
 cat > "$HOME/.config/systemd/user/${SERVICE_NAME}-update.timer" <<EOF

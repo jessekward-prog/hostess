@@ -123,7 +123,7 @@ cat > "$UPDATE_PLIST_PATH" <<EOF
   <array>
     <string>/bin/bash</string>
     <string>-c</string>
-    <string>git -C '${INSTALL_DIR}' pull --ff-only &amp;&amp; npm --prefix '${INSTALL_DIR}' install --omit=dev &amp;&amp; launchctl kickstart -k gui/\$(id -u)/xyz.cmdward.hostess</string>
+    <string>old=\$(git -C '${INSTALL_DIR}' rev-parse HEAD) &amp;&amp; git -C '${INSTALL_DIR}' pull --ff-only &amp;&amp; if [ "\$(git -C '${INSTALL_DIR}' rev-parse HEAD)" != "\$old" ]; then npm --prefix '${INSTALL_DIR}' install --omit=dev &amp;&amp; launchctl kickstart -k gui/\$(id -u)/xyz.cmdward.hostess; fi</string>
   </array>
   <key>StartInterval</key><integer>3600</integer>
   <key>RunAtLoad</key><false/>
