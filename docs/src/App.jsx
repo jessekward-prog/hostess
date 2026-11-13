@@ -347,158 +347,140 @@ const TELEMETRY_BARS = [
   { label: 'LIVE_AI_SWAP', pct: 100, val: '/api/lm' },
 ];
 
-const CyberCoreCanvas = ({ onMouseTelemetry }) => {
+const HECATE_BAYER8 = [
+  [0,32,8,40,2,34,10,42],[48,16,56,24,50,18,58,26],
+  [12,44,4,36,14,46,6,38],[60,28,52,20,62,30,54,22],
+  [3,35,11,43,1,33,9,41],[51,19,59,27,49,17,57,25],
+  [15,47,7,39,13,45,5,37],[63,31,55,23,61,29,53,21],
+];
+const HECATE_PROFILE_CROP = [40, 10, 480, 470];
+const HECATE_PROFILE_POLY = [[190,20],[120,65],[92,150],[78,275],[95,400],[160,438],[300,442],[420,430],[472,235],[455,115],[360,40]];
+
+const loadImage = (src) => new Promise((resolve) => {
+  const img = new Image();
+  img.onload = () => resolve(img);
+  img.src = src;
+});
+
+function featherStatue(img, crop, w, filter, r, hold) {
+  const h = Math.round(w * crop[3] / crop[2]);
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const x = c.getContext('2d');
+  x.filter = filter;
+  x.drawImage(img, crop[0], crop[1], crop[2], crop[3], 0, 0, w, h);
+  x.filter = 'none';
+  const g = x.createRadialGradient(w * 0.5, h * 0.5, 1, w * 0.5, h * 0.5, Math.max(w, h) * r);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(hold, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,1)');
+  x.fillStyle = g;
+  x.fillRect(0, 0, w, h);
+  return c;
+}
+
+function maskProfile(img, w) {
+  const cr = HECATE_PROFILE_CROP;
+  const s = document.createElement('canvas');
+  s.width = cr[2]; s.height = cr[3];
+  const sx = s.getContext('2d');
+  sx.beginPath();
+  HECATE_PROFILE_POLY.forEach((p, i) => {
+    const x = p[0] - cr[0], y = p[1] - cr[1];
+    i ? sx.lineTo(x, y) : sx.moveTo(x, y);
+  });
+  sx.closePath();
+  sx.clip();
+  sx.filter = 'grayscale(1) brightness(1.35) contrast(1.12)';
+  sx.drawImage(img, cr[0], cr[1], cr[2], cr[3], 0, 0, cr[2], cr[3]);
+  const h = Math.round(w * cr[3] / cr[2]);
+  const out = document.createElement('canvas');
+  out.width = w; out.height = h;
+  const x = out.getContext('2d');
+  x.drawImage(s, 0, 0, w, h);
+  const g = x.createLinearGradient(0, h * 0.7, 0, h);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,1)');
+  x.fillStyle = g;
+  x.fillRect(0, h * 0.7, w, h * 0.3);
+  return out;
+}
+
+function composeHecate(imgs, W, H) {
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const x = c.getContext('2d', { willReadFrequently: true });
+  x.fillStyle = '#000';
+  x.fillRect(0, 0, W, H);
+  const mid = featherStatue(imgs.front, [95, 265, 320, 410], 154, 'grayscale(1) brightness(0.95) contrast(1.1)', 0.62, 0.74);
+  const right = featherStatue(imgs.quarter, [50, 335, 350, 420], 128, 'grayscale(1) brightness(0.98) contrast(1.15)', 0.6, 0.72);
+  x.drawImage(maskProfile(imgs.profile, 140), -12, 66);
+  x.drawImage(right, 224, 58);
+  x.drawImage(mid, (W - mid.width) / 2, -4);
+  const g = x.createLinearGradient(0, H - 58, 0, H);
+  g.addColorStop(0, 'rgba(0,0,0,0)');
+  g.addColorStop(1, 'rgba(0,0,0,1)');
+  x.fillStyle = g;
+  x.fillRect(0, H - 58, W, 58);
+  return c;
+}
+
+const HecateMascot = ({ onMouseTelemetry }) => {
   const canvasRef = useRef(null);
-  const pointer = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return undefined;
+    const W = canvas.width, H = canvas.height;
     const ctx = canvas.getContext('2d');
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let t = 0;
+    let timer;
+    let cancelled = false;
 
-    let raf;
-    let width = 0;
-    let height = 0;
+    Promise.all([
+      loadImage('/mascot/hecate-front.png'),
+      loadImage('/mascot/hecate-3q.png'),
+      loadImage('/mascot/hecate-profile.png'),
+    ]).then(([front, quarter, profile]) => {
+      if (cancelled) return;
+      const base = composeHecate({ front, quarter, profile }, W, H);
+      const baseCtx = base.getContext('2d');
+      const dot = document.createElement('canvas');
+      dot.width = W; dot.height = H;
+      const dctx = dot.getContext('2d');
 
-    const resize = () => {
-      const parent = canvas.parentElement;
-      if (!parent) return;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      width = parent.clientWidth;
-      height = parent.clientHeight;
-      canvas.width = width * dpr;
-      canvas.height = height * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    };
-    resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(canvas.parentElement);
-
-    // Precompute geodesic sphere + inner cube vertices
-    const points = [];
-    const latSteps = 12;
-    const lonSteps = 22;
-    for (let i = 0; i <= latSteps; i++) {
-      const phi = (Math.PI * i) / latSteps;
-      for (let j = 0; j < lonSteps; j++) {
-        const theta = (2 * Math.PI * j) / lonSteps;
-        points.push({
-          x: Math.sin(phi) * Math.cos(theta),
-          y: Math.cos(phi),
-          z: Math.sin(phi) * Math.sin(theta),
-          ring: i,
-        });
-      }
-    }
-
-    const glitchBlocks = [
-      { rx: -0.22, ry: -0.18, w: 34, h: 12 },
-      { rx: 0.16, ry: -0.05, w: 26, h: 10 },
-      { rx: -0.14, ry: 0.14, w: 42, h: 8 },
-      { rx: 0.21, ry: 0.19, w: 22, h: 14 },
-    ];
-
-    let angle = 0;
-    let scanY = 0;
-
-    const project = (p, rotY, rotX, cx, cy, r) => {
-      const cosY = Math.cos(rotY);
-      const sinY = Math.sin(rotY);
-      const x1 = p.x * cosY - p.z * sinY;
-      const z1 = p.z * cosY + p.x * sinY;
-
-      const cosX = Math.cos(rotX);
-      const sinX = Math.sin(rotX);
-      const y2 = p.y * cosX - z1 * sinX;
-      const z2 = z1 * cosX + p.y * sinX;
-
-      const scale = 2.4 / (2.4 - z2 * 0.65);
-      return {
-        sx: cx + x1 * r * scale,
-        sy: cy + y2 * r * scale,
-        depth: z2,
+      const tick = () => {
+        t++;
+        const flicker = !reduceMotion && t % 47 === 0;
+        const gain = 1 + (flicker ? 0.35 : 0);
+        const bias = -0.3 + (flicker ? 0.08 : 0);
+        const phase = reduceMotion ? 0 : (t % 2) * 2;
+        const d = baseCtx.getImageData(0, 0, W, H);
+        const p = d.data;
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            const i = (y * W + x) * 4;
+            let l = (0.299 * p[i] + 0.587 * p[i + 1] + 0.114 * p[i + 2]) / 255;
+            l = Math.min(1, Math.max(0, (l - 0.5) * gain + 0.5 + bias));
+            const thr = (HECATE_BAYER8[(y + phase) & 7][(x + phase) & 7] + 0.5) / 64;
+            const on = l > thr;
+            p[i] = 235; p[i + 1] = 235; p[i + 2] = 235;
+            p[i + 3] = on ? 255 : Math.round(255 * 0.58 * Math.max(0, l));
+          }
+        }
+        dctx.putImageData(d, 0, 0);
+        ctx.clearRect(0, 0, W, H);
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(dot, 0, 0);
       };
-    };
-
-    const draw = () => {
-      angle += reduceMotion ? 0.001 : 0.0055;
-      scanY = (scanY + (reduceMotion ? 0.4 : 1.4)) % (height || 400);
-
-      ctx.clearRect(0, 0, width, height);
-      const cx = width * 0.5;
-      const cy = height * 0.52;
-      const radius = Math.min(width, height) * 0.34;
-      const rotY = angle + pointer.current.x * 0.45;
-      const rotX = 0.25 + pointer.current.y * 0.3;
-
-      // Crosshair axes
-      ctx.strokeStyle = 'rgba(201, 169, 92, 0.1)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(cx - radius * 1.45, cy);
-      ctx.lineTo(cx + radius * 1.45, cy);
-      ctx.moveTo(cx, cy - radius * 1.35);
-      ctx.lineTo(cx, cy + radius * 1.35);
-      ctx.stroke();
-
-      // Wireframe sphere edges
-      const projected = points.map((p) => project(p, rotY, rotX, cx, cy, radius));
-
-      for (let i = 0; i <= latSteps; i++) {
-        ctx.beginPath();
-        for (let j = 0; j <= lonSteps; j++) {
-          const idx = i * lonSteps + (j % lonSteps);
-          const pt = projected[idx];
-          if (!pt) continue;
-          if (j === 0) ctx.moveTo(pt.sx, pt.sy);
-          else ctx.lineTo(pt.sx, pt.sy);
-        }
-        ctx.strokeStyle = i % 3 === 0 ? 'rgba(201, 169, 92, 0.36)' : 'rgba(208, 214, 204, 0.22)';
-        ctx.lineWidth = i % 3 === 0 ? 1.15 : 0.7;
-        ctx.stroke();
-      }
-
-      for (let j = 0; j < lonSteps; j += 2) {
-        ctx.beginPath();
-        for (let i = 0; i <= latSteps; i++) {
-          const idx = i * lonSteps + j;
-          const pt = projected[idx];
-          if (!pt) continue;
-          if (i === 0) ctx.moveTo(pt.sx, pt.sy);
-          else ctx.lineTo(pt.sx, pt.sy);
-        }
-        ctx.strokeStyle = 'rgba(208, 214, 204, 0.2)';
-        ctx.lineWidth = 0.7;
-        ctx.stroke();
-      }
-
-      // Highlighted vertex nodes
-      projected.forEach((pt, idx) => {
-        if (pt.depth < -0.15) return;
-        const size = pt.depth > 0.45 ? 2.2 : 1.3;
-        ctx.fillStyle = idx % 7 === 0 ? '#c9a95c' : 'rgba(244, 246, 240, 0.75)';
-        ctx.fillRect(pt.sx - size * 0.5, pt.sy - size * 0.5, size, size);
-      });
-
-      // Acid-volt glitch data blocks (matching Cyber Brutalist reference)
-      glitchBlocks.forEach((b, k) => {
-        const pulse = Math.sin(angle * 2.2 + k * 1.4) * 8;
-        ctx.fillStyle = 'rgba(201, 169, 92, 0.78)';
-        ctx.fillRect(cx + b.rx * width + pulse, cy + b.ry * height, b.w, b.h);
-      });
-
-      // Sweep line
-      ctx.fillStyle = 'rgba(201, 169, 92, 0.16)';
-      ctx.fillRect(0, scanY, width, 1.5);
-
-      raf = requestAnimationFrame(draw);
-    };
-    draw();
+      tick();
+      if (!reduceMotion) timer = setInterval(tick, 110);
+    });
 
     return () => {
-      cancelAnimationFrame(raf);
-      ro.disconnect();
+      cancelled = true;
+      clearInterval(timer);
     };
   }, []);
 
@@ -506,7 +488,6 @@ const CyberCoreCanvas = ({ onMouseTelemetry }) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const nx = (e.clientX - rect.left) / rect.width - 0.5;
     const ny = (e.clientY - rect.top) / rect.height - 0.5;
-    pointer.current = { x: nx, y: ny };
     onMouseTelemetry({
       x: (36.17 + nx * 12).toFixed(4),
       y: (-86.76 + ny * 12).toFixed(4),
@@ -516,7 +497,7 @@ const CyberCoreCanvas = ({ onMouseTelemetry }) => {
 
   return (
     <div className="hero-right-canvas" onMouseMove={handleMove}>
-      <canvas ref={canvasRef} style={{ width: '100%', height: '100%', display: 'block' }} />
+      <canvas ref={canvasRef} width={340} height={250} className="hecate-canvas" />
     </div>
   );
 };
@@ -681,7 +662,7 @@ export default function App() {
             </div>
 
             <div className="hero-right">
-              <CyberCoreCanvas onMouseTelemetry={setCoords} />
+              <HecateMascot onMouseTelemetry={setCoords} />
               <div className="scanline-overlay" />
 
               <div className="hud-top">
