@@ -282,8 +282,8 @@
   .os-panel .step-num { color: var(--os-accent, var(--s-text-2)); border-color: var(--os-tint, var(--s-border)); }
 
   .manifest-list { list-style: none; margin: 0 0 8px; padding: 0; font-size: 12px; color: var(--s-text-2); }
-  .manifest-list li { display: flex; gap: 8px; padding: 3px 0; }
-  .manifest-list code { color: var(--s-text-0); flex-shrink: 0; }
+  .manifest-list li { display: grid; grid-template-columns: 78px 1fr; gap: 8px; padding: 3px 0; }
+  .manifest-list code { color: var(--s-text-0); }
 
   footer.page-foot {
     margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--s-border);
@@ -645,11 +645,11 @@ postgres: false
 autoUpdate: false
 env: []</div>
             <ul class="manifest-list">
-              <li><code>name</code> lowercase letters/numbers/hyphens, 2-50 chars</li>
-              <li><code>port</code> what your app listens on inside the container</li>
-              <li><code>postgres</code> true wires a DATABASE_URL + DB_* vars to a shared Postgres</li>
-              <li><code>autoUpdate</code> true redeploys automatically when the source repo gets a new commit (checked every ~10 min)</li>
-              <li><code>env</code> each name gets its own reveal panel on the app card — set a value there and it's wired in via <code>docker run -e</code> on redeploy, no manual env file editing</li>
+              <li><code>name</code><span>lowercase letters/numbers/hyphens, 2-50 chars</span></li>
+              <li><code>port</code><span>what your app listens on inside the container</span></li>
+              <li><code>postgres</code><span>true wires a DATABASE_URL + DB_* vars to a shared Postgres</span></li>
+              <li><code>autoUpdate</code><span>true redeploys automatically when the source repo gets a new commit (checked every ~10 min)</span></li>
+              <li><code>env</code><span>each name gets its own reveal panel on the app card — set a value there and it's wired in via <code>docker run -e</code> on redeploy, no manual env file editing</span></li>
             </ul>
           </div>
         </div>
