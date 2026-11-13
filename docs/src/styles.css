@@ -9,13 +9,13 @@
   --grid: #242922;
   --grid-bright: #384034;
 
-  --volt: #23874a;
+  --volt: #005f00;
   --volt-ink: #ecfff1;
-  --volt-dim: rgba(35, 135, 74, 0.12);
-  --volt-border: rgba(35, 135, 74, 0.45);
+  --volt-dim: rgba(0, 95, 0, 0.12);
+  --volt-border: rgba(0, 95, 0, 0.45);
 
-  --btn: #23874a;
-  --btn-hover: #2c9b57;
+  --btn: #005f00;
+  --btn-hover: #007a00;
   --btn-radius: 6px;
 
   --text-0: #f4f6f0;
@@ -49,7 +49,8 @@ html, body {
 button { cursor: pointer; border: none; background: none; padding: 0; font-family: inherit; color: inherit; }
 a { color: inherit; text-decoration: none; }
 code, pre, .mono { font-family: var(--mono); }
-h1, h2, h3, p { margin: 0; }
+h1, h2, h3, h4, p { margin: 0; }
+h1, h2, h3, h4, .principle-title, .manual-card-title, .module-title, .deck-heading, .sec-bar, .sec-bar .sub { font-family: var(--display); }
 :focus-visible { outline: 2px solid var(--volt); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
@@ -75,8 +76,8 @@ h1, h2, h3, p { margin: 0; }
   min-height: 100vh;
   background-color: var(--bg);
   background-image:
-    linear-gradient(to right, rgba(35, 135, 74, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(35, 135, 74, 0.03) 1px, transparent 1px);
+    linear-gradient(to right, rgba(0, 95, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 95, 0, 0.03) 1px, transparent 1px);
   background-size: 32px 32px;
   position: relative;
 }
@@ -274,7 +275,7 @@ h1.cyber-title .volt-accent { color: var(--volt); display: block; }
 .hero-right {
   position: relative;
   min-height: 440px;
-  background: radial-gradient(circle at 50% 48%, rgba(35, 135, 74, 0.08) 0%, #050605 70%);
+  background: radial-gradient(circle at 50% 48%, rgba(0, 95, 0, 0.08) 0%, #050605 70%);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -352,7 +353,7 @@ h1.cyber-title .volt-accent { color: var(--volt); display: block; }
   padding: 16px 24px;
   border-bottom: 1px solid var(--grid);
   background: var(--panel);
-  font-family: var(--mono);
+  font-family: var(--display);
   font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.1em;
@@ -387,7 +388,7 @@ h1.cyber-title .volt-accent { color: var(--volt); display: block; }
 .principle-top { display: flex; align-items: center; justify-content: space-between; }
 .principle-plus { font-family: var(--mono); font-size: var(--fs-xs); color: var(--text-3); }
 .principle-title {
-  font-family: var(--mono);
+  font-family: var(--display);
   font-size: var(--fs-base);
   font-weight: 700;
   letter-spacing: 0.05em;
@@ -597,7 +598,7 @@ h1.cyber-title .volt-accent { color: var(--volt); display: block; }
 .manual-card.wide { grid-column: 1 / -1; }
 .manual-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .manual-card-title {
-  font-family: var(--mono);
+  font-family: var(--display);
   font-size: var(--fs-xs);
   font-weight: 700;
   color: var(--text-0);
