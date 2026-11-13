@@ -2,429 +2,742 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Hostess — install</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hostess — Self-Hosted App Platform</title>
+<meta name="description" content="Turn a clean Linux, macOS, or Windows machine into a self-hosted Docker PaaS with shared Postgres, isolated web search, local AI auto-linking, and Tailscale remote access.">
 <link rel="icon" type="image/svg+xml" href="/icon.svg">
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  /* ── shelf-cmd "CMD" theme tokens — the app's real default, not the amber
-     phosphor one the CSS comment implies. Grayscale-first; --s-accent is the
-     only color, reserved for interactive/active state. ── */
+  /* ── shelf-cmd "CMD" theme tokens — grayscale base with PlayStation
+     face-button accents scoped per OS (Linux green, macOS pink, Windows blue).
+     Every text token meets WCAG AA (>=4.5:1) against #000000, #111111, and #1a1a1a. ── */
   :root {
-    --s-font: 'JetBrains Mono', 'Fira Mono', ui-monospace, Menlo, Consolas, monospace;
+    --mono:            'JetBrains Mono', 'Fira Mono', ui-monospace, Menlo, Consolas, monospace;
+    --sans:            'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --s-bg:            #000000;
     --s-surface:       #111111;
-    --s-surface-2:     #1e1e1e;
-    --s-border:        #333333;
+    --s-surface-2:     #1a1a1a;
+    --s-border:        #2c2c2c;
+    --s-border-soft:   #222222;
     --s-accent:        #ffffff;
     --s-accent-faint:  rgba(255,255,255,0.07);
-    --s-accent-glow:   rgba(255,255,255,0.18);
-    --s-accent-strong: rgba(255,255,255,0.95);
     --s-text-0:        #ffffff;
-    --s-text-1:        #b0b0b0;
-    --s-text-2:        #666666;
-    --s-text-3:        #444444;
-    --danger:          #c0392b;
-    --danger-strong:   rgba(180,40,0,0.9);
+    --s-text-1:        #d4d4d4;
+    --s-text-2:        #a3a3a3;
+    --s-text-3:        #8a8a8a;
     --ok:              #3fb37f;
+    --ok-bg:           rgba(63,179,127,0.12);
+    --ps-linux:        #3fb37f;
+    --ps-macos:        #e0559c;
+    --ps-windows:      #4f8fe0;
+
+    /* Type scale (11px minimum floor across the entire UI) */
+    --fs-xs:           11px;
+    --fs-sm:           12px;
+    --fs-md:           13.5px;
+    --fs-base:         14.5px;
+    --fs-lg:           16px;
+    --fs-xl:           20px;
+    --fs-2xl:          28px;
+
+    /* Emil Kowalski motion curves */
+    --ease-out:        cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-drawer:     cubic-bezier(0.32, 0.72, 0, 1);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { color-scheme: dark; scroll-behavior: smooth; }
   html, body { height: 100%; margin: 0; padding: 0; }
   body {
     background: var(--s-bg);
     color: var(--s-text-1);
-    font-family: var(--s-font);
+    font-family: var(--sans);
+    font-size: var(--fs-md);
+    line-height: 1.6;
     -webkit-font-smoothing: antialiased;
   }
+  ::selection { background: var(--s-accent-faint); color: var(--s-text-0); }
   button { cursor: pointer; border: none; background: none; padding: 0; font-family: inherit; color: inherit; }
   a { color: inherit; }
+  code, pre, .mono { font-family: var(--mono); }
+  h1, h2, h3 { font-family: var(--mono); color: var(--s-text-0); letter-spacing: -0.015em; margin: 0; }
 
   :focus-visible { outline: 2px solid var(--s-accent); outline-offset: 2px; }
 
-  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
   ::-webkit-scrollbar-track { background: var(--s-surface); }
   ::-webkit-scrollbar-thumb { background: var(--s-border); border-radius: 2px; }
   @media (min-width: 1024px) {
-    ::-webkit-scrollbar { width: 10px; }
-    ::-webkit-scrollbar-thumb { background: var(--s-border); border: 3px solid var(--s-surface); border-radius: 5px; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: var(--s-border); border: 2px solid var(--s-surface); border-radius: 5px; }
   }
-  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
-  .no-scrollbar::-webkit-scrollbar { display: none; }
 
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+    *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; scroll-behavior: auto !important; }
   }
 
-  /* ── Shell: sidebar + main, exactly shelf-cmd's aside/nav split ── */
+  /* ── Shell: fixed sidebar + main ── */
   .shell { display: flex; min-height: 100vh; align-items: flex-start; }
 
   aside.sidebar {
-    width: 240px; flex-shrink: 0;
+    width: 268px; flex-shrink: 0;
     background: var(--s-surface);
-    border-right: 1px solid var(--s-border);
+    border-right: 1px solid var(--s-border-soft);
     position: sticky; top: 0; height: 100vh;
     overflow: hidden;
   }
   @media (max-width: 1023px) {
     aside.sidebar {
       position: fixed; left: 0; top: 0; z-index: 40;
-      width: min(280px, 82vw);
+      width: min(288px, 84vw); height: 100dvh;
       transform: translateX(-100%);
-      transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
-      box-shadow: 4px 0 24px rgba(0,0,0,0.5);
+      transition: transform 0.26s var(--ease-drawer);
+      box-shadow: 4px 0 24px rgba(0,0,0,0.6);
     }
     aside.sidebar.open { transform: translateX(0); }
     .sidebar-content { padding-top: max(8px, env(safe-area-inset-top)); }
-    .sidebar-stats { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+    .sidebar-stats { padding-bottom: max(14px, env(safe-area-inset-bottom)); }
   }
 
   .menu-btn {
     display: none;
-    position: fixed; z-index: 20;
-    top: max(16px, env(safe-area-inset-top)); left: 16px;
+    position: fixed; z-index: 25;
+    top: max(14px, env(safe-area-inset-top)); left: 16px;
     width: 44px; height: 44px;
     align-items: center; justify-content: center;
     background: var(--s-surface); border: 1px solid var(--s-border);
     border-radius: 8px; color: var(--s-text-0);
+    transition: border-color 0.15s ease, transform 0.14s var(--ease-out);
   }
+  .menu-btn:hover { border-color: var(--s-text-2); }
+  .menu-btn:active { transform: scale(0.96); }
   @media (max-width: 1023px) { .menu-btn { display: flex; } }
-
-  .drawer-close {
-    display: none; width: 44px; height: 44px; margin: 0 0 0 auto;
-    align-items: center; justify-content: center; flex-shrink: 0;
-    color: var(--s-text-2); font-size: 16px;
-  }
-  @media (max-width: 1023px) { .drawer-close { display: flex; } }
 
   .sidebar-backdrop {
     display: none; position: fixed; inset: 0; z-index: 30;
-    background: rgba(0,0,0,0.6); opacity: 0; pointer-events: none;
-    transition: opacity 0.24s;
+    background: rgba(0,0,0,0.65); opacity: 0; pointer-events: none;
+    transition: opacity 0.22s ease;
   }
   @media (max-width: 1023px) {
     .sidebar-backdrop { display: block; }
     .sidebar-backdrop.open { opacity: 1; pointer-events: auto; }
   }
 
-  /* Canvas painted by mountWaveBackground() sits behind this; content stays
-     on its own stacking layer so the animation never eats a click. */
   .sidebar-content {
     position: relative; z-index: 1; height: 100%;
     display: flex; flex-direction: column; overflow-y: auto;
   }
 
-  /* CRT scanline, same trick as chat-cmd's .fx-scanline — scoped to the
-     sidebar instead of the full viewport. */
-  .sidebar-scanline {
-    position: absolute; inset: 0; pointer-events: none; z-index: 0;
-    mix-blend-mode: multiply;
-    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.32) 0px, rgba(0,0,0,0.32) 2px, transparent 2px, transparent 6px);
+  .brand-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 18px 16px; border-bottom: 1px solid var(--s-border-soft);
   }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .brand .mark {
+    width: 26px; height: 26px; border-radius: 6px;
+    border: 1.5px solid var(--s-text-0);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .brand-title { font-family: var(--mono); color: var(--s-text-0); font-size: var(--fs-md); font-weight: 700; display: block; line-height: 1.2; }
+  .brand-sub { font-family: var(--mono); color: var(--s-text-3); font-size: var(--fs-xs); display: block; margin-top: 2px; }
 
-  nav.sidebar-nav { flex: 1; padding: 20px 8px; overflow-y: auto; }
+  .drawer-close {
+    display: none; width: 36px; height: 36px; border-radius: 6px;
+    align-items: center; justify-content: center; flex-shrink: 0;
+    color: var(--s-text-2); font-size: var(--fs-base);
+  }
+  .drawer-close:hover { background: var(--s-surface-2); color: var(--s-text-0); }
+  @media (max-width: 1023px) { .drawer-close { display: flex; } }
+
+  .sidebar-cta {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin: 14px 12px 4px; padding: 11px 12px; border-radius: 8px;
+    background: var(--ok); color: #05170e;
+    font-family: var(--mono); font-size: var(--fs-sm); font-weight: 700;
+    text-decoration: none; transition: background 0.14s ease, transform 0.12s var(--ease-out);
+  }
+  .sidebar-cta:hover { background: #52c590; }
+  .sidebar-cta:active { transform: scale(0.97); }
+  .sidebar-cta svg { flex-shrink: 0; }
+
+  nav.sidebar-nav { flex: 1; padding: 14px 10px 20px; overflow-y: auto; }
 
   .section-label {
-    font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
-    color: var(--s-text-3); padding: 0 12px; margin: 20px 0 6px; display: block;
+    font-family: var(--mono); font-size: var(--fs-xs); font-weight: 600;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    color: var(--s-text-3); padding: 0 10px; margin: 18px 0 6px; display: block;
   }
-  .section-label:first-child { margin-top: 0; }
+  .section-label:first-child { margin-top: 2px; }
 
   .row {
     width: 100%; display: flex; align-items: center; gap: 10px;
-    padding: 7px 12px; border-radius: 6px; font-size: 13px;
+    padding: 8px 10px; border-radius: 6px;
+    font-family: var(--mono); font-size: var(--fs-sm);
     text-align: left; color: var(--s-text-2); position: relative;
-    transition: background 0.12s, color 0.12s;
+    text-decoration: none;
+    transition: background 0.12s ease, color 0.12s ease;
   }
   .row svg { flex-shrink: 0; }
+  .row .label-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .row:hover { background: var(--s-surface-2); color: var(--s-text-0); }
-  .row.active { background: var(--s-accent-faint); color: var(--os-accent, var(--s-accent)); }
+  .row.active { background: var(--s-accent-faint); color: var(--os-accent, var(--s-accent)); font-weight: 600; }
   .row.active::before {
     content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
     width: 2px; height: 18px; border-radius: 2px; background: var(--os-accent, var(--s-accent));
   }
-  /* PlayStation face-button colors — shelf's own category-color convention,
-     one per OS, applied the same low-alpha "tint don't fight the theme" way. */
-  .os-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--os-accent, var(--s-text-3)); flex-shrink: 0; }
+  .os-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--os-accent, var(--s-text-3)); flex-shrink: 0; }
 
-  .sidebar-stats { padding: 12px 16px; border-top: 1px solid var(--s-border); }
+  .sidebar-stats { padding: 14px 16px; border-top: 1px solid var(--s-border-soft); font-family: var(--mono); }
   .stat-row {
     display: flex; justify-content: space-between; align-items: baseline;
-    font-size: 10px; letter-spacing: 0.14em; color: var(--s-text-3); margin-top: 4px;
+    font-size: var(--fs-xs); color: var(--s-text-3); margin-top: 6px;
   }
   .stat-row:first-child { margin-top: 0; }
   .stat-row .v { color: var(--s-text-2); font-variant-numeric: tabular-nums; }
-  .sidebar-stats a { color: var(--s-text-2); text-decoration: none; }
+  .sidebar-stats a { color: var(--s-text-1); text-decoration: none; }
   .sidebar-stats a:hover { color: var(--s-accent); text-decoration: underline; }
 
   /* ── Main content ── */
-  main { flex: 1; min-width: 0; padding: 32px 32px 90px; max-width: 900px; margin: 0 auto; }
-  @media (max-width: 1023px) { main { padding: calc(max(16px, env(safe-area-inset-top)) + 56px) 16px 60px; } }
-
-  header.top { margin-bottom: 26px; }
-  h1 {
-    font-size: 1.3rem; margin: 0 0 8px; letter-spacing: -0.01em;
-    color: var(--s-text-0); display: flex; align-items: center; gap: 9px;
+  main { flex: 1; min-width: 0; padding: 48px 48px 100px; max-width: 980px; margin: 0 auto; }
+  @media (max-width: 1023px) {
+    main { padding: calc(max(16px, env(safe-area-inset-top)) + 56px) 20px 72px; }
   }
-  h1 .mark {
+
+  /* ── Hero + Architectural Scorecard ── */
+  header.top { margin-bottom: 40px; }
+  .hero-top {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 20px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+  h1.hero-title {
+    font-size: var(--fs-2xl); line-height: 1.15;
+    display: flex; align-items: center; gap: 12px;
+  }
+  h1.hero-title .mark {
     display: flex; align-items: center; justify-content: center;
-    width: 26px; height: 26px; border-radius: 6px;
-    border: 1.5px solid var(--s-text-0);
+    width: 36px; height: 36px; border-radius: 8px;
+    border: 1.5px solid var(--s-text-0); background: var(--s-surface); flex-shrink: 0;
   }
-  .tagline { color: var(--s-text-2); font-size: 0.85rem; max-width: 58ch; margin: 0 0 14px; line-height: 1.6; }
-  .badges { display: flex; gap: 8px; flex-wrap: wrap; font-size: 0.72rem; }
-  .badge { border: 1px solid var(--s-border); border-radius: 999px; padding: 4px 11px; color: var(--s-text-2); }
-  .badge code { color: var(--s-text-1); font-size: 0.72rem; }
-  .badge a { color: var(--s-text-0); text-decoration: none; }
-  .badge a:hover { text-decoration: underline; }
+  @keyframes cursor-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+  .caret-blink { animation: cursor-blink 1s step-end infinite; color: var(--ok); }
 
-  /* Mobile OS picker — replaces the sidebar's INSTALL section below 1024px,
-     same horizontal-strip pattern shelf uses for its mobile shelf/tab bars. */
-  .mobile-os-tabs {
-    display: none; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 22px;
+  .hero-links { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .hero-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: var(--fs-xs);
+    padding: 6px 12px; border-radius: 999px;
+    border: 1px solid var(--s-border); background: var(--s-surface);
+    color: var(--s-text-1); text-decoration: none;
+    transition: border-color 0.14s ease, color 0.14s ease, transform 0.12s var(--ease-out);
   }
-  @media (max-width: 1023px) { .mobile-os-tabs { display: flex; } }
-  .pill {
-    flex-shrink: 0; display: flex; align-items: center; gap: 6px;
-    padding: 7px 14px; border-radius: 999px; font-size: 12px;
-    border: 1px solid var(--s-border); color: var(--s-text-2);
+  a.hero-pill:hover { border-color: var(--s-text-1); color: var(--s-text-0); }
+  a.hero-pill:active { transform: scale(0.97); }
+  .hero-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ok); }
+
+  .tagline {
+    color: var(--s-text-1); font-size: var(--fs-lg); max-width: 66ch;
+    margin: 0 0 24px; line-height: 1.6;
   }
-  .pill.active { border-color: var(--os-accent, var(--s-accent)); color: var(--os-accent, var(--s-accent)); background: var(--s-accent-faint); }
-
-  h2 { font-size: 0.95rem; color: var(--s-text-0); margin: 0 0 3px; display: flex; align-items: center; gap: 8px; }
-  .h2-sub { font-size: 0.78rem; color: var(--s-text-3); margin: 0 0 16px; }
-
-  .grid {
-    display: grid; gap: 14px; margin-bottom: 30px;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  .tagline code {
+    color: var(--s-text-0); background: var(--s-surface-2);
+    border: 1px solid var(--s-border); padding: 1px 6px; border-radius: 4px; font-size: 0.9em;
   }
 
-  .card {
-    border-radius: 12px; overflow: hidden;
+  .scorecard {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+  }
+  @media (max-width: 820px) { .scorecard { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 480px) { .scorecard { grid-template-columns: 1fr; } }
+
+  .score-tile {
     background: var(--s-surface); border: 1px solid var(--s-border);
-    transition: border-color 0.18s, transform 0.18s cubic-bezier(0.2,0.8,0.2,1);
+    border-radius: 10px; padding: 14px 16px;
   }
-  .card:hover { border-color: var(--s-text-3); }
-  .card-head { padding: 15px 16px 0; }
-  .card-title { font-size: 13px; font-weight: 600; color: var(--s-text-0); margin: 0 0 4px; display: flex; align-items: center; gap: 8px; }
-  .card-desc { font-size: 12px; color: var(--s-text-2); line-height: 1.55; margin: 0 0 13px; }
-  .card-body { padding: 0 16px; }
-  .card-foot {
+  .score-tile .k {
+    font-family: var(--mono); font-size: var(--fs-xs); font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--s-text-3); margin-bottom: 5px;
+  }
+  .score-tile .v {
+    font-family: var(--mono); font-size: var(--fs-sm);
+    color: var(--s-text-0); line-height: 1.45;
+  }
+
+  /* ── Section headers ── */
+  section.block { margin-top: 48px; scroll-margin-top: 28px; }
+  section.block:first-of-type { margin-top: 0; }
+  .sec-head {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 6px;
+  }
+  .sec-title-group { display: flex; align-items: center; gap: 10px; }
+  .sec-num { font-family: var(--mono); font-size: var(--fs-sm); color: var(--s-text-3); font-variant-numeric: tabular-nums; }
+  h2 { font-size: var(--fs-xl); }
+  .sec-desc { font-size: var(--fs-md); color: var(--s-text-2); margin: 0 0 18px; max-width: 66ch; }
+
+  /* ── OS Install Workbench (Full-width command hero + 2-col detail grid) ── */
+  #panel-linux   { --os-accent: var(--ps-linux);   --os-tint: rgba(63,179,127,0.38);  --os-faint: rgba(63,179,127,0.08); }
+  #panel-macos   { --os-accent: var(--ps-macos);   --os-tint: rgba(224,85,156,0.38);  --os-faint: rgba(224,85,156,0.08); }
+  #panel-windows { --os-accent: var(--ps-windows); --os-tint: rgba(79,143,224,0.38);  --os-faint: rgba(79,143,224,0.08); }
+
+  .os-tabs-bar {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 14px; margin-top: 13px; border-top: 1px solid var(--s-surface-2);
+    gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
   }
-
-  .icon-btn {
-    display: inline-flex; align-items: center; gap: 5px;
-    padding: 5px 9px; border-radius: 6px; font-size: 11px;
-    color: var(--s-text-3); transition: color 0.12s, background 0.12s;
+  .os-tabs {
+    display: inline-flex; gap: 6px; padding: 4px;
+    background: var(--s-surface); border: 1px solid var(--s-border); border-radius: 10px;
   }
-  .icon-btn:hover { color: var(--s-accent); background: var(--s-surface-2); }
-  .icon-btn.copied { color: var(--ok); }
-  .icon-btn svg { flex-shrink: 0; }
-
-  .link-out { font-size: 11px; color: var(--s-text-3); text-decoration: none; display: inline-flex; align-items: center; gap: 3px; }
-  .link-out:hover { color: var(--s-accent); }
-
-  pre.code-block, .code-block {
-    background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 8px;
-    padding: 11px 12px; margin: 0 0 13px; overflow-x: auto;
-    font-size: 12px; line-height: 1.6; color: var(--s-text-1);
-    white-space: pre-wrap; word-break: break-word;
+  .os-tab {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 8px 14px; border-radius: 7px;
+    font-family: var(--mono); font-size: var(--fs-sm); font-weight: 500;
+    color: var(--s-text-2); border: 1px solid transparent;
+    transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease, transform 0.12s var(--ease-out);
   }
-  .code-block.accent { color: var(--s-text-0); }
-
-  /* Reveal-panel toggle — same chevron+label+height-expand shelf uses for a
-     card's "tutorial plan" panel. Never a native <details>/<summary>. */
-  .reveal-toggle {
-    display: flex; align-items: center; gap: 5px; font-size: 12px;
-    color: var(--s-accent); margin-bottom: 8px;
+  .os-tab:hover { color: var(--s-text-0); background: var(--s-surface-2); }
+  .os-tab:active { transform: scale(0.97); }
+  .os-tab.active {
+    background: var(--s-surface-2);
+    color: var(--os-accent);
+    border-color: var(--os-tint);
+    font-weight: 600;
   }
-  .reveal-toggle .chev { font-size: 10px; transition: transform 0.18s; display: inline-block; }
-  .reveal-toggle.open .chev { transform: rotate(90deg); }
-  .reveal-panel {
-    max-height: 0; overflow: hidden; opacity: 0;
-    transition: max-height 0.22s cubic-bezier(0.32,0.72,0,1), opacity 0.18s;
-  }
-  .reveal-panel.open { max-height: 2400px; opacity: 1; }
-  .steps { padding: 2px 2px 12px; }
-  .step { margin-bottom: 14px; }
-  .step:last-child { margin-bottom: 0; }
-  .step-label { font-size: 11.5px; color: var(--s-text-1); line-height: 1.55; margin: 0 0 5px; }
-  .step-label b { color: var(--s-text-0); font-weight: 600; }
-  .step-num {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--s-border);
-    font-size: 9.5px; color: var(--s-text-2); margin-right: 6px; flex-shrink: 0;
-  }
-
-  .note-box {
-    border: 1px dashed var(--s-border); border-radius: 8px; padding: 11px 13px;
-    font-size: 12px; color: var(--s-text-2); line-height: 1.55; margin-top: 10px;
-  }
+  .os-meta { font-family: var(--mono); font-size: var(--fs-xs); color: var(--s-text-3); }
 
   .os-panel { display: none; }
   .os-panel.active { display: block; }
 
-  /* One PlayStation face-button color per OS, scoped to that panel — everything
-     inside (card border, code accent, reveal-toggle) reads var(--os-accent)
-     rather than hardcoding it, same token-cascade trick shelf uses per-theme. */
-  #panel-linux   { --os-accent: #3fb37f; --os-tint: rgba(63,179,127,0.33); }   /* △ green */
-  #panel-macos   { --os-accent: #e0559c; --os-tint: rgba(224,85,156,0.33); }  /* □ pink */
-  #panel-windows { --os-accent: #4f8fe0; --os-tint: rgba(79,143,224,0.33); }  /* ✕ blue */
+  /* Full-width terminal install card */
+  .terminal-card {
+    background: var(--s-surface);
+    border: 1px solid var(--os-tint, var(--s-border));
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 14px;
+  }
+  .terminal-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
+    padding: 11px 18px;
+    background: var(--s-surface-2);
+    border-bottom: 1px solid var(--s-border);
+  }
+  @media (max-width: 720px) { .terminal-bar { flex-wrap: wrap; } }
+  .terminal-title {
+    display: flex; align-items: center; gap: 9px; min-width: 0; white-space: nowrap;
+    font-family: var(--mono); font-size: var(--fs-sm); font-weight: 600; color: var(--s-text-0);
+  }
+  .terminal-sub {
+    font-family: var(--sans); font-size: var(--fs-sm); font-weight: 400; color: var(--s-text-2);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  @media (max-width: 720px) { .terminal-sub { white-space: normal; } }
+  .terminal-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
 
-  .os-panel .card { border-color: var(--os-tint, var(--s-border)); }
-  .os-panel .code-block.accent { color: var(--os-accent, var(--s-text-0)); }
-  .os-panel .reveal-toggle { color: var(--os-accent, var(--s-accent)); }
-  .os-panel .icon-btn:hover { color: var(--os-accent, var(--s-accent)); background: var(--s-surface-2); }
-  .os-panel .link-out:hover { color: var(--os-accent, var(--s-accent)); }
-  .os-panel .step-num { color: var(--os-accent, var(--s-text-2)); border-color: var(--os-tint, var(--s-border)); }
+  .copy-primary-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 7px;
+    background: var(--os-accent, var(--s-accent));
+    color: #05120c;
+    font-family: var(--mono); font-size: var(--fs-xs); font-weight: 700;
+    transition: opacity 0.14s ease, transform 0.12s var(--ease-out);
+  }
+  #panel-macos .copy-primary-btn { color: #190410; }
+  #panel-windows .copy-primary-btn { color: #04101f; }
+  .copy-primary-btn:hover { opacity: 0.9; }
+  .copy-primary-btn:active { transform: scale(0.97); }
+  .copy-primary-btn.copied { background: var(--s-text-0); color: #000000; }
 
-  .manifest-list { list-style: none; margin: 0 0 8px; padding: 0; font-size: 12px; color: var(--s-text-2); }
-  .manifest-list li { display: grid; grid-template-columns: 78px 1fr; gap: 8px; padding: 3px 0; }
-  .manifest-list code { color: var(--s-text-0); }
+  .link-out {
+    font-family: var(--mono); font-size: var(--fs-xs);
+    color: var(--s-text-2); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 6px 8px; border-radius: 6px;
+    transition: color 0.12s ease, background 0.12s ease;
+  }
+  .link-out:hover { color: var(--s-text-0); background: var(--s-bg); }
+
+  .terminal-body {
+    padding: 16px 18px;
+    background: #080808;
+    display: flex; align-items: flex-start; gap: 12px;
+    overflow-x: auto;
+  }
+  .terminal-prompt {
+    font-family: var(--mono); font-size: var(--fs-sm); font-weight: 700;
+    color: var(--os-accent, var(--ok)); user-select: none; flex-shrink: 0; line-height: 1.65;
+  }
+  .terminal-cmd {
+    font-family: var(--mono); font-size: var(--fs-sm); line-height: 1.65;
+    color: var(--s-text-0); white-space: pre-wrap; word-break: break-word; flex: 1; margin: 0;
+  }
+
+  /* 2-column detail grid under the terminal card */
+  .grid-2 {
+    display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
+  }
+  @media (max-width: 760px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .card {
+    border-radius: 12px;
+    background: var(--s-surface);
+    border: 1px solid var(--s-border);
+    padding: 18px;
+    display: flex; flex-direction: column;
+    transition: border-color 0.16s ease;
+  }
+  .card:hover { border-color: #3d3d3d; }
+  .card-title {
+    font-family: var(--mono); font-size: var(--fs-base); font-weight: 600;
+    color: var(--s-text-0); margin: 0 0 6px;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .card-desc {
+    font-size: var(--fs-md); color: var(--s-text-2); line-height: 1.55; margin: 0 0 14px;
+  }
+  .card-desc:last-child { margin-bottom: 0; }
+  .card-desc code, .expect-list code, .spec-card code {
+    color: var(--s-text-0); background: var(--s-surface-2);
+    border: 1px solid var(--s-border); padding: 1px 5px; border-radius: 4px; font-size: var(--fs-xs);
+  }
+
+  .expect-list {
+    list-style: none; margin: 0; padding: 0;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .expect-list li {
+    display: grid; grid-template-columns: 68px 1fr; gap: 10px;
+    font-size: var(--fs-md); color: var(--s-text-1); line-height: 1.55;
+    padding-top: 10px; border-top: 1px solid var(--s-border-soft);
+  }
+  .expect-list li:first-child { padding-top: 0; border-top: none; }
+  .expect-tag {
+    font-family: var(--mono); font-size: var(--fs-xs); font-weight: 600;
+    color: var(--os-accent, var(--s-text-2));
+    text-transform: uppercase; letter-spacing: 0.05em; padding-top: 2px;
+  }
+  .expect-list b { color: var(--s-text-0); font-weight: 600; }
+
+  .code-block {
+    background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 8px;
+    padding: 12px 14px; margin: 0 0 12px; overflow-x: auto;
+    font-family: var(--mono); font-size: var(--fs-sm); line-height: 1.65; color: var(--s-text-1);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .code-block:last-child { margin-bottom: 0; }
+  .code-block .c-comment { color: var(--s-text-3); }
+  .code-block .c-key { color: var(--s-text-0); font-weight: 600; }
+  .code-block .c-val { color: var(--ok); }
+
+  /* Reveal-panel toggle — custom chevron + smooth expand */
+  .reveal-toggle {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: var(--fs-sm); font-weight: 600;
+    color: var(--os-accent, var(--s-accent));
+    margin-top: auto; padding-top: 6px;
+    transition: opacity 0.12s ease;
+  }
+  .reveal-toggle:hover { opacity: 0.85; }
+  .reveal-toggle .chev { font-size: var(--fs-xs); transition: transform 0.18s var(--ease-out); display: inline-block; }
+  .reveal-toggle.open .chev { transform: rotate(90deg); }
+  .reveal-panel {
+    max-height: 0; overflow: hidden; opacity: 0;
+    transition: max-height 0.24s var(--ease-drawer), opacity 0.18s ease;
+  }
+  .reveal-panel.open { max-height: 2600px; opacity: 1; margin-top: 14px; }
+
+  .steps { display: flex; flex-direction: column; gap: 14px; }
+  .step-label {
+    font-family: var(--mono); font-size: var(--fs-xs); font-weight: 600;
+    color: var(--s-text-0); text-transform: uppercase; letter-spacing: 0.06em;
+    margin: 0 0 6px;
+  }
+
+  /* ── Platform capabilities grid ── */
+  .spec-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  }
+  @media (max-width: 880px) { .spec-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 560px) { .spec-grid { grid-template-columns: 1fr; } }
+
+  .spec-card {
+    background: var(--s-surface); border: 1px solid var(--s-border);
+    border-radius: 10px; padding: 16px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .spec-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .spec-title {
+    font-family: var(--mono); font-size: var(--fs-sm); font-weight: 600; color: var(--s-text-0);
+  }
+  .spec-badge {
+    font-family: var(--mono); font-size: var(--fs-xs);
+    padding: 2px 8px; border-radius: 999px;
+    background: var(--s-surface-2); border: 1px solid var(--s-border); color: var(--s-text-2);
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .spec-badge.auto { background: var(--ok-bg); border-color: rgba(63,179,127,0.3); color: var(--ok); }
+  .spec-body { font-size: var(--fs-md); color: var(--s-text-2); line-height: 1.55; margin: 0; }
+
+  /* ── Manifest table + Deploy column ── */
+  .manifest-list {
+    list-style: none; margin: 14px 0 0; padding: 0;
+    font-size: var(--fs-sm); color: var(--s-text-2);
+  }
+  .manifest-list li {
+    display: grid; grid-template-columns: 118px 1fr; gap: 10px;
+    padding: 7px 0; border-top: 1px solid var(--s-border-soft);
+    align-items: baseline;
+  }
+  .manifest-list li:first-child { border-top: none; padding-top: 2px; }
+  .manifest-list li:last-child { padding-bottom: 0; }
+  .manifest-list code.k {
+    color: var(--s-text-0); font-weight: 600; font-size: var(--fs-xs);
+  }
+  .manifest-list span code {
+    color: var(--s-text-0); background: var(--s-surface-2);
+    padding: 1px 5px; border-radius: 4px; font-size: var(--fs-xs);
+  }
+
+  .compliance-banner {
+    margin-top: 14px;
+    background: var(--s-surface);
+    border: 1px solid rgba(63,179,127,0.35);
+    border-radius: 12px;
+    padding: 18px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 18px; flex-wrap: wrap;
+  }
+  .compliance-banner-text h3 {
+    font-size: var(--fs-base); color: var(--s-text-0); margin: 0 0 4px;
+  }
+  .compliance-banner-text p {
+    font-size: var(--fs-md); color: var(--s-text-2); margin: 0; max-width: 60ch;
+  }
+  .compliance-banner-btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 16px; border-radius: 8px;
+    background: var(--ok); color: #05170e;
+    font-family: var(--mono); font-size: var(--fs-sm); font-weight: 700;
+    text-decoration: none; flex-shrink: 0;
+    transition: background 0.14s ease, transform 0.12s var(--ease-out);
+  }
+  .compliance-banner-btn:hover { background: #52c590; }
+  .compliance-banner-btn:active { transform: scale(0.97); }
 
   footer.page-foot {
-    margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--s-border);
-    font-size: 11px; color: var(--s-text-3);
+    margin-top: 56px; padding-top: 18px; border-top: 1px solid var(--s-border-soft);
+    font-family: var(--mono); font-size: var(--fs-xs); color: var(--s-text-3);
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
   }
-  footer.page-foot a { color: var(--s-text-2); text-decoration: none; }
+  footer.page-foot a { color: var(--s-text-1); text-decoration: none; }
   footer.page-foot a:hover { color: var(--s-accent); text-decoration: underline; }
 </style>
 </head>
 <body>
 <div class="shell">
 
-  <button class="menu-btn" onclick="openMenu()" aria-label="Open menu" aria-expanded="false">
+  <button class="menu-btn" onclick="openMenu()" aria-label="Open navigation menu" aria-expanded="false">
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
   </button>
   <div class="sidebar-backdrop" onclick="closeMenu()"></div>
 
   <aside class="sidebar">
-    <div class="sidebar-scanline"></div>
     <div class="sidebar-content">
-    <button class="drawer-close" onclick="closeMenu()" aria-label="Close menu">✕</button>
-    <nav class="sidebar-nav">
-      <span class="section-label">Install</span>
-      <button class="row active" data-os="linux" style="--os-accent:#3fb37f" onclick="selectOS('linux')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-        <span class="truncate flex-1">Linux</span>
-        <span class="os-dot"></span>
-      </button>
-      <button class="row" data-os="macos" style="--os-accent:#e0559c" onclick="selectOS('macos')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.7 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.8-1.5 0-3 .9-3.7 2.3-1.6 2.8-.4 6.9 1.1 9.2.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.2.6-.9 1-1.7 1.3-2.5-1.7-.7-2.5-2.4-2.5-3.9z"/><path d="M14.2 5.4c.6-.7 1-1.7.9-2.6-.9 0-2 .6-2.6 1.3-.6.6-1.1 1.6-1 2.6 1 .1 2-.5 2.7-1.3z"/></svg>
-        <span class="truncate flex-1">macOS</span>
-        <span class="os-dot"></span>
-      </button>
-      <button class="row" data-os="windows" style="--os-accent:#4f8fe0" onclick="selectOS('windows')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>
-        <span class="truncate flex-1">Windows</span>
-        <span class="os-dot"></span>
-      </button>
+      <div class="brand-row">
+        <a class="brand" href="/">
+          <span class="mark"><svg width="15" height="15" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="42" stroke="#fff" stroke-width="6"/><g stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23"/><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23" transform="rotate(120,50,50)"/><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23" transform="rotate(240,50,50)"/></g><circle cx="50" cy="50" r="8" stroke="#fff" stroke-width="4.4"/><g stroke="#fff" stroke-width="4.4" stroke-linecap="round"><line x1="50" y1="44" x2="50" y2="56"/><line x1="50" y1="44" x2="50" y2="56" transform="rotate(60,50,50)"/><line x1="50" y1="44" x2="50" y2="56" transform="rotate(120,50,50)"/></g></svg></span>
+          <div>
+            <span class="brand-title">Hostess</span>
+            <span class="brand-sub">install &amp; overview</span>
+          </div>
+        </a>
+        <button class="drawer-close" onclick="closeMenu()" aria-label="Close navigation menu">✕</button>
+      </div>
 
-      <div style="border-top:1px solid var(--s-border); margin:16px 8px 12px;"></div>
-      <span class="section-label" style="margin-top:0;">Reference</span>
-      <button class="row" onclick="scrollToId('deploy-section')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
-        <span class="truncate flex-1">Deploying an app</span>
-      </button>
-      <button class="row" onclick="scrollToId('limits-section')">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <span class="truncate flex-1">Known limitations</span>
-      </button>
-      <a class="row" href="/rules.html">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        <span class="truncate flex-1">App compliance rules</span>
+      <a class="sidebar-cta" href="/rules.html">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg>
+        <span>Compliance Rules &amp; AI Prompt</span>
       </a>
-    </nav>
 
-    <div class="sidebar-stats">
-      <div class="stat-row"><span>SOURCE</span><a href="https://github.com/jessekward-prog/hostess" target="_blank" rel="noopener">GitHub ↗</a></div>
-      <div class="stat-row"><span>DASHBOARD</span><span class="v">:5300 loopback</span></div>
-    </div>
+      <nav class="sidebar-nav">
+        <span class="section-label">Install</span>
+        <button class="row active" data-os="linux" style="--os-accent:#3fb37f" onclick="selectOS('linux')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span class="label-text">Linux</span>
+          <span class="os-dot"></span>
+        </button>
+        <button class="row" data-os="macos" style="--os-accent:#e0559c" onclick="selectOS('macos')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.7 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.8-.9-3-.8-1.5 0-3 .9-3.7 2.3-1.6 2.8-.4 6.9 1.1 9.2.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.2 0 2-1.1 2.8-2.2.6-.9 1-1.7 1.3-2.5-1.7-.7-2.5-2.4-2.5-3.9z"/><path d="M14.2 5.4c.6-.7 1-1.7.9-2.6-.9 0-2 .6-2.6 1.3-.6.6-1.1 1.6-1 2.6 1 .1 2-.5 2.7-1.3z"/></svg>
+          <span class="label-text">macOS</span>
+          <span class="os-dot"></span>
+        </button>
+        <button class="row" data-os="windows" style="--os-accent:#4f8fe0" onclick="selectOS('windows')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="8" height="8"/><rect x="13" y="3" width="8" height="8"/><rect x="3" y="13" width="8" height="8"/><rect x="13" y="13" width="8" height="8"/></svg>
+          <span class="label-text">Windows</span>
+          <span class="os-dot"></span>
+        </button>
+
+        <span class="section-label">Architecture</span>
+        <button class="row" onclick="scrollToId('platform-section')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+          <span class="label-text">Platform services</span>
+        </button>
+        <button class="row" onclick="scrollToId('deploy-section')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" y1="22" x2="12" y2="12"/></svg>
+          <span class="label-text">app.yaml &amp; deploy</span>
+        </button>
+        <a class="row" href="/rules.html">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          <span class="label-text">App compliance rules</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-stats">
+        <div class="stat-row"><span>SOURCE</span><a href="https://github.com/jessekward-prog/hostess" target="_blank" rel="noopener">GitHub ↗</a></div>
+        <div class="stat-row"><span>LOCAL PORT</span><span class="v">127.0.0.1:5300</span></div>
+        <div class="stat-row"><span>REMOTE</span><span class="v">Tailscale / Tunnel</span></div>
+      </div>
     </div>
   </aside>
 
   <main>
     <header class="top">
-      <h1><span class="mark"><svg width="15" height="15" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="42" stroke="#fff" stroke-width="6"/><g stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23"/><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23" transform="rotate(120,50,50)"/><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23" transform="rotate(240,50,50)"/></g><circle cx="50" cy="50" r="8" stroke="#fff" stroke-width="4.4"/><g stroke="#fff" stroke-width="4.4" stroke-linecap="round"><line x1="50" y1="44" x2="50" y2="56"/><line x1="50" y1="44" x2="50" y2="56" transform="rotate(60,50,50)"/><line x1="50" y1="44" x2="50" y2="56" transform="rotate(120,50,50)"/></g></svg></span>hostess</h1>
-      <p class="tagline">One command turns a clean machine into a self-hosted app platform. Point <strong style="color:var(--s-text-1)">hostess</strong> at any repo with an <code style="color:var(--s-text-0)">app.yaml</code> and it builds, deploys, and manages it in Docker for you.</p>
-      <div class="badges">
-        <span class="badge">Dashboard on <code>localhost:5300</code>, loopback only</span>
-        <span class="badge"><a href="https://github.com/jessekward-prog/hostess" target="_blank" rel="noopener">Source on GitHub ↗</a></span>
+      <div class="hero-top">
+        <h1 class="hero-title">
+          <span class="mark"><svg width="20" height="20" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="42" stroke="#fff" stroke-width="6"/><g stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23"/><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23" transform="rotate(120,50,50)"/><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23" transform="rotate(240,50,50)"/></g><circle cx="50" cy="50" r="8" stroke="#fff" stroke-width="4.4"/><g stroke="#fff" stroke-width="4.4" stroke-linecap="round"><line x1="50" y1="44" x2="50" y2="56"/><line x1="50" y1="44" x2="50" y2="56" transform="rotate(60,50,50)"/><line x1="50" y1="44" x2="50" y2="56" transform="rotate(120,50,50)"/></g></svg></span>
+          <span>hostess<span class="caret-blink">_</span></span>
+        </h1>
+        <div class="hero-links">
+          <span class="hero-pill"><span class="dot"></span>Loopback + Tailscale + Quick Tunnel</span>
+          <a class="hero-pill" href="https://github.com/jessekward-prog/hostess" target="_blank" rel="noopener">jessekward-prog/hostess ↗</a>
+        </div>
+      </div>
+
+      <p class="tagline">
+        One command turns a clean Linux, macOS, or Windows machine into a self-hosted app platform. Point <strong>Hostess</strong> at any git URL or local folder with an <code>app.yaml</code> + <code>Dockerfile</code>, and it builds the image, wires shared Postgres, search, local AI, and push notifications, and runs the container for you.
+      </p>
+
+      <div class="scorecard">
+        <div class="score-tile">
+          <div class="k">Bootstrap</div>
+          <div class="v">Docker + Node + background service in one command</div>
+        </div>
+        <div class="score-tile">
+          <div class="k">Shared Backing</div>
+          <div class="v">Postgres, isolated SearXNG, ntfy push, LM Studio link</div>
+        </div>
+        <div class="score-tile">
+          <div class="k">Phone Access</div>
+          <div class="v">Tailscale Private Link or on-demand Cloudflare tunnel</div>
+        </div>
+        <div class="score-tile">
+          <div class="k">Built-In Tools</div>
+          <div class="v">Curated Marketplace + Forge AI app builder</div>
+        </div>
       </div>
     </header>
 
-    <div class="mobile-os-tabs no-scrollbar">
-      <button class="pill active" data-os="linux" style="--os-accent:#3fb37f" onclick="selectOS('linux')">Linux</button>
-      <button class="pill" data-os="macos" style="--os-accent:#e0559c" onclick="selectOS('macos')">macOS</button>
-      <button class="pill" data-os="windows" style="--os-accent:#4f8fe0" onclick="selectOS('windows')">Windows</button>
-    </div>
+    <!-- INSTALL -->
+    <section class="block" id="install-section">
+      <div class="sec-head">
+        <h2>Install on your machine</h2>
+      </div>
+      <p class="sec-desc">Pick your operating system. Every installer is idempotent: safe to run on a brand-new machine and safe to re-run later.</p>
 
-    <!-- LINUX -->
-    <section class="os-panel active" id="panel-linux">
-      <h2><span class="os-dot"></span>Linux</h2>
-      <p class="h2-sub">Debian / Ubuntu-family — apt + a user-level systemd service</p>
-      <div class="grid">
-        <div class="card">
-          <div class="card-head">
-            <p class="card-title">Quick install</p>
-            <p class="card-desc">One command. Works on a clean machine, safe to re-run.</p>
-          </div>
-          <div class="card-body">
-            <div class="code-block accent" id="cmd-linux">(command -v git >/dev/null 2>&1 || (sudo apt-get update -y && sudo apt-get install -y git)) && (git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || git -C ~/hostess pull --ff-only) && ~/hostess/install.sh</div>
-          </div>
-          <div class="card-foot">
-            <button class="icon-btn" data-copy="cmd-linux" onclick="copyCmd(this)">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              <span>Copy</span>
-            </button>
-            <a class="link-out" href="https://github.com/jessekward-prog/hostess/blob/main/install.sh" target="_blank" rel="noopener">view source ↗</a>
-          </div>
+      <div class="os-tabs-bar">
+        <div class="os-tabs" role="tablist" aria-label="Operating system">
+          <button class="os-tab active" data-os="linux" style="--os-accent:#3fb37f; --os-tint:rgba(63,179,127,0.45)" onclick="selectOS('linux')" role="tab" aria-selected="true">
+            <span class="os-dot" style="background:#3fb37f"></span>
+            <span>Linux</span>
+          </button>
+          <button class="os-tab" data-os="macos" style="--os-accent:#e0559c; --os-tint:rgba(224,85,156,0.45)" onclick="selectOS('macos')" role="tab" aria-selected="false">
+            <span class="os-dot" style="background:#e0559c"></span>
+            <span>macOS</span>
+          </button>
+          <button class="os-tab" data-os="windows" style="--os-accent:#4f8fe0; --os-tint:rgba(79,143,224,0.45)" onclick="selectOS('windows')" role="tab" aria-selected="false">
+            <span class="os-dot" style="background:#4f8fe0"></span>
+            <span>Windows</span>
+          </button>
         </div>
+        <span class="os-meta" id="os-meta-label">Debian / Ubuntu family · apt + user systemd service</span>
+      </div>
 
-        <div class="card">
-          <div class="card-head">
-            <p class="card-title">What to expect</p>
-            <p class="card-desc">Mostly unattended — this is everything it'll ask of you.</p>
-          </div>
-          <div class="card-body">
-            <div class="steps">
-              <div class="step"><p class="step-label"><span class="step-num">1</span>Terminal asks for your <b>sudo password</b> once, for the apt/Docker installs.</p></div>
-              <div class="step"><p class="step-label"><span class="step-num">2</span>First time only: log out and back in so your new <b>docker</b> group membership takes effect, then re-run the command.</p></div>
-              <div class="step"><p class="step-label"><span class="step-num">3</span><b>Done</b> when it prints the dashboard URL and opens it in your browser.</p></div>
+      <!-- LINUX PANEL -->
+      <div class="os-panel active" id="panel-linux">
+        <div class="terminal-card">
+          <div class="terminal-bar">
+            <div class="terminal-title">
+              <span class="os-dot"></span>
+              <span>Quick install (Bash)</span>
+              <span class="terminal-sub">Installs git if missing, clones to ~/hostess, and runs install.sh</span>
+            </div>
+            <div class="terminal-actions">
+              <a class="link-out" href="https://github.com/jessekward-prog/hostess/blob/main/install.sh" target="_blank" rel="noopener">install.sh ↗</a>
+              <button class="copy-primary-btn" data-copy="cmd-linux" onclick="copyCmd(this)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>Copy command</span>
+              </button>
             </div>
           </div>
+          <div class="terminal-body">
+            <span class="terminal-prompt">$</span>
+            <pre class="terminal-cmd" id="cmd-linux">(command -v git >/dev/null 2>&1 || (sudo apt-get update -y && sudo apt-get install -y git)) && (git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || git -C ~/hostess pull --ff-only) && ~/hostess/install.sh</pre>
+          </div>
         </div>
 
-        <div class="card">
-          <div class="card-head">
-            <p class="card-title">What it sets up</p>
-            <p class="card-desc">Installs Docker, Node.js 18+, and git if missing (adds you to the <code style="color:var(--s-text-0)">docker</code> group — log out/in after). Clones to <code style="color:var(--s-text-0)">~/hostess</code> and registers a systemd user service so the dashboard survives reboot and logout.</p>
+        <div class="grid-2">
+          <div class="card">
+            <h3 class="card-title">What happens when you run it</h3>
+            <p class="card-desc">Mostly unattended. Here is every prompt you will see on a clean machine:</p>
+            <ul class="expect-list">
+              <li>
+                <span class="expect-tag">Step 01</span>
+                <span>Terminal asks for your <b>sudo password</b> once to install missing packages via <code>apt</code> and Docker's official repository.</span>
+              </li>
+              <li>
+                <span class="expect-tag">Step 02</span>
+                <span>First run only: if Docker was just installed, log out and back in so your new <code>docker</code> group membership takes effect, then re-run the command.</span>
+              </li>
+              <li>
+                <span class="expect-tag">Step 03</span>
+                <span><b>Ready</b> when it prints <code>http://localhost:5300</code> and opens the dashboard in your browser.</span>
+              </li>
+            </ul>
           </div>
-          <div class="card-body">
+
+          <div class="card">
+            <h3 class="card-title">What it sets up</h3>
+            <p class="card-desc">
+              Ensures Docker, Node.js 18+, <code>git</code>, and <code>curl</code> are installed. Clones to <code>~/hostess</code>, registers a user-level <code>hostess.service</code> with <code>loginctl enable-linger</code> so it survives reboot and logout, and adds an hourly <code>hostess-update.timer</code> that only restarts the server when a new commit lands on <code>main</code>.
+            </p>
             <button class="reveal-toggle" onclick="toggleReveal(this)">
               <span class="chev">▸</span><span>show manual commands</span>
             </button>
             <div class="reveal-panel">
               <div class="steps">
                 <div class="step">
-                  <p class="step-label"><span class="step-num">1</span><b>Docker, Node, git</b></p>
-                  <div class="code-block">sudo apt-get update -y && sudo apt-get install -y git curl ca-certificates
+                  <p class="step-label">1. Docker, Node.js 20, git</p>
+                  <pre class="code-block">sudo apt-get update -y && sudo apt-get install -y git curl ca-certificates
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
 sudo apt-get install -y nodejs
 curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker "$USER"</div>
+sudo usermod -aG docker "$USER"</pre>
                 </div>
                 <div class="step">
-                  <p class="step-label"><span class="step-num">2</span><b>Clone + install</b></p>
-                  <div class="code-block">git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess
-cd ~/hostess && npm install --omit=dev</div>
+                  <p class="step-label">2. Clone + install dependencies</p>
+                  <pre class="code-block">git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess
+cd ~/hostess && npm install --omit=dev</pre>
                 </div>
                 <div class="step">
-                  <p class="step-label"><span class="step-num">3</span><b>systemd service</b></p>
-                  <div class="code-block">mkdir -p ~/.config/systemd/user
+                  <p class="step-label">3. User systemd service</p>
+                  <pre class="code-block">mkdir -p ~/.config/systemd/user
 cat > ~/.config/systemd/user/hostess.service &lt;&lt;EOF
 [Unit]
 Description=Hostess dashboard
@@ -440,83 +753,88 @@ WantedBy=default.target
 EOF
 systemctl --user daemon-reload
 systemctl --user enable --now hostess
-loginctl enable-linger "$USER"</div>
+loginctl enable-linger "$USER"</pre>
                 </div>
                 <div class="step">
-                  <p class="step-label"><span class="step-num">4</span><b>Manage it</b></p>
-                  <div class="code-block">systemctl --user status  hostess
+                  <p class="step-label">4. Service control</p>
+                  <pre class="code-block">systemctl --user status  hostess
 systemctl --user restart hostess
-systemctl --user stop    hostess</div>
+systemctl --user stop    hostess</pre>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </section>
 
-    <!-- MACOS -->
-    <section class="os-panel" id="panel-macos">
-      <h2><span class="os-dot"></span>macOS</h2>
-      <p class="h2-sub">Apple Silicon or Intel — Homebrew + a launchd agent</p>
-      <div class="grid">
-        <div class="card">
-          <div class="card-head">
-            <p class="card-title">Quick install</p>
-            <p class="card-desc">One command. Works on a clean machine, safe to re-run.</p>
-          </div>
-          <div class="card-body">
-            <div class="code-block accent" id="cmd-macos">if ! xcode-select -p >/dev/null 2>&1; then xcode-select --install; echo "Approve the Command Line Tools dialog, then re-run this command."; else (git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || git -C ~/hostess pull --ff-only) && ~/hostess/install-macos.sh; fi</div>
-          </div>
-          <div class="card-foot">
-            <button class="icon-btn" data-copy="cmd-macos" onclick="copyCmd(this)">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              <span>Copy</span>
-            </button>
-            <a class="link-out" href="https://github.com/jessekward-prog/hostess/blob/main/install-macos.sh" target="_blank" rel="noopener">view source ↗</a>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-head">
-            <p class="card-title">What to expect</p>
-            <p class="card-desc">This is everything it'll ask of you.</p>
-          </div>
-          <div class="card-body">
-            <div class="steps">
-              <div class="step"><p class="step-label"><span class="step-num">1</span>Terminal asks for your <b>Mac login password</b> once, for Homebrew/installs.</p></div>
-              <div class="step"><p class="step-label"><span class="step-num">2</span>Docker Desktop's first launch shows a <b>permissions dialog</b> — approve it. No account/sign-in needed.</p></div>
-              <div class="step"><p class="step-label"><span class="step-num">3</span><b>Done</b> when it prints the dashboard URL and opens it in your browser.</p></div>
+      <!-- MACOS PANEL -->
+      <div class="os-panel" id="panel-macos">
+        <div class="terminal-card">
+          <div class="terminal-bar">
+            <div class="terminal-title">
+              <span class="os-dot"></span>
+              <span>Quick install (macOS)</span>
+              <span class="terminal-sub">Checks Xcode CLI Tools, clones to ~/hostess, runs install-macos.sh</span>
+            </div>
+            <div class="terminal-actions">
+              <a class="link-out" href="https://github.com/jessekward-prog/hostess/blob/main/install-macos.sh" target="_blank" rel="noopener">install-macos.sh ↗</a>
+              <button class="copy-primary-btn" data-copy="cmd-macos" onclick="copyCmd(this)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>Copy command</span>
+              </button>
             </div>
           </div>
+          <div class="terminal-body">
+            <span class="terminal-prompt">%</span>
+            <pre class="terminal-cmd" id="cmd-macos">if ! xcode-select -p >/dev/null 2>&1; then xcode-select --install; echo "Approve the Command Line Tools dialog, then re-run this command."; else (git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess || git -C ~/hostess pull --ff-only) && ~/hostess/install-macos.sh; fi</pre>
+          </div>
         </div>
 
-        <div class="card">
-          <div class="card-head">
-            <p class="card-title">What it sets up</p>
-            <p class="card-desc">Installs Homebrew if missing, then git/node/Docker Desktop. Docker's first run needs you to click through its permissions dialog. Clones to <code style="color:var(--s-text-0)">~/hostess</code> and registers a launchd agent so the dashboard survives reboot and logout.</p>
+        <div class="grid-2">
+          <div class="card">
+            <h3 class="card-title">What happens when you run it</h3>
+            <p class="card-desc">Works on Apple Silicon and Intel Macs. Here is what it asks of you:</p>
+            <ul class="expect-list">
+              <li>
+                <span class="expect-tag">Step 01</span>
+                <span>If macOS Command Line Tools aren't installed yet, macOS pops up an install dialog. Approve it, then re-run the command.</span>
+              </li>
+              <li>
+                <span class="expect-tag">Step 02</span>
+                <span>Terminal asks for your <b>Mac login password</b> once for Homebrew and Docker Desktop installation.</span>
+              </li>
+              <li>
+                <span class="expect-tag">Step 03</span>
+                <span>Docker Desktop's first launch shows a <b>permissions dialog</b>. Approve it (no Docker Hub account required), and your browser opens to <code>http://localhost:5300</code>.</span>
+              </li>
+            </ul>
           </div>
-          <div class="card-body">
+
+          <div class="card">
+            <h3 class="card-title">What it sets up</h3>
+            <p class="card-desc">
+              Installs Homebrew if missing, followed by <code>git</code>, <code>node</code>, and Docker Desktop. Clones to <code>~/hostess</code> and registers a <code>launchd</code> agent (<code>xyz.cmdward.hostess.plist</code>) with full Homebrew/Docker <code>PATH</code> plus an hourly update agent that only restarts when upstream commits change.
+            </p>
             <button class="reveal-toggle" onclick="toggleReveal(this)">
               <span class="chev">▸</span><span>show manual commands</span>
             </button>
             <div class="reveal-panel">
               <div class="steps">
                 <div class="step">
-                  <p class="step-label"><span class="step-num">1</span><b>Homebrew, git, node, Docker</b></p>
-                  <div class="code-block">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+                  <p class="step-label">1. Homebrew, git, Node, Docker Desktop</p>
+                  <pre class="code-block">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 brew install git node
 brew install --cask docker
-open -a Docker</div>
+open -a Docker</pre>
                 </div>
                 <div class="step">
-                  <p class="step-label"><span class="step-num">2</span><b>Clone + install</b></p>
-                  <div class="code-block">git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess
-cd ~/hostess && npm install --omit=dev</div>
+                  <p class="step-label">2. Clone + install dependencies</p>
+                  <pre class="code-block">git clone --depth 1 https://github.com/jessekward-prog/hostess.git ~/hostess
+cd ~/hostess && npm install --omit=dev</pre>
                 </div>
                 <div class="step">
-                  <p class="step-label"><span class="step-num">3</span><b>launchd agent</b></p>
-                  <div class="code-block">cat > ~/Library/LaunchAgents/xyz.cmdward.hostess.plist &lt;&lt;EOF
+                  <p class="step-label">3. launchd agent</p>
+                  <pre class="code-block">cat > ~/Library/LaunchAgents/xyz.cmdward.hostess.plist &lt;&lt;EOF
 &lt;?xml version="1.0" encoding="UTF-8"?&gt;
 &lt;plist version="1.0"&gt;&lt;dict&gt;
   &lt;key&gt;Label&lt;/key&gt;&lt;string&gt;xyz.cmdward.hostess&lt;/string&gt;
@@ -531,97 +849,100 @@ cd ~/hostess && npm install --omit=dev</div>
   &lt;/dict&gt;
 &lt;/dict&gt;&lt;/plist&gt;
 EOF
-launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.hostess.plist</div>
+launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.hostess.plist</pre>
                 </div>
                 <div class="step">
-                  <p class="step-label"><span class="step-num">4</span><b>Manage it</b></p>
-                  <div class="code-block">launchctl unload ~/Library/LaunchAgents/xyz.cmdward.hostess.plist
-launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.hostess.plist</div>
+                  <p class="step-label">4. Service control</p>
+                  <pre class="code-block">launchctl unload ~/Library/LaunchAgents/xyz.cmdward.hostess.plist
+launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.hostess.plist</pre>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </section>
 
-    <!-- WINDOWS -->
-    <section class="os-panel" id="panel-windows">
-      <h2><span class="os-dot"></span>Windows</h2>
-      <p class="h2-sub">PowerShell — winget + a Scheduled Task, self-elevates via UAC</p>
-      <div class="grid">
-        <div class="card">
-          <div class="card-head">
-            <p class="card-title">Quick install</p>
-            <p class="card-desc">Run in PowerShell (Start → type "PowerShell"). Approve the UAC prompt.</p>
-          </div>
-          <div class="card-body">
-            <div class="code-block accent" id="cmd-windows">iwr -useb https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.ps1 | iex</div>
-          </div>
-          <div class="card-foot">
-            <button class="icon-btn" data-copy="cmd-windows" onclick="copyCmd(this)">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-              <span>Copy</span>
-            </button>
-            <a class="link-out" href="https://github.com/jessekward-prog/hostess/blob/main/install.ps1" target="_blank" rel="noopener">view source ↗</a>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-head">
-            <p class="card-title">What to expect</p>
-            <p class="card-desc">This is everything it'll ask of you — leave the new window open, it's doing the work.</p>
-          </div>
-          <div class="card-body">
-            <div class="steps">
-              <div class="step"><p class="step-label"><span class="step-num">1</span>A <b>UAC prompt</b> appears — click Yes. A new elevated PowerShell window opens; that's the real install running, not a second copy.</p></div>
-              <div class="step"><p class="step-label"><span class="step-num">2</span>Docker Desktop's first launch shows a <b>license dialog</b> — click Accept. It may also offer to sign in to Docker Hub — skip that, it's optional.</p></div>
-              <div class="step"><p class="step-label"><span class="step-num">3</span>If it says <b>WSL2 needs a reboot</b>, restart and paste the same command again — it picks up where it left off.</p></div>
-              <div class="step"><p class="step-label"><span class="step-num">4</span><b>Done</b> when your browser opens itself to the dashboard.</p></div>
+      <!-- WINDOWS PANEL -->
+      <div class="os-panel" id="panel-windows">
+        <div class="terminal-card">
+          <div class="terminal-bar">
+            <div class="terminal-title">
+              <span class="os-dot"></span>
+              <span>Quick install (PowerShell)</span>
+              <span class="terminal-sub">Self-elevates via UAC, installs prerequisites via winget, and starts Hostess</span>
+            </div>
+            <div class="terminal-actions">
+              <a class="link-out" href="https://github.com/jessekward-prog/hostess/blob/main/install.ps1" target="_blank" rel="noopener">install.ps1 ↗</a>
+              <button class="copy-primary-btn" data-copy="cmd-windows" onclick="copyCmd(this)">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                <span>Copy command</span>
+              </button>
             </div>
           </div>
+          <div class="terminal-body">
+            <span class="terminal-prompt">PS&gt;</span>
+            <pre class="terminal-cmd" id="cmd-windows">iwr -useb https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.ps1 | iex</pre>
+          </div>
         </div>
 
-        <div class="card">
-          <div class="card-head">
-            <p class="card-title">What it sets up</p>
-            <p class="card-desc">Installs git/Node LTS/Docker Desktop via winget, enables WSL2 if needed (a truly clean machine needs one reboot here — Docker's requirement, not this script's). Clones to <code style="color:var(--s-text-0)">$HOME\hostess</code> and registers a Scheduled Task so the dashboard survives reboot.</p>
+        <div class="grid-2">
+          <div class="card">
+            <h3 class="card-title">What happens when you run it</h3>
+            <p class="card-desc">Paste into any PowerShell window (Start menu, type "PowerShell"):</p>
+            <ul class="expect-list">
+              <li>
+                <span class="expect-tag">Step 01</span>
+                <span>A <b>UAC prompt</b> appears. Click Yes; a new elevated PowerShell window opens and runs the installation.</span>
+              </li>
+              <li>
+                <span class="expect-tag">Step 02</span>
+                <span>If WSL2 was never enabled on this PC, it enables WSL2 and asks you to reboot once, then paste the same command again.</span>
+              </li>
+              <li>
+                <span class="expect-tag">Step 03</span>
+                <span>Accept Docker Desktop's first-run license dialog (skip Docker Hub sign-in). Your browser opens to <code>http://localhost:5300</code> once Docker is ready.</span>
+              </li>
+            </ul>
           </div>
-          <div class="card-body">
+
+          <div class="card">
+            <h3 class="card-title">What it sets up</h3>
+            <p class="card-desc">
+              Installs <code>Git.Git</code>, <code>OpenJS.NodeJS.LTS</code> (18+), and <code>Docker.DockerDesktop</code> via <code>winget</code>. Clones to <code>$HOME\hostess</code> and registers a logon Scheduled Task with automatic restart-on-failure plus an hourly update check.
+            </p>
             <button class="reveal-toggle" onclick="toggleReveal(this)">
               <span class="chev">▸</span><span>show manual commands</span>
             </button>
             <div class="reveal-panel">
               <div class="steps">
                 <div class="step">
-                  <p class="step-label"><span class="step-num">1</span><b>git, Node, Docker Desktop</b></p>
-                  <div class="code-block">winget install --id Git.Git -e
+                  <p class="step-label">1. git, Node.js LTS, Docker Desktop</p>
+                  <pre class="code-block">winget install --id Git.Git -e
 winget install --id OpenJS.NodeJS.LTS -e
-winget install --id Docker.DockerDesktop -e</div>
+winget install --id Docker.DockerDesktop -e</pre>
                 </div>
                 <div class="step">
-                  <p class="step-label"><span class="step-num">2</span><b>WSL2</b></p>
-                  <div class="code-block">wsl --install --no-distribution</div>
-                  <p class="step-label" style="margin-top:5px;">If this just installed it, reboot Windows and re-run the installer — it stops cleanly and tells you this.</p>
+                  <p class="step-label">2. Enable WSL2</p>
+                  <pre class="code-block">wsl --install --no-distribution</pre>
                 </div>
                 <div class="step">
-                  <p class="step-label"><span class="step-num">3</span><b>Clone + install</b></p>
-                  <div class="code-block">git clone --depth 1 https://github.com/jessekward-prog/hostess.git $HOME\hostess
+                  <p class="step-label">3. Clone + install dependencies</p>
+                  <pre class="code-block">git clone --depth 1 https://github.com/jessekward-prog/hostess.git $HOME\hostess
 cd $HOME\hostess
-npm install --omit=dev</div>
+npm install --omit=dev</pre>
                 </div>
                 <div class="step">
-                  <p class="step-label"><span class="step-num">4</span><b>Scheduled Task</b></p>
-                  <div class="code-block">$action = New-ScheduledTaskAction -Execute "powershell.exe" `
-  -Argument '-NoProfile -WindowStyle Hidden -Command "Set-Location $HOME\hostess; node server.js"'
-$trigger = New-ScheduledTaskTrigger -AtLogOn
+                  <p class="step-label">4. Scheduled Task</p>
+                  <pre class="code-block">$action = New-ScheduledTaskAction -Execute "powershell.exe" `
+  -Argument '-NoProfile -WindowStyle Hidden -Command "while ($true) { Set-Location $HOME\hostess; node server.js; Start-Sleep -Seconds 2 }"'
+$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 Register-ScheduledTask -TaskName hostess -Action $action -Trigger $trigger -Force
-Start-ScheduledTask -TaskName hostess</div>
+Start-ScheduledTask -TaskName hostess</pre>
                 </div>
                 <div class="step">
-                  <p class="step-label"><span class="step-num">5</span><b>Manage it</b></p>
-                  <div class="code-block">Start-ScheduledTask -TaskName hostess
-Stop-ScheduledTask  -TaskName hostess</div>
+                  <p class="step-label">5. Service control</p>
+                  <pre class="code-block">Start-ScheduledTask -TaskName hostess
+Stop-ScheduledTask  -TaskName hostess</pre>
                 </div>
               </div>
             </div>
@@ -630,57 +951,140 @@ Stop-ScheduledTask  -TaskName hostess</div>
       </div>
     </section>
 
-    <section id="deploy-section">
-      <h2>Deploying an app</h2>
-      <p class="h2-sub">Once it's running, point it at any repo with a Dockerfile + app.yaml at its root</p>
-      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));">
-        <div class="card">
-          <div class="card-head">
-            <p class="card-title">app.yaml</p>
+    <!-- PLATFORM CAPABILITIES -->
+    <section class="block" id="platform-section">
+      <div class="sec-head">
+        <h2>What Hostess wires automatically</h2>
+      </div>
+      <p class="sec-desc">Apps declare what they need in <code>app.yaml</code> or source code; Hostess provisions the backing containers, networks, and secrets at deploy time.</p>
+
+      <div class="spec-grid">
+        <div class="spec-card">
+          <div class="spec-head">
+            <span class="spec-title">Shared Postgres</span>
+            <span class="spec-badge">postgres: true</span>
           </div>
-          <div class="card-body">
-            <div class="code-block">name: my-app
-port: 3000
-postgres: false
-autoUpdate: false
-env: []</div>
-            <ul class="manifest-list">
-              <li><code>name</code><span>lowercase letters/numbers/hyphens, 2-50 chars</span></li>
-              <li><code>port</code><span>what your app listens on inside the container</span></li>
-              <li><code>postgres</code><span>true wires a DATABASE_URL + DB_* vars to a shared Postgres</span></li>
-              <li><code>autoUpdate</code><span>true redeploys automatically when the source repo gets a new commit (checked every ~10 min)</span></li>
-              <li><code>env</code><span>each name gets its own reveal panel on the app card — set a value there and it's wired in via <code>docker run -e</code> on redeploy, no manual env file editing</span></li>
-            </ul>
-          </div>
+          <p class="spec-body">Creates an isolated SQL role and database on <code>selfhost-postgres</code> (<code>selfhost-net</code>) and injects both <code>DATABASE_URL</code> and discrete <code>DB_*</code> variables. Redeploys reuse the existing role password.</p>
         </div>
-        <div class="card">
-          <div class="card-head">
-            <p class="card-title">Deploy it</p>
-            <p class="card-desc">Paste the repo URL (or a local path) into the dashboard, or from the CLI:</p>
+
+        <div class="spec-card">
+          <div class="spec-head">
+            <span class="spec-title">Isolated Web Search</span>
+            <span class="spec-badge">search: true</span>
           </div>
-          <div class="card-body">
-            <div class="code-block">node deploy.js https://github.com/you/your-app
-node deploy.js /path/to/local/repo</div>
-            <p class="card-desc" style="margin-top:2px;">Redeploying the same app name reuses its host port, container name, and — for Postgres apps — its existing role password.</p>
+          <p class="spec-body">Provisions a shared SearXNG instance on a dedicated <code>hostess-search</code> network (no route to Postgres) and injects <code>SEARXNG_URL</code> for JSON search queries.</p>
+        </div>
+
+        <div class="spec-card">
+          <div class="spec-head">
+            <span class="spec-title">Local AI Auto-Link</span>
+            <span class="spec-badge auto">Auto-detected</span>
           </div>
+          <p class="spec-body">Scans JS/TS source for <code>LM_STUDIO_URL</code>, <code>LM_STUDIO_API_KEY</code>, and <code>LM_STUDIO_MODEL</code> and injects your MY AI library endpoint automatically without editing <code>app.yaml</code>.</p>
+        </div>
+
+        <div class="spec-card">
+          <div class="spec-head">
+            <span class="spec-title">Private Push Server</span>
+            <span class="spec-badge auto">Auto-detected</span>
+          </div>
+          <p class="spec-body">Apps reading <code>NTFY_URL</code>, <code>NTFY_TOKEN</code>, and <code>NTFY_TOPIC</code> are joined to <code>hostess-push</code>, a built-in <code>ntfy</code> server published privately to your phone over Tailscale.</p>
+        </div>
+
+        <div class="spec-card">
+          <div class="spec-head">
+            <span class="spec-title">Pre-Build Security Guard</span>
+            <span class="spec-badge auto">Every deploy</span>
+          </div>
+          <p class="spec-body">Before <code>docker build</code> runs, your local AI reviews the repo's <code>Dockerfile</code>, <code>app.yaml</code>, and entrypoint for privileged flags, remote script execution, or exposed secrets.</p>
+        </div>
+
+        <div class="spec-card">
+          <div class="spec-head">
+            <span class="spec-title">Forge &amp; Marketplace</span>
+            <span class="spec-badge">Built in</span>
+          </div>
+          <p class="spec-body">Install curated apps from the Marketplace in one click, or describe a new app in <b>Forge</b> (<code>/forge.html</code>) to generate, test-drive, and deploy it locally.</p>
         </div>
       </div>
     </section>
 
-    <section id="limits-section">
-      <h2>Known limitations</h2>
-      <div class="note-box">
-        The <b>Local/Claude AI toggle</b> on an app card only appears if that app implements its own <code style="color:var(--s-text-0)">GET/PUT /api/lm</code>, protected by a <code style="color:var(--s-text-0)">SYNC_SECRET</code> env var (contract documented in the repo README). Apps that don't implement it show no toggle at all — there's no generic fallback yet, so wiring AI into an app currently means building that endpoint into it, not just flipping a switch.
+    <!-- DEPLOYING AN APP -->
+    <section class="block" id="deploy-section">
+      <div class="sec-head">
+        <h2>Deploying an app</h2>
+      </div>
+      <p class="sec-desc">Every deployable repository has a <code>Dockerfile</code> and an <code>app.yaml</code> at its root.</p>
+
+      <div class="grid-2">
+        <div class="card">
+          <h3 class="card-title">app.yaml schema</h3>
+          <pre class="code-block"><span class="c-key">name:</span> <span class="c-val">my-app</span>
+<span class="c-key">port:</span> <span class="c-val">3000</span>
+<span class="c-key">postgres:</span> <span class="c-val">false</span>
+<span class="c-key">search:</span> <span class="c-val">false</span>
+<span class="c-key">autoUpdate:</span> <span class="c-val">true</span>
+<span class="c-key">dataDir:</span> <span class="c-val">/app/data</span>
+<span class="c-key">description:</span> <span class="c-val">"Short blurb shown on the card"</span>
+<span class="c-key">icon:</span> <span class="c-val">public/icon.svg</span>
+<span class="c-key">env:</span> <span class="c-val">[]</span></pre>
+          <ul class="manifest-list">
+            <li><code class="k">name</code><span>Lowercase letters, numbers, and hyphens (2 to 50 chars).</span></li>
+            <li><code class="k">port</code><span>Container port the app listens on (bind <code>0.0.0.0</code>, not localhost). Hostess does not inject <code>PORT</code>.</span></li>
+            <li><code class="k">postgres</code><span>Provisions a role + database and injects <code>DATABASE_URL</code> + <code>DB_*</code>.</span></li>
+            <li><code class="k">search</code><span>Attaches <code>hostess-search</code> and injects <code>SEARXNG_URL</code>.</span></li>
+            <li><code class="k">dataDir</code><span>Absolute container path persisted across redeploys in a named Docker volume.</span></li>
+            <li><code class="k">autoUpdate</code><span>Polls git remotes every 10 minutes and redeploys on new commits.</span></li>
+            <li><code class="k">publicGateway</code><span>Optional <code>{ port: 3001 }</code> for narrow token-gated share links via <code>/run/hostess-gateway/url</code>.</span></li>
+            <li><code class="k">env</code><span>Extra env var names exposed on the card's reveal panel (AI, <code>APP_PIN</code>, and <code>NTFY_*</code> are auto-detected in JS/TS).</span></li>
+          </ul>
+        </div>
+
+        <div class="card">
+          <h3 class="card-title">Deploy from UI or CLI</h3>
+          <p class="card-desc">Paste any GitHub URL or local directory path into the dashboard on <code>localhost:5300</code>, or deploy from a terminal:</p>
+          <pre class="code-block"><span class="c-comment"># Deploy from a GitHub repository</span>
+node deploy.js https://github.com/you/your-app
+
+<span class="c-comment"># Deploy from a local directory on disk</span>
+node deploy.js /path/to/local/repo</pre>
+
+          <h3 class="card-title" style="margin-top:16px;">Lifecycle &amp; live AI model switching</h3>
+          <p class="card-desc">
+            Redeploying the same app name reuses its assigned host port, container name, persistent <code>dataDir</code> volume, and Postgres password.
+          </p>
+          <p class="card-desc">
+            Every app that reads <code>LM_STUDIO_*</code> receives your fleet AI settings at deploy time. Apps that also implement the optional <code>GET/PUT /api/lm</code> contract (protected by <code>SYNC_SECRET</code>) get a live Local / Claude provider and model switcher right on their dashboard card without needing a container restart.
+          </p>
+        </div>
+      </div>
+
+      <div class="compliance-banner">
+        <div class="compliance-banner-text">
+          <h3>Making an existing repository Hostess-compliant?</h3>
+          <p>The compliance rules page includes a ready-to-paste AI prompt that audits any repo against every Hostess requirement (PIN gate, graceful SIGTERM, Postgres SSL, AI model portability) and fixes what's missing.</p>
+        </div>
+        <a class="compliance-banner-btn" href="/rules.html">
+          <span>Open Compliance Rules &amp; Prompt</span>
+          <span>→</span>
+        </a>
       </div>
     </section>
 
     <footer class="page-foot">
-      <a href="https://github.com/jessekward-prog/hostess" target="_blank" rel="noopener">jessekward-prog/hostess</a> — personal project, no telemetry, nothing leaves your machine.
+      <span><a href="https://github.com/jessekward-prog/hostess" target="_blank" rel="noopener">jessekward-prog/hostess</a> · self-hosted, zero telemetry, nothing leaves your machine.</span>
+      <span><a href="/rules.html">Compliance Rules →</a></span>
     </footer>
   </main>
 </div>
 
 <script>
+const OS_META = {
+  linux: 'Debian / Ubuntu family · apt + user systemd service',
+  macos: 'Apple Silicon or Intel · Homebrew + launchd agent',
+  windows: 'Windows 10/11 PowerShell · winget + Scheduled Task (UAC)'
+};
+
 function openMenu() {
   document.querySelector('aside.sidebar').classList.add('open');
   document.querySelector('.sidebar-backdrop').classList.add('open');
@@ -705,9 +1109,15 @@ document.querySelectorAll('aside.sidebar .row, aside.sidebar a').forEach(el => {
 
 function selectOS(os) {
   document.querySelectorAll('.row[data-os]').forEach(el => el.classList.toggle('active', el.dataset.os === os));
-  document.querySelectorAll('.pill[data-os]').forEach(el => el.classList.toggle('active', el.dataset.os === os));
+  document.querySelectorAll('.os-tab[data-os]').forEach(el => {
+    const active = el.dataset.os === os;
+    el.classList.toggle('active', active);
+    el.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
   document.querySelectorAll('.os-panel').forEach(el => el.classList.remove('active'));
   document.getElementById('panel-' + os).classList.add('active');
+  const meta = document.getElementById('os-meta-label');
+  if (meta && OS_META[os]) meta.textContent = OS_META[os];
 }
 
 (function detectOS() {
@@ -729,20 +1139,20 @@ async function copyCmd(btn) {
   try {
     await navigator.clipboard.writeText(text);
     btn.classList.add('copied');
-    label.textContent = 'Copied';
-    setTimeout(() => { btn.classList.remove('copied'); label.textContent = 'Copy'; }, 1500);
+    label.textContent = 'Copied!';
+    setTimeout(() => { btn.classList.remove('copied'); label.textContent = 'Copy command'; }, 1500);
   } catch {
-    label.textContent = 'select & copy';
+    label.textContent = 'Select & copy';
   }
 }
 
 function scrollToId(id) {
-  document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
+  document.getElementById('install-section') && id === 'install-section'
+    ? document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' })
+    : document.getElementById(id).scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// Ported from chat-cmd's WaveBackground.jsx (itself ported from apps-cmd's XMB
-// wave) — same sine-band + particle canvas, fixed to 'outline' style / 'normal'
-// speed per request rather than exposing the full style/speed matrix.
+// Ported from chat-cmd's WaveBackground.jsx — sine-band + particle canvas in the sidebar.
 function mountWaveBackground(container, accentRgb) {
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const canvas = document.createElement('canvas');
@@ -769,7 +1179,7 @@ function mountWaveBackground(container, accentRgb) {
   new ResizeObserver(size).observe(container);
 
   function draw() {
-    t += reduceMotion ? 0.00075 : 0.001; // speed: slower than chat-cmd's 'normal' (half)
+    t += reduceMotion ? 0.00075 : 0.001;
     const W = container.clientWidth, H = container.clientHeight;
     ctx.clearRect(0, 0, W, H);
 
@@ -781,7 +1191,7 @@ function mountWaveBackground(container, accentRgb) {
         x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
       const c = b.tint ? `${A[0]},${A[1]},${A[2]}` : steel;
-      ctx.strokeStyle = `rgba(${c},${Math.min(b.a * 5, 0.9)})`; // style: outline
+      ctx.strokeStyle = `rgba(${c},${Math.min(b.a * 5, 0.9)})`;
       ctx.lineWidth = 1.5;
       ctx.stroke();
     });
@@ -799,7 +1209,7 @@ function mountWaveBackground(container, accentRgb) {
   }
   draw();
 }
-mountWaveBackground(document.querySelector('aside.sidebar'), '232,132,10'); // chat-cmd's default phosphor amber
+mountWaveBackground(document.querySelector('aside.sidebar'), '232,132,10');
 </script>
 </body>
 </html>

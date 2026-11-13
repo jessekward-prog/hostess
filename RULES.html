@@ -12,7 +12,7 @@
   :root {
     --bg: #000000; --surface: #111111; --surface-2: #1e1e1e; --border: #2c2c2c; --border-soft: #232323;
     --accent: #ffffff; --accent-faint: rgba(255,255,255,0.06);
-    --text-0: #ffffff; --text-1: #b3b3b3; --text-2: #767676; --text-3: #474747;
+    --text-0: #ffffff; --text-1: #d4d4d4; --text-2: #a3a3a3; --text-3: #8a8a8a;
     --ok: #3fb37f; --ok-bg: rgba(63,179,127,0.12);
     --warn: #e0a53f; --warn-bg: rgba(224,165,63,0.12);
     --req: #e0564f; --req-bg: rgba(224,86,79,0.12);
@@ -45,17 +45,17 @@
   .brand { display: flex; align-items: center; gap: 9px; padding: 0 20px 18px; border-bottom: 1px solid var(--border-soft); margin-bottom: 6px; }
   .brand .mark { width: 24px; height: 24px; border-radius: 6px; border: 1.5px solid var(--text-0); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
   .brand strong { font-family: var(--mono); color: var(--text-0); font-size: 13.5px; letter-spacing: -0.01em; }
-  .brand span { display: block; font-size: 10px; color: var(--text-3); font-family: var(--mono); letter-spacing: 0.06em; }
+  .brand span { display: block; font-size: 11px; color: var(--text-3); font-family: var(--mono); letter-spacing: 0.06em; }
 
   nav { padding: 14px 12px; }
-  nav .label { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); padding: 0 8px; margin: 16px 0 5px; display: block; }
+  nav .label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-3); padding: 0 8px; margin: 16px 0 5px; display: block; }
   nav .label:first-child { margin-top: 0; }
   nav a {
     display: flex; align-items: baseline; gap: 8px; text-decoration: none; color: var(--text-2);
     font-size: 12.5px; padding: 5px 8px; border-radius: 5px; transition: background 0.12s, color 0.12s;
   }
   nav a:hover { background: var(--surface-2); color: var(--text-0); }
-  nav a .n { font-family: var(--mono); font-size: 10.5px; color: var(--text-3); flex-shrink: 0; width: 15px; }
+  nav a .n { font-family: var(--mono); font-size: 11px; color: var(--text-3); flex-shrink: 0; width: 15px; }
 
   main { flex: 1; min-width: 0; padding: 56px 60px 120px; max-width: 900px; }
   @media (max-width: 900px) { main { padding: 32px 20px 80px; } }
@@ -73,7 +73,7 @@
   .score-tile {
     background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
   }
-  .score-tile .k { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; }
+  .score-tile .k { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin-bottom: 6px; }
   .score-tile .v { font-family: var(--mono); font-size: 13px; color: var(--text-0); line-height: 1.5; }
 
   section { margin: 64px 0; scroll-margin-top: 32px; }
@@ -84,7 +84,7 @@
   .sec-desc { color: var(--text-2); font-size: 13.5px; margin: 8px 0 22px; max-width: 62ch; }
 
   .tag {
-    display: inline-flex; align-items: center; font-family: var(--mono); font-size: 10px; font-weight: 600;
+    display: inline-flex; align-items: center; font-family: var(--mono); font-size: 11px; font-weight: 600;
     letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 9px; border-radius: 999px; flex-shrink: 0;
   }
   .tag.req { background: var(--req-bg); color: var(--req); }
@@ -112,7 +112,7 @@
   code.field { color: var(--text-0); background: var(--surface-2); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
 
   table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 10px; }
-  table th { text-align: left; font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); padding: 0 10px 8px 0; border-bottom: 1px solid var(--border); font-weight: 600; }
+  table th { text-align: left; font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-3); padding: 0 10px 8px 0; border-bottom: 1px solid var(--border); font-weight: 600; }
   table td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--border-soft); color: var(--text-1); vertical-align: top; }
   table td:first-child, table th:first-child { font-family: var(--mono); color: var(--text-0); white-space: nowrap; }
   .tbl-wrap { overflow-x: auto; }
@@ -173,7 +173,7 @@
   .modal-sub { font-size: 13px; color: var(--text-2); margin: 0 0 20px; max-width: 62ch; }
 
   .copy-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
-  .copy-bar .lbl { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
+  .copy-bar .lbl { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); }
   .copy-btn {
     font-family: var(--mono); font-size: 11.5px; font-weight: 700; padding: 8px 16px; border-radius: 7px;
     background: var(--ok); color: #05170e; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 7px;
@@ -190,7 +190,7 @@
   .prompt-box:focus { outline: 1px solid var(--text-2); outline-offset: -1px; }
 
   .tutorial-block { margin-top: 20px; padding: 16px 20px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
-  .tutorial-block h4 { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin: 0 0 13px; }
+  .tutorial-block h4 { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-3); margin: 0 0 13px; }
   .tool-row { display: flex; gap: 14px; margin-bottom: 10px; font-size: 12.5px; color: var(--text-1); line-height: 1.55; }
   .tool-row:last-child { margin-bottom: 0; }
   .tool-row b { color: var(--text-0); font-family: var(--mono); font-size: 12px; min-width: 148px; flex-shrink: 0; }
