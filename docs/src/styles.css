@@ -9,13 +9,13 @@
   --grid: #242922;
   --grid-bright: #384034;
 
-  --volt: #4a6b1e;
+  --volt: #3a5f22;
   --volt-ink: #ecfff1;
-  --volt-dim: rgba(74, 107, 30, 0.12);
-  --volt-border: rgba(74, 107, 30, 0.45);
+  --volt-dim: rgba(58, 95, 34, 0.12);
+  --volt-border: rgba(58, 95, 34, 0.45);
 
-  --btn: #4a6b1e;
-  --btn-hover: #5c7f28;
+  --btn: #3a5f22;
+  --btn-hover: #4b7229;
   --btn-radius: 6px;
 
   --text-0: #f4f6f0;
@@ -76,8 +76,8 @@ h1, h2, h3, h4, .principle-title, .manual-card-title, .module-title, .deck-headi
   min-height: 100vh;
   background-color: var(--bg);
   background-image:
-    linear-gradient(to right, rgba(74, 107, 30, 0.03) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(74, 107, 30, 0.03) 1px, transparent 1px);
+    linear-gradient(to right, rgba(58, 95, 34, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(58, 95, 34, 0.03) 1px, transparent 1px);
   background-size: 32px 32px;
   position: relative;
 }
@@ -275,7 +275,7 @@ h1.cyber-title .volt-accent { color: var(--volt); display: block; }
 .hero-right {
   position: relative;
   min-height: 440px;
-  background: radial-gradient(circle at 50% 48%, rgba(74, 107, 30, 0.08) 0%, #050605 70%);
+  background: radial-gradient(circle at 50% 48%, rgba(58, 95, 34, 0.08) 0%, #050605 70%);
   overflow: hidden;
   display: flex;
   flex-direction: column;
