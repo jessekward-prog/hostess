@@ -174,7 +174,7 @@ const PRINCIPLES = [
       <svg width="26" height="26" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.4">
         <polygon points="14,2 25,8.5 25,19.5 14,26 3,19.5 3,8.5" />
         <polyline points="3,8.5 14,15 25,8.5" />
-        <line x1="14" y1="15" x2="14" y2="26" stroke="#c9a95c" />
+        <line x1="14" y1="15" x2="14" y2="26" stroke="#23874a" />
       </svg>
     ),
   },
@@ -185,7 +185,7 @@ const PRINCIPLES = [
     icon: (
       <svg width="26" height="26" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.4">
         <rect x="3" y="3" width="22" height="22" />
-        <rect x="8" y="8" width="12" height="12" stroke="#c9a95c" />
+        <rect x="8" y="8" width="12" height="12" stroke="#23874a" />
         <line x1="3" y1="14" x2="8" y2="14" /><line x1="20" y1="14" x2="25" y2="14" />
         <line x1="14" y1="3" x2="14" y2="8" /><line x1="14" y1="20" x2="14" y2="25" />
       </svg>
@@ -197,7 +197,7 @@ const PRINCIPLES = [
     desc: 'Shared Postgres sits on selfhost-net while SearXNG and ntfy push run in isolated Docker fabrics.',
     icon: (
       <svg width="26" height="26" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.4">
-        <circle cx="8" cy="8" r="4" /><circle cx="20" cy="8" r="4" stroke="#c9a95c" />
+        <circle cx="8" cy="8" r="4" /><circle cx="20" cy="8" r="4" stroke="#23874a" />
         <circle cx="14" cy="20" r="4" />
         <line x1="12" y1="8" x2="16" y2="8" /><line x1="9.5" y1="11.5" x2="12.5" y2="16.5" /><line x1="18.5" y1="11.5" x2="15.5" y2="16.5" />
       </svg>
@@ -210,9 +210,9 @@ const PRINCIPLES = [
     icon: (
       <svg width="26" height="26" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.4">
         <circle cx="14" cy="14" r="9" />
-        <line x1="14" y1="2" x2="14" y2="26" stroke="#c9a95c" />
+        <line x1="14" y1="2" x2="14" y2="26" stroke="#23874a" />
         <line x1="2" y1="14" x2="26" y2="14" />
-        <circle cx="14" cy="14" r="3" fill="#c9a95c" stroke="none" />
+        <circle cx="14" cy="14" r="3" fill="#23874a" stroke="none" />
       </svg>
     ),
   },
@@ -222,8 +222,8 @@ const PRINCIPLES = [
     desc: 'Loopback-only :5300 control plane, scrypt auth, Tailscale Private Link, and zero external telemetry.',
     icon: (
       <svg width="26" height="26" viewBox="0 0 28 28" fill="none" stroke="currentColor" strokeWidth="1.4">
-        <rect x="4" y="4" width="5" height="5" /><rect x="19" y="4" width="5" height="5" stroke="#c9a95c" />
-        <rect x="11.5" y="11.5" width="5" height="5" fill="#c9a95c" stroke="none" />
+        <rect x="4" y="4" width="5" height="5" /><rect x="19" y="4" width="5" height="5" stroke="#23874a" />
+        <rect x="11.5" y="11.5" width="5" height="5" fill="#23874a" stroke="none" />
         <rect x="4" y="19" width="5" height="5" /><rect x="19" y="19" width="5" height="5" />
       </svg>
     ),
@@ -239,12 +239,12 @@ const PLATFORM_MODULES = [
     art: (
       <svg width="100%" height="84" viewBox="0 0 240 84" fill="none">
         <rect x="14" y="14" width="64" height="56" stroke="#384034" strokeWidth="1" />
-        <rect x="20" y="22" width="52" height="10" fill="#c9a95c" fillOpacity="0.85" />
+        <rect x="20" y="22" width="52" height="10" fill="#23874a" fillOpacity="0.85" />
         <rect x="20" y="38" width="52" height="8" fill="#242922" />
         <rect x="20" y="52" width="38" height="8" fill="#242922" />
-        <line x1="78" y1="42" x2="152" y2="42" stroke="#c9a95c" strokeDasharray="4 3" />
-        <polygon points="150,37 160,42 150,47" fill="#c9a95c" />
-        <rect x="162" y="18" width="64" height="48" stroke="#c9a95c" strokeWidth="1.2" fill="#0b0d0b" />
+        <line x1="78" y1="42" x2="152" y2="42" stroke="#23874a" strokeDasharray="4 3" />
+        <polygon points="150,37 160,42 150,47" fill="#23874a" />
+        <rect x="162" y="18" width="64" height="48" stroke="#23874a" strokeWidth="1.2" fill="#0b0d0b" />
         <line x1="162" y1="34" x2="226" y2="34" stroke="#384034" />
         <line x1="162" y1="50" x2="226" y2="50" stroke="#384034" />
       </svg>
@@ -258,11 +258,11 @@ const PLATFORM_MODULES = [
     art: (
       <svg width="100%" height="84" viewBox="0 0 240 84" fill="none">
         <circle cx="120" cy="42" r="30" stroke="#384034" strokeWidth="1" strokeDasharray="3 3" />
-        <circle cx="120" cy="42" r="18" stroke="#c9a95c" strokeWidth="1.2" />
+        <circle cx="120" cy="42" r="18" stroke="#23874a" strokeWidth="1.2" />
         <line x1="70" y1="42" x2="170" y2="42" stroke="#242922" />
         <line x1="120" y1="6" x2="120" y2="78" stroke="#242922" />
-        <rect x="116" y="38" width="8" height="8" fill="#c9a95c" />
-        <path d="M135 57 L154 74" stroke="#c9a95c" strokeWidth="2.2" />
+        <rect x="116" y="38" width="8" height="8" fill="#23874a" />
+        <path d="M135 57 L154 74" stroke="#23874a" strokeWidth="2.2" />
       </svg>
     ),
   },
@@ -274,13 +274,13 @@ const PLATFORM_MODULES = [
     art: (
       <svg width="100%" height="84" viewBox="0 0 240 84" fill="none">
         <line x1="36" y1="22" x2="120" y2="42" stroke="#384034" />
-        <line x1="36" y1="62" x2="120" y2="42" stroke="#c9a95c" />
-        <line x1="120" y1="42" x2="204" y2="22" stroke="#c9a95c" />
+        <line x1="36" y1="62" x2="120" y2="42" stroke="#23874a" />
+        <line x1="120" y1="42" x2="204" y2="22" stroke="#23874a" />
         <line x1="120" y1="42" x2="204" y2="62" stroke="#384034" />
         <rect x="28" y="14" width="16" height="16" stroke="#9ea699" fill="#060706" />
-        <rect x="28" y="54" width="16" height="16" stroke="#c9a95c" fill="#060706" />
-        <polygon points="120,26 136,42 120,58 104,42" stroke="#c9a95c" fill="#121612" />
-        <rect x="196" y="14" width="16" height="16" stroke="#c9a95c" fill="#c9a95c" fillOpacity="0.2" />
+        <rect x="28" y="54" width="16" height="16" stroke="#23874a" fill="#060706" />
+        <polygon points="120,26 136,42 120,58 104,42" stroke="#23874a" fill="#121612" />
+        <rect x="196" y="14" width="16" height="16" stroke="#23874a" fill="#23874a" fillOpacity="0.2" />
         <rect x="196" y="54" width="16" height="16" stroke="#9ea699" fill="#060706" />
       </svg>
     ),
@@ -292,9 +292,9 @@ const PLATFORM_MODULES = [
     bodyHtml: 'Apps reading <code>NTFY_URL</code>, <code>NTFY_TOKEN</code>, and <code>NTFY_TOPIC</code> join <code>hostess-push</code>, a built-in <code>ntfy</code> relay published privately to your phone over Tailscale.',
     art: (
       <svg width="100%" height="84" viewBox="0 0 240 84" fill="none">
-        <polyline points="16,46 58,46 72,22 86,66 102,16 118,58 134,36 146,46 224,46" stroke="#c9a95c" strokeWidth="1.6" />
+        <polyline points="16,46 58,46 72,22 86,66 102,16 118,58 134,36 146,46 224,46" stroke="#23874a" strokeWidth="1.6" />
         <line x1="16" y1="68" x2="224" y2="68" stroke="#242922" />
-        <rect x="98" y="12" width="8" height="8" fill="#c9a95c" />
+        <rect x="98" y="12" width="8" height="8" fill="#23874a" />
       </svg>
     ),
   },
@@ -306,8 +306,8 @@ const PLATFORM_MODULES = [
     art: (
       <svg width="100%" height="84" viewBox="0 0 240 84" fill="none">
         <polygon points="120,10 156,22 152,54 120,74 88,54 84,22" stroke="#9ea699" strokeWidth="1.2" fill="#0b0d0b" />
-        <polygon points="120,20 144,29 141,49 120,63 99,49 96,29" stroke="#c9a95c" strokeWidth="1.2" />
-        <line x1="60" y1="42" x2="180" y2="42" stroke="#c9a95c" strokeOpacity="0.45" strokeDasharray="3 3" />
+        <polygon points="120,20 144,29 141,49 120,63 99,49 96,29" stroke="#23874a" strokeWidth="1.2" />
+        <line x1="60" y1="42" x2="180" y2="42" stroke="#23874a" strokeOpacity="0.45" strokeDasharray="3 3" />
       </svg>
     ),
   },
@@ -319,9 +319,9 @@ const PLATFORM_MODULES = [
     art: (
       <svg width="100%" height="84" viewBox="0 0 240 84" fill="none">
         <rect x="28" y="16" width="52" height="52" stroke="#384034" />
-        <rect x="94" y="16" width="52" height="52" stroke="#c9a95c" fill="#121612" />
+        <rect x="94" y="16" width="52" height="52" stroke="#23874a" fill="#121612" />
         <rect x="160" y="16" width="52" height="52" stroke="#384034" />
-        <rect x="102" y="24" width="36" height="10" fill="#c9a95c" />
+        <rect x="102" y="24" width="36" height="10" fill="#23874a" />
         <rect x="102" y="40" width="24" height="6" fill="#384034" />
         <rect x="102" y="52" width="30" height="6" fill="#384034" />
       </svg>
@@ -507,7 +507,6 @@ export default function App() {
   const [manualOpen, setManualOpen] = useState(false);
   const [copiedKey, setCopiedKey] = useState(null);
   const [activeField, setActiveField] = useState('name');
-  const [sysTime, setSysTime] = useState('00:00:00');
   const [coords, setCoords] = useState({ x: '127.0.0.1', y: 'PORT_5300', z: 'DOCKER_NET' });
 
   const { scrollYProgress } = useScroll();
@@ -518,15 +517,8 @@ export default function App() {
     const ua = navigator.userAgent;
     if (/Windows/.test(ua)) setOs('windows');
     else if (/Mac OS X|Macintosh/.test(ua)) setOs('macos');
-
-    const updateClock = () => {
-      const now = new Date();
-      setSysTime(now.toTimeString().slice(0, 8));
-    };
-    updateClock();
-    const timer = setInterval(updateClock, 1000);
-    return () => clearInterval(timer);
   }, []);
+
 
   const currentOS = OS_DATA[os];
   const currentFieldObj = MANIFEST_FIELDS.find((f) => f.key === activeField) || MANIFEST_FIELDS[0];
@@ -555,36 +547,6 @@ export default function App() {
         </aside>
 
         <div className="cyber-main">
-          {/* ── Sticky Brutalist Topbar ── */}
-          <header className="cyber-topbar">
-            <a className="topbar-brand" href="#top">
-              <span>HOSTESS<span className="blink-caret">_</span></span>
-            </a>
-
-            <nav className="topbar-nav" aria-label="Primary navigation">
-              <a className="topbar-link" href="#section-install">INSTALL</a>
-              <span className="topbar-plus">+</span>
-              <a className="topbar-link" href="#section-principles">PRINCIPLES</a>
-              <span className="topbar-plus">+</span>
-              <a className="topbar-link" href="#section-modules">MODULES</a>
-              <span className="topbar-plus">+</span>
-              <a className="topbar-link" href="#section-manifest">APP.YAML</a>
-              <span className="topbar-plus">+</span>
-              <a className="topbar-link" href="/rules.html">RULES</a>
-            </nav>
-
-            <div className="topbar-right">
-              <div className="sys-time-box">
-                <span>SYS_TIME</span>
-                <strong>{sysTime} // :5300</strong>
-              </div>
-              <a className="topbar-cta" href="/rules.html">
-                <span>COMPLIANCE AI</span>
-                <span>↗</span>
-              </a>
-            </div>
-          </header>
-
           {/* ── /01 Hero Grid ── */}
           <section id="top" className="hero-grid">
             <div className="hero-left">
@@ -643,17 +605,17 @@ export default function App() {
                 <svg width="16" height="120" viewBox="0 0 16 120" fill="#9ea699">
                   <rect x="2" y="0" width="12" height="3" />
                   <rect x="2" y="7" width="12" height="1" />
-                  <rect x="2" y="12" width="12" height="5" fill="#c9a95c" />
+                  <rect x="2" y="12" width="12" height="5" fill="#23874a" />
                   <rect x="2" y="21" width="12" height="2" />
                   <rect x="2" y="28" width="12" height="6" />
                   <rect x="2" y="38" width="12" height="1" />
                   <rect x="2" y="44" width="12" height="4" />
-                  <rect x="2" y="53" width="12" height="2" fill="#c9a95c" />
+                  <rect x="2" y="53" width="12" height="2" fill="#23874a" />
                   <rect x="2" y="60" width="12" height="5" />
                   <rect x="2" y="70" width="12" height="1" />
                   <rect x="2" y="76" width="12" height="4" />
                   <rect x="2" y="85" width="12" height="2" />
-                  <rect x="2" y="92" width="12" height="6" fill="#c9a95c" />
+                  <rect x="2" y="92" width="12" height="6" fill="#23874a" />
                   <rect x="2" y="103" width="12" height="3" />
                   <rect x="2" y="112" width="12" height="4" />
                 </svg>
@@ -670,7 +632,7 @@ export default function App() {
                   <span>&gt; RENDERING_CORE...</span><br />
                   <span className="v">LOOPBACK // TAILSCALE // TUNNEL</span>
                 </div>
-                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#c9a95c" strokeWidth="1.2">
+                <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#23874a" strokeWidth="1.2">
                   <circle cx="14" cy="14" r="11" />
                   <ellipse cx="14" cy="14" rx="5.5" ry="11" />
                   <line x1="3" y1="14" x2="25" y2="14" />
@@ -714,7 +676,7 @@ export default function App() {
                     <span className="principle-plus">+</span>
                   </div>
                   <div>
-                    <div className="mono" style={{ fontSize: 12, color: '#c9a95c', marginBottom: 4 }}>{p.code}</div>
+                    <div className="mono" style={{ fontSize: 12, color: '#23874a', marginBottom: 4 }}>{p.code}</div>
                     <h2 className="principle-title">{p.title}</h2>
                   </div>
                   <p className="principle-desc">{p.desc}</p>
@@ -916,7 +878,7 @@ export default function App() {
               viewport={{ once: true, amount: 0.12 }}
               transition={{ duration: 0.36 }}
             >
-              <div className="mono" style={{ fontSize: 12, color: '#c9a95c', fontWeight: 700 }}>/05</div>
+              <div className="mono" style={{ fontSize: 12, color: '#23874a', fontWeight: 700 }}>/05</div>
               <h2 className="deck-heading">APP.YAML<br />CONTRACT</h2>
               <p style={{ fontSize: 14, color: '#a0a89b' }}>
                 Every repository root requires <code>app.yaml</code> + <code>Dockerfile</code>. Select any key below to inspect behavior:
@@ -950,7 +912,7 @@ export default function App() {
               viewport={{ once: true, amount: 0.12 }}
               transition={{ duration: 0.36, delay: 0.08 }}
             >
-              <div className="mono" style={{ fontSize: 12, color: '#c9a95c', fontWeight: 700 }}>/06</div>
+              <div className="mono" style={{ fontSize: 12, color: '#23874a', fontWeight: 700 }}>/06</div>
               <h2 className="deck-heading">SYSTEM STATUS &amp;<br />DEPLOY CLI</h2>
 
               <div className="telemetry-rows">
@@ -994,7 +956,7 @@ node deploy.js /path/to/local/repo`}</pre>
               viewport={{ once: true, amount: 0.12 }}
               transition={{ duration: 0.36, delay: 0.16 }}
             >
-              <div className="mono" style={{ fontSize: 12, color: '#c9a95c', fontWeight: 700 }}>/07</div>
+              <div className="mono" style={{ fontSize: 12, color: '#23874a', fontWeight: 700 }}>/07</div>
               <h2 className="deck-heading">COMPLIANCE<br />PROMPT FOR AI</h2>
               <p style={{ fontSize: 14, color: '#a0a89b', lineHeight: 1.6 }}>
                 Making an existing repo Hostess-ready? Open the compliance specification and copy the AI agent audit prompt to validate Dockerfile, <code>PORT</code>, Postgres SSL, PIN gates, and graceful <code>SIGTERM</code> shutdown.
