@@ -207,7 +207,8 @@
     .conn-status { white-space: normal; }
   }
 
-  h2 { font-size: 16px; color: var(--s-text-0); margin: 0 0 12px; }
+  h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 20px; letter-spacing: -0.01em; color: var(--s-text-0); margin: 0 0 14px; display: flex; align-items: center; gap: 14px; }
+  h2::after { content: ''; flex: 1; height: 1px; background: var(--s-border); }
 
   .card { position: relative; border-radius: 12px; overflow: hidden; background: var(--s-surface); border: 1px solid var(--s-border); transition: border-color 0.18s; }
   .card-content { position: relative; z-index: 1; }
@@ -234,15 +235,15 @@
     display: flex; align-items: center; justify-content: center;
     width: calc(100% - 32px); margin: 10px 16px 2px;
     background: rgba(var(--crt-green-rgb), 0.1); color: var(--crt-green);
-    border: 1.5px solid var(--crt-green); border-radius: 8px; padding: 10.5px 14px; font-size: var(--fs-base); font-weight: 700;
-    letter-spacing: 0.01em; transition: background 0.12s, transform 0.08s;
+    border: 1px solid rgba(var(--crt-green-rgb), 0.55); border-radius: 8px; padding: 10.5px 14px; font-size: var(--fs-base); font-weight: 600;
+    letter-spacing: 0.01em; text-decoration: none; transition: background 0.12s, border-color 0.12s, transform 0.08s;
   }
   .open-app-btn::after {
     content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; mix-blend-mode: multiply;
     background: repeating-linear-gradient(0deg, rgba(0,0,0,0.35) 0px, rgba(0,0,0,0.35) 1px, transparent 1px, transparent 3px);
   }
   .open-app-btn-label { position: relative; z-index: 1; display: flex; align-items: center; gap: 7px; }
-  .open-app-btn:hover { background: rgba(var(--crt-green-rgb), 0.18); }
+  .open-app-btn:hover { background: rgba(var(--crt-green-rgb), 0.18); border-color: var(--crt-green); }
   .open-app-btn:active { transform: scale(0.98); }
   .open-app-btn:disabled { background: var(--s-surface-2); color: var(--s-text-3); border-color: var(--s-border); cursor: default; }
   .open-app-btn:disabled::after { content: none; }
@@ -300,16 +301,16 @@
 
   .card-spacer { flex: 1; }
   .app-foot { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; margin-top: 12px; border-top: 1px solid var(--s-surface-2); }
-  .icon-btn { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border-radius: 6px; font-size: var(--fs-sm); color: var(--s-text-3); transition: color 0.12s, background 0.12s; }
+  .icon-btn { display: inline-flex; align-items: center; gap: 5px; padding: 7px 9px; border-radius: 6px; font-size: var(--fs-sm); color: var(--s-text-3); transition: color 0.12s, background 0.12s; }
   .icon-btn:hover { color: var(--s-accent); background: var(--s-surface-2); }
-  .icon-btn.danger { color: var(--danger); }
-  .icon-btn.danger:hover { color: var(--danger); }
+  .icon-btn.danger:hover { color: var(--danger); background: rgba(224,86,79,0.12); }
   .icon-btn.confirm { background: var(--danger-strong); color: #fff; padding: 5px 10px; }
   .icon-btn.confirm:hover { color: #fff; background: var(--danger-strong); }
   .icon-btn:disabled { color: var(--s-text-3); opacity: 0.4; background: none; cursor: default; }
   .icon-btn:disabled:hover { color: var(--s-text-3); background: none; }
 
-  .reveal-toggle { display: flex; align-items: center; gap: 5px; font-size: var(--fs-md); color: var(--s-accent); padding: 8px 16px 0; }
+  .reveal-toggle { display: flex; align-items: center; gap: 5px; font-size: var(--fs-md); color: var(--s-text-1); padding: 8px 16px 0; transition: color 0.12s; }
+  .reveal-toggle:hover, .reveal-toggle.open { color: var(--s-text-0); }
   .reveal-toggle[hidden] { display: none; }
   .reveal-toggle .chev { font-size: var(--fs-xs); transition: transform 0.18s; display: inline-block; }
   .reveal-toggle.open .chev { transform: rotate(90deg); }
@@ -325,7 +326,7 @@
   footer.page-foot a { color: var(--s-text-2); text-decoration: none; }
   footer.page-foot a:hover { color: var(--s-accent); text-decoration: underline; }
 
-  .marketplace-btn { margin: 0 8px 14px; color: var(--s-text-1); }
+  .marketplace-btn { color: var(--s-text-1); }
   .marketplace-btn:hover { color: var(--s-text-0); background: var(--s-surface-2); }
 
   .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 190; }
@@ -336,7 +337,8 @@
     display: flex; flex-direction: column; overflow: hidden; margin: 0;
   }
   .marketplace-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--s-border); flex-shrink: 0; }
-  .marketplace-head h2 { margin: 0; font-size: 18px; }
+  .marketplace-head h2 { margin: 0; font-size: 20px; }
+  .marketplace-head h2::after { content: none; }
   .marketplace-body { flex: 1; overflow-y: auto; padding: 22px; }
   #marketplace-grid { grid-template-columns: repeat(2, 1fr); }
   .marketplace-card .app-card-head { padding: 22px 20px 0; }
@@ -607,13 +609,13 @@ function showAuthOverlay(mode) {
   overlay.id = 'auth-overlay';
   overlay.style.cssText = 'position:fixed; inset:0; background:var(--s-bg); z-index:999; display:flex; align-items:center; justify-content:center; padding:20px;';
   overlay.innerHTML = `
-    <form style="display:flex; flex-direction:column; gap:10px; width:260px;">
-      <div style="font-size:var(--fs-lg); color:var(--s-text-0); font-weight:600;">${isSetup ? 'Create your Hostess account' : 'Log in to Hostess'}</div>
+    <form class="card" style="display:flex; flex-direction:column; gap:12px; width:320px; max-width:100%; padding:24px;">
+      <h1 style="font-family:Georgia,'Times New Roman',serif; margin:0 0 4px;">${document.querySelector('h1 .mark').outerHTML}<span>Hostess</span></h1>
       ${isSetup ? '<div class="myai-hint">First launch — this account protects the dashboard everywhere it\'s reachable from, including this machine.</div>' : ''}
-      <input class="myai-input" id="auth-username" autocomplete="username" placeholder="username" autofocus>
-      <input class="myai-input" id="auth-password" type="password" autocomplete="${isSetup ? 'new-password' : 'current-password'}" placeholder="${isSetup ? 'password (min. 8 characters)' : 'password'}">
+      <input class="myai-input" id="auth-username" autocomplete="username" placeholder="username" style="padding:9px 10px; font-size:var(--fs-base);" autofocus>
+      <input class="myai-input" id="auth-password" style="padding:9px 10px; font-size:var(--fs-base);" type="password" autocomplete="${isSetup ? 'new-password' : 'current-password'}" placeholder="${isSetup ? 'password (min. 8 characters)' : 'password'}">
       <div id="auth-error" style="font-size:var(--fs-sm); color:#ff6666; display:none;"></div>
-      <button class="myai-save" type="submit">${isSetup ? 'Create account' : 'Log in'}</button>
+      <button class="deploy-btn" type="submit">${isSetup ? 'Create account' : 'Log in'}</button>
     </form>`;
   document.body.appendChild(overlay);
   overlay.querySelector('form').addEventListener('submit', async (e) => {

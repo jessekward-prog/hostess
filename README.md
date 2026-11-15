@@ -1,6 +1,6 @@
 # Hostess
 
-A tiny self-hosted PaaS for one Linux box: paste a git URL (or local path), it builds a Docker
+A tiny self-hosted PaaS for one Linux, macOS or Windows machine: paste a git URL (or local path), it builds a Docker
 image, wires up Postgres if the app needs one, and runs it on an auto-picked port. Dashboard +
 CLI, no external accounts, nothing leaves the machine.
 
