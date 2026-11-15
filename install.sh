@@ -10,8 +10,18 @@ echo "== hostess installer =="
 SUDO=""
 if command -v sudo >/dev/null 2>&1; then SUDO="sudo"; fi
 
+# git, curl and Node come from apt. On another distro, fail with a reason, not "apt-get: command not found".
+need_apt() {
+  if ! command -v apt-get >/dev/null 2>&1; then
+    echo "This installer uses apt (Debian/Ubuntu family) and $1 is missing." >&2
+    echo "Install Docker, Node.js 18+, git and curl yourself, then re-run this script." >&2
+    exit 1
+  fi
+}
+
 # --- prerequisites ---
 if ! command -v git >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1; then
+  need_apt "git or curl"
   echo "Installing git and curl..."
   $SUDO apt-get update -y && $SUDO apt-get install -y git curl ca-certificates
 fi
@@ -21,6 +31,7 @@ if command -v node >/dev/null 2>&1; then
   NODE_MAJOR="$(node -v | sed 's/^v//;s/\..*//')"
 fi
 if [ "$NODE_MAJOR" -lt 18 ]; then
+  need_apt "Node.js 18+"
   echo "Installing Node.js 20.x..."
   curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO bash -
   $SUDO apt-get install -y nodejs
@@ -32,6 +43,30 @@ if ! command -v docker >/dev/null 2>&1; then
   curl -fsSL https://get.docker.com | $SUDO sh
   $SUDO usermod -aG docker "$USER"
   DOCKER_GROUP_JUST_ADDED=1
+elif ! docker info >/dev/null 2>&1; then
+  # Docker was already here but this user can't talk to it. Without this the service comes up
+  # "active" and every deploy fails with permission denied.
+  if ! id -nG "$USER" | tr ' ' '\n' | grep -qx docker; then
+    echo "Adding $USER to the docker group..."
+    $SUDO usermod -aG docker "$USER"
+    DOCKER_GROUP_JUST_ADDED=1
+  else
+    echo "Warning: Docker is installed but not responding. Start it (sudo systemctl start docker), or log out and back in if you were only just added to the docker group." >&2
+  fi
+fi
+
+# Go Online opens its links with cloudflared. Optional: everything else works without it.
+if ! command -v cloudflared >/dev/null 2>&1; then
+  echo "Installing cloudflared (used by Go Online)..."
+  deb="$(mktemp)"
+  if command -v dpkg >/dev/null 2>&1 \
+    && curl -fsSL -o "$deb" "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$(dpkg --print-architecture).deb" \
+    && $SUDO dpkg -i "$deb" >/dev/null; then
+    :
+  else
+    echo "Couldn't install cloudflared. Go Online stays unavailable until you install it; everything else works." >&2
+  fi
+  rm -f "$deb"
 fi
 
 # --- fetch the app ---
@@ -92,7 +127,8 @@ EOF
 systemctl --user daemon-reload
 systemctl --user enable "$SERVICE_NAME"
 systemctl --user enable --now "${SERVICE_NAME}-update.timer"
-loginctl enable-linger "$USER" 2>/dev/null || true
+loginctl enable-linger "$USER" 2>/dev/null || $SUDO loginctl enable-linger "$USER" 2>/dev/null \
+  || echo "Warning: couldn't enable linger, so Hostess will stop when you log out. Run: sudo loginctl enable-linger $USER" >&2
 
 if [ "$DOCKER_GROUP_JUST_ADDED" = "1" ]; then
   # This shell's own docker-group membership won't apply until a fresh

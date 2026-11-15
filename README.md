@@ -26,8 +26,9 @@ iwr -useb https://raw.githubusercontent.com/jessekward-prog/hostess/main/install
 
 Each installs Docker/Node/git if missing, clones the repo to `~/hostess`
 (`$HOME\hostess` on Windows), and registers a persistent background service —
-a user-level systemd service on Linux, a launchd agent on macOS, a Scheduled Task on Windows —
-so the dashboard survives reboots and logouts.
+a user-level systemd service on Linux, a launchd agent on macOS, a Scheduled Task on Windows.
+On Linux the dashboard keeps running through reboots and logouts. On macOS and Windows it starts
+when you log in, because Docker Desktop itself only runs inside a login session.
 
 Already have the repo checked out? Run the installer for your OS from inside it instead — it
 detects the existing checkout and skips the clone.

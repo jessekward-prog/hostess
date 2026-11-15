@@ -444,5 +444,8 @@ app.listen(PORT, '127.0.0.1', () => {
   }
 });
 
+// 'exit' also covers selfupdate's process.exit(1). Windows does not kill child processes with
+// their parent, so without this an update would orphan every open cloudflared tunnel.
+process.on('exit', () => tunnel.stopAll());
 process.on('SIGTERM', () => { tunnel.stopAll(); process.exit(0); });
 process.on('SIGINT', () => { tunnel.stopAll(); process.exit(0); });

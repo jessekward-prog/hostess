@@ -15,7 +15,7 @@ const OS_DATA = {
       { html: 'If Docker was just installed, log out and back in so your new <code>docker</code> group membership applies, then run <code>systemctl --user start hostess</code>.' },
       { html: 'Otherwise it prints <code>http://localhost:5300</code> and opens the dashboard in your browser.' },
     ],
-    setupHtml: 'Ensures Docker, Node.js 18+, <code>git</code>, and <code>curl</code> are installed. Clones to <code>~/hostess</code>, registers a user-level <code>hostess.service</code> with <code>loginctl enable-linger</code> so it survives reboot and logout, and adds an hourly <code>hostess-update.timer</code> that only restarts the server when a new commit lands on <code>main</code>.',
+    setupHtml: 'Ensures Docker, Node.js 18+, <code>git</code>, <code>curl</code> and <code>cloudflared</code> (for Go Online) are installed. Clones to <code>~/hostess</code>, registers a user-level <code>hostess.service</code> with <code>loginctl enable-linger</code> so it survives reboot and logout, and adds an hourly <code>hostess-update.timer</code> that only restarts the server when a new commit lands on <code>main</code>.',
     manual: [
       {
         title: '1. Docker, Node.js 20, git',
@@ -23,7 +23,9 @@ const OS_DATA = {
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
 sudo apt-get install -y nodejs
 curl -fsSL https://get.docker.com | sudo sh
-sudo usermod -aG docker "$USER"`,
+sudo usermod -aG docker "$USER"
+curl -fsSL -o /tmp/cloudflared.deb "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$(dpkg --print-architecture).deb"
+sudo dpkg -i /tmp/cloudflared.deb`,
       },
       {
         title: '2. Clone + install dependencies',
@@ -71,12 +73,12 @@ systemctl --user stop    hostess`,
       { html: 'Terminal asks for your <b>Mac login password</b> once for Homebrew and Docker Desktop installation.' },
       { html: 'Docker Desktop\'s first launch shows a <b>permissions dialog</b>. Approve it (no Docker Hub account required), and your browser opens to <code>http://localhost:5300</code>.' },
     ],
-    setupHtml: 'Installs Homebrew if missing, followed by <code>git</code>, <code>node</code>, and Docker Desktop. Clones to <code>~/hostess</code> and registers a <code>launchd</code> agent (<code>xyz.cmdward.hostess.plist</code>) with full Homebrew/Docker <code>PATH</code> plus an hourly update agent that only restarts when upstream commits change.',
+    setupHtml: 'Installs Homebrew if missing, followed by <code>git</code>, <code>node</code>, <code>cloudflared</code> (for Go Online) and Docker Desktop. Clones to <code>~/hostess</code> and registers a <code>launchd</code> agent (<code>xyz.cmdward.hostess.plist</code>) that starts at login, with full Homebrew/Docker <code>PATH</code> plus an hourly update agent that only restarts when upstream commits change.',
     manual: [
       {
         title: '1. Homebrew, git, Node, Docker Desktop',
         code: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-brew install git node
+brew install git node cloudflared
 brew install --cask docker
 open -a Docker`,
       },
@@ -122,14 +124,15 @@ launchctl load -w ~/Library/LaunchAgents/xyz.cmdward.hostess.plist`,
     expect: [
       { html: 'A <b>UAC prompt</b> appears. Click Yes; a new elevated PowerShell window opens and runs the installation.' },
       { html: 'If WSL2 was never enabled on this PC, it enables WSL2 and asks you to reboot once, then paste the same command again.' },
-      { html: 'Accept Docker Desktop\'s first-run license dialog (skip Docker Hub sign-in). Your browser opens to <code>http://localhost:5300</code> once Docker is ready.' },
+      { html: 'Accept Docker Desktop\'s first-run license dialog (skip Docker Hub sign-in). Your browser opens to <code>http://localhost:5300</code> once Docker is ready. If the installer says it added you to <code>docker-users</code>, sign out and back in once.' },
     ],
-    setupHtml: 'Installs <code>Git.Git</code>, <code>OpenJS.NodeJS.LTS</code> (18+), and <code>Docker.DockerDesktop</code> via <code>winget</code>. Clones to <code>$HOME\\hostess</code> and registers a logon Scheduled Task with automatic restart-on-failure plus an hourly update check.',
+    setupHtml: 'Installs <code>Git.Git</code>, <code>OpenJS.NodeJS.LTS</code> (18+), <code>Cloudflare.cloudflared</code> (for Go Online) and <code>Docker.DockerDesktop</code> via <code>winget</code>. Clones to <code>$HOME\\hostess</code> and registers a logon Scheduled Task with automatic restart-on-failure plus an hourly update check.',
     manual: [
       {
         title: '1. git, Node.js LTS, Docker Desktop',
         code: `winget install --id Git.Git -e
 winget install --id OpenJS.NodeJS.LTS -e
+winget install --id Cloudflare.cloudflared -e
 winget install --id Docker.DockerDesktop -e`,
       },
       {

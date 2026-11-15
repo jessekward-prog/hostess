@@ -50,6 +50,12 @@ if ! command -v docker >/dev/null 2>&1; then
   brew install --cask docker
 fi
 
+# Go Online opens its links with cloudflared. Optional: everything else works without it.
+if ! command -v cloudflared >/dev/null 2>&1; then
+  echo "Installing cloudflared (used by Go Online)..."
+  brew install cloudflared || echo "Couldn't install cloudflared. Go Online stays unavailable until you install it; everything else works." >&2
+fi
+
 if ! docker info >/dev/null 2>&1; then
   echo "Starting Docker Desktop..."
   open -a Docker 2>/dev/null || open -a "Docker Desktop" 2>/dev/null || open /Applications/Docker.app 2>/dev/null || true

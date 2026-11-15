@@ -76,6 +76,13 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     Refresh-Path
 }
 
+# Go Online opens its links with cloudflared. Optional: everything else works without it.
+if (-not (Get-Command cloudflared -ErrorAction SilentlyContinue)) {
+    Write-Host "Installing cloudflared (used by Go Online)..."
+    winget install --id Cloudflare.cloudflared -e --source winget --accept-package-agreements --accept-source-agreements
+    Refresh-Path
+}
+
 # Docker Desktop's named pipe only accepts docker-users members (or admins).
 # Its own GUI first-run wizard normally adds you to that group, but a silent
 # winget install skips that wizard entirely -- so the scheduled task below,
@@ -83,11 +90,13 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 # can come up unable to reach Docker at all even though the check right below
 # this (run as Administrator) succeeds. Add the membership ourselves so it
 # doesn't depend on the user ever clicking through that wizard.
+$addedToDockerUsers = $false
 try {
     if (Get-LocalGroup -Name "docker-users" -ErrorAction SilentlyContinue) {
         if (-not (Get-LocalGroupMember -Group "docker-users" -Member $env:USERNAME -ErrorAction SilentlyContinue)) {
             Write-Host "Adding $env:USERNAME to the docker-users group..."
             Add-LocalGroupMember -Group "docker-users" -Member $env:USERNAME -ErrorAction SilentlyContinue
+            $addedToDockerUsers = $true
         }
     }
 } catch {}
@@ -143,12 +152,14 @@ if ($pkgJson -and (Test-Path $pkgJson) -and (Select-String -Path $pkgJson -Patte
 }
 
 Set-Location $InstallDir
-npm install --omit=dev
+# npm.cmd, not npm: under PowerShell plain `npm` resolves to npm.ps1, which the default
+# execution policy refuses to run.
+npm.cmd install --omit=dev
 
 # --- scheduled task (survives logoff/reboot, runs hidden, auto-restarts on non-zero exit) ---
 $TaskName = "hostess"
 $action = New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-NoProfile -WindowStyle Hidden -Command `"Set-Location '$InstallDir'; while (`$true) { node server.js; if (`$LASTEXITCODE -eq 0) { break }; Start-Sleep -Seconds 2 }`""
+    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"Set-Location '$InstallDir'; while (`$true) { node server.js; if (`$LASTEXITCODE -eq 0) { break }; Start-Sleep -Seconds 2 }`""
 $trigger = New-ScheduledTaskTrigger -AtLogOn
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
@@ -159,9 +170,11 @@ Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
 Start-ScheduledTask -TaskName $TaskName
 
 # --- hourly self-update scheduled task ---
+# Restarts by stopping whatever owns port 5300, never every node.exe running a server.js:
+# that would also kill the user's own unrelated Node servers.
 $UpdateTaskName = "hostess-update"
 $updateAction = New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-NoProfile -WindowStyle Hidden -Command `"`$old = git -C '$InstallDir' rev-parse HEAD; git -C '$InstallDir' pull --ff-only; if (`$LASTEXITCODE -eq 0 -and (git -C '$InstallDir' rev-parse HEAD) -ne `$old) { npm --prefix '$InstallDir' install --omit=dev; Get-CimInstance Win32_Process -Filter \`"Name = 'node.exe'\`" | Where-Object { `$_.CommandLine -like '*server.js*' } | ForEach-Object { Stop-Process -Id `$_.ProcessId -Force -ErrorAction SilentlyContinue }; Start-ScheduledTask -TaskName hostess }`""
+    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"`$old = git -C '$InstallDir' rev-parse HEAD; git -C '$InstallDir' pull --ff-only; if (`$LASTEXITCODE -eq 0 -and (git -C '$InstallDir' rev-parse HEAD) -ne `$old) { npm.cmd --prefix '$InstallDir' install --omit=dev; Get-NetTCPConnection -LocalPort 5300 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id `$_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-ScheduledTask -TaskName hostess }`""
 $updateTrigger = New-ScheduledTaskTrigger -RepetitionInterval (New-TimeSpan -Hours 1) -Once -At (Get-Date)
 $updateSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
@@ -171,5 +184,8 @@ Register-ScheduledTask -TaskName $UpdateTaskName -Action $updateAction -Trigger 
 Write-Host ""
 Write-Host "hostess is running at http://localhost:5300"
 Write-Host "Manage it with: Start-ScheduledTask/Stop-ScheduledTask -TaskName $TaskName"
+if ($addedToDockerUsers) {
+    Write-Warning "You were just added to the docker-users group. Sign out of Windows and back in once, or deploys will fail with a Docker permission error."
+}
 Start-Sleep -Seconds 1
 Start-Process "http://localhost:5300"

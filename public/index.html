@@ -398,6 +398,7 @@
             <div><b>Ollama</b> — runs on port 11434 automatically once it's installed; nothing to turn on.</div>
             <div><b>text-generation-webui</b> — launch it with the <code>--api</code> flag; it listens on port 5000 by default.</div>
             <div style="border-top:1px solid var(--s-border);padding-top:6px;">That address is usually on <b>your computer</b>, not this server.</div>
+            <div>If it runs on <b>this same machine</b>, <code>http://localhost:1234</code> is fine: Hostess points your apps at this machine for you. On Linux also turn on <b>Serve on Local Network</b> in LM Studio (or set <code>OLLAMA_HOST=0.0.0.0</code>), and if a firewall such as ufw is on, allow Docker's network to reach that port. Otherwise apps in Docker can't reach it.</div>
           </div>
           <span class="myai-status" id="myai-status"></span>
           <div class="myai-presets" id="myai-presets"></div>
@@ -521,8 +522,8 @@
 
         <div data-ts-phase="login" hidden>
           <div style="font-size:var(--fs-base); color:var(--s-text-1);">2. Log in (creates a free account on first run):</div>
-          <div class="myai-input" style="cursor:pointer; font-size:var(--fs-sm);" title="click to copy">sudo tailscale up</div>
-          <div class="myai-hint">Run that in a terminal on this machine — it'll print a link to open in a browser. Checking automatically.</div>
+          <div class="myai-input" id="ts-login-cmd" style="cursor:pointer; font-size:var(--fs-sm);" title="click to copy">sudo tailscale up</div>
+          <div class="myai-hint" id="ts-login-hint">Run that in a terminal on this machine — it'll print a link to open in a browser. Checking automatically.</div>
         </div>
 
         <div data-ts-phase="enable" hidden>
@@ -1332,6 +1333,10 @@ if (isLocalView()) {
       else { cmd.hidden = true; link.hidden = false; }
     } else if (!state.loggedIn) {
       showTsPhase('login');
+      if (state.platform !== 'linux') { // macOS and Windows sign in through the Tailscale app, not a terminal
+        document.getElementById('ts-login-cmd').hidden = true;
+        document.getElementById('ts-login-hint').textContent = 'Open the Tailscale app on this machine and sign in. Checking automatically.';
+      }
     } else if (!tsHubServed) {
       showTsPhase('enable');
     } else {

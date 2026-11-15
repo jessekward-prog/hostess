@@ -239,6 +239,7 @@
       <a href="#guard"><span class="n">06</span>Security guard</a>
       <a href="#hygiene"><span class="n">07</span>Repo hygiene</a>
       <a href="#runtime"><span class="n">08</span>Runtime environment</a>
+      <a href="#hosts"><span class="n">09</span>Any host, any stack</a>
 
       <span class="label">Reference</span>
       <a href="#connectivity"><span class="n">→</span>Web connectivity</a>
@@ -298,6 +299,8 @@
         <li><span class="body">App installs a <code class="field">SIGTERM</code> handler and the Dockerfile uses exec-form <code class="field">CMD</code> — otherwise every redeploy SIGKILLs it mid-write — <a href="#runtime">§8</a></span></li>
         <li><span class="body">No build step depends on git history or tags — the clone is <code class="field">--depth 1</code> — <a href="#runtime">§8</a></span></li>
         <li><span class="body">Non-JS apps list <b>every</b> env var in <code class="field">env:</code> — auto-detection only scans JS/TS — <a href="#runtime">§8</a></span></li>
+        <li><span class="body">Builds the same on Linux, Apple Silicon and Windows: LF line endings, exact file-name case, no amd64-only pins — <a href="#hosts">§9</a></span></li>
+        <li><span class="body">Works on <code class="field">localhost</code>, Tailscale and tunnel addresses alike; a PWA's manifest and service worker are reachable without the PIN — <a href="#hosts">§9</a></span></li>
       </ul>
     </section>
 
@@ -628,6 +631,43 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
       </div>
     </section>
 
+    <section id="hosts">
+      <div class="sec-head"><span class="sec-num">§9</span><h2>Any host, any stack</h2></div>
+      <p class="sec-desc">The container is always Linux, but the clone and the build run on the operator's machine: Linux, an Apple Silicon or Intel Mac, or Windows. The app is then opened from several different addresses.</p>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Build the same on Linux, macOS and Windows</h3><span class="tag req">Required</span></div>
+        <ul>
+          <li><b>CPU.</b> Apple Silicon builds arm64. No <code class="field">--platform=linux/amd64</code>, multi-arch base images only, and pick downloaded binaries by <code class="field">TARGETARCH</code>.</li>
+          <li><b>Line endings.</b> Git for Windows checks out CRLF by default and a CRLF shell script dies in the container with "no such file or directory". Add <code class="field">.gitattributes</code> with <code class="field">* text=auto eol=lf</code>.</li>
+          <li><b>Executable bit.</b> Scripts committed from Windows are mode 644. Run them as <code class="field">sh script.sh</code> or <code class="field">chmod +x</code> in the Dockerfile.</li>
+          <li><b>File-name case.</b> macOS and Windows ignore case, the container does not. Import and asset paths must match exactly, and no two paths may differ only by case.</li>
+          <li><b>Names Windows can't check out.</b> No <code class="field">: * ? " &lt; &gt; |</code>, no trailing dot or space, no <code class="field">con</code>/<code class="field">aux</code>/<code class="field">nul</code>/<code class="field">prn</code>, no committed symlinks, no very deep paths.</li>
+          <li><b>Nothing built on the host goes into the image.</b> No copied <code class="field">node_modules</code> or virtualenv.</li>
+        </ul>
+        <pre># .gitattributes
+* text=auto eol=lf</pre>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>One container, no host access</h3><span class="tag req">Required</span></div>
+        <p>Never address the host yourself: no <code class="field">host.docker.internal</code> or <code class="field">localhost</code> expecting a host service (use the injected URLs as given), no host paths, bind mounts, GPU, USB, Bluetooth or serial. Hostess gives an app one container plus shared Postgres, search and push. A repo that needs Redis, MySQL, a worker container or a compose stack does not fit as it is.</p>
+        <p><code class="field">dataDir</code> holds only data, never the app directory: a volume mounted over <code class="field">/app</code> keeps serving the first deploy's code. With a non-root <code class="field">USER</code>, create and <code class="field">chown</code> the directory in the Dockerfile first.</p>
+        <p>The Dockerfile must build with a plain <code class="field">docker build .</code>: no build args, no build secrets. A static site or SPA with no server of its own needs a small one added, which is also where its PIN gate lives.</p>
+      </div>
+
+      <div class="rule">
+        <div class="rule-head"><h3>Works from every address it is opened on</h3><span class="tag req">Required</span></div>
+        <p>The same app is opened at <code class="field">http://localhost:&lt;port&gt;</code>, an https Tailscale address and a temporary https tunnel address.</p>
+        <ul>
+          <li>No hardcoded origin, domain or port; relative URLs; WebSockets derive <code class="field">ws</code>/<code class="field">wss</code> from <code class="field">location</code>. Build-time frontend vars (<code class="field">VITE_*</code>, <code class="field">NEXT_PUBLIC_*</code>) can't come from Hostess.</li>
+          <li>Session cookie is <code class="field">HttpOnly</code>, <code class="field">SameSite=Lax</code>, and <code class="field">Secure</code> only over https. Safari drops a <code class="field">Secure</code> cookie on <code class="field">http://localhost</code>, so unlocking loops on a Mac.</li>
+          <li>PIN attempts are throttled globally as well as per IP: through a tunnel everyone shares the proxy's address.</li>
+          <li><b>PWAs:</b> the manifest, icons and service worker file are served without the PIN (the browser fetches the manifest without cookies). The service worker never caches <code class="field">/api/</code>, anything behind the PIN, a 401, or a <code class="field">Range</code> request, and the app still works without it.</li>
+        </ul>
+      </div>
+    </section>
+
     <section id="connectivity">
       <div class="sec-head"><span class="sec-num">Ref</span><h2>Web connectivity — what your app can reach, and how</h2></div>
       <p class="sec-desc">Seven different needs get confused with each other constantly. Each has exactly one right mechanism, and picking the wrong one is how apps end up bundling a tunnel binary or hardcoding a public domain. Find your row first.</p>
@@ -773,7 +813,7 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
         <span id="copyPromptLabel">Copy all</span>
       </button>
     </div>
-    <textarea class="prompt-box" id="promptText" readonly spellcheck="false">You're bringing this repository into compliance with a self-hosted PaaS called Hostess. Check every item below against the current code and fix whatever doesn't comply — don't change anything that's already fine. When you're done, summarize what you changed and what was already compliant.
+    <textarea class="prompt-box" id="promptText" readonly spellcheck="false">You're bringing this repository into compliance with a self-hosted PaaS called Hostess. Check every item below against the current code and fix whatever doesn't comply — don't change anything that's already fine. When you're done, summarize what you changed, what was already compliant, and anything you could not make comply and why. The repo may be in any language; where an example below is Node, apply the same rule in this repo's stack.
 
 1. app.yaml must exist at the repo root with:
    - name: lowercase letters/numbers/hyphens only, 2-50 characters
@@ -788,16 +828,17 @@ for (const sig of [<span class="s">'SIGTERM'</span>, <span class="s">'SIGINT'</s
    - icon: a repo-relative path to an existing .svg, .png, or .ico file in the repo (optional, cosmetic) -- shown on the app's dashboard card
    Create this file if it's missing, using the app's real values. If the app has a real icon/logo asset already in the repo and no description/icon set, add them.
 
-2. Dockerfile must exist at the repo root and build an image whose process ends up listening on the exact port declared in app.yaml (remember Hostess does not inject PORT). Inside the container, the app must bind 0.0.0.0 (or whatever its framework binds by default) -- never 127.0.0.1 or localhost, which would make it unreachable from the host once a port is mapped to it. If the Dockerfile runs a build step (vite, tsc, etc.), do not set ENV NODE_ENV=production before installing dependencies (or use npm ci --include=dev) so devDependencies needed for the build aren't skipped.
+2. Dockerfile must exist at the repo root and build an image whose process ends up listening on the exact port declared in app.yaml (remember Hostess does not inject PORT). Inside the container, the app must bind 0.0.0.0 (or whatever its framework binds by default) -- never 127.0.0.1 or localhost, which would make it unreachable from the host once a port is mapped to it. If the Dockerfile runs a build step (vite, tsc, etc.), do not set ENV NODE_ENV=production before installing dependencies (or use npm ci --include=dev) so devDependencies needed for the build aren't skipped. The Dockerfile must build with a plain `docker build .` from the repo root -- Hostess passes no build args, build secrets or compose file. If the repo is a static site or SPA with no server of its own, add a minimal server that serves the built files with an index.html fallback (it also has to host the PIN gate, see #6). If the container runs as a non-root user, listen on a port above 1024.
 
 2b. If the app needs to hand out a public download/share link for one specific thing while otherwise staying private (no Go Online, Tailscale-only), it must NOT bundle a tunneling binary (cloudflared, ngrok, etc.) or spawn its own outbound tunnel -- that decision belongs to Hostess, not the app, regardless of how narrow or well-intentioned the reason is. Instead: declare publicGateway.port in app.yaml, mount only the specific public routes (e.g. a token-gated file download -- no login, no listing, no upload, nothing else the main app exposes) on that port as a separate listener, and read the app's current public URL (if any) from /run/hostess-gateway/url at the moment it's needed -- empty or missing means not currently enabled, don't cache a URL from an earlier read. Hostess owns starting/stopping/reconnecting the actual tunnel via the app's dashboard card.
 
-3. The app must boot and stay running with only the environment variables provided automatically (a Postgres connection, if postgres: true). Anything optional -- an API key, an integration, an AI provider, search, or push notifications -- must NOT cause a hard crash or process.exit() if it's unset or unreachable at boot (note: search and push networks are attached immediately after container start via docker network connect, so never probe SEARXNG_URL or NTFY_URL synchronously at top-level startup). Find any boot-time checks that exit on missing optional config and make them leave that feature disabled instead, so the server still starts and can be configured afterward.
+3. The app must boot and stay running with only the environment variables provided automatically (a Postgres connection, if postgres: true). Anything optional -- an API key, an integration, an AI provider, search, or push notifications -- must NOT cause a hard crash or exit (process.exit, sys.exit, os.Exit, a panic) if it's unset or unreachable at boot (note: search and push networks are attached immediately after container start via docker network connect, so never probe SEARXNG_URL or NTFY_URL synchronously at top-level startup). Find any boot-time checks that exit on missing optional config and make them leave that feature disabled instead, so the server still starts and can be configured afterward.
 
 4. If the app uses Postgres, make sure its SSL config respects sslmode=disable in the connection string, rather than forcing SSL purely from NODE_ENV:
    ssl: /sslmode=disable/i.test(process.env.DATABASE_URL || '')
      ? false
      : process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+   That snippet is node-postgres; with any other driver the rule is the same: honour sslmode=disable from the URL. The URL starts postgres:// (SQLAlchemy needs that rewritten to postgresql://). The app's role owns its own database but is not a superuser, so an extension that needs superuser cannot be created: report it.
    Also don't assume a fresh/empty database on every deploy or restart.
 
 5. If the app calls a vision or chat AI model, use these exact environment variable names (rename anything that currently uses different names for the same thing):
@@ -843,10 +884,30 @@ Optional -- only if the app already has its own admin/settings API and a live AI
    - The repo is cloned with git clone --depth 1 (and local-path deploys are copied without .git), so there is no history and there are no tags. If any build step or start script runs git describe / git rev-parse / a commit count to produce a version string, replace it with a value baked into a file -- it will otherwise fail or emit garbage.
    - The pre-build security scan reads only the Dockerfile, app.yaml, and ONE entrypoint file found at the repo root, matched against exactly this list: server.js, index.js, app.js, main.py, app.py, main.go. If the real entrypoint is somewhere else (src/index.js, bin/www, cmd/server/main.go), add or keep a root file with one of those names so the scan actually sees the app's code.
    - The container is recreated from scratch on every redeploy (docker rm -f), so anything written to the container filesystem outside dataDir is lost. Check for code writing uploads, SQLite files, caches or logs to a path not covered by dataDir.
-   - The container is stopped with SIGTERM, a 10-second grace period, then SIGKILL, on every single redeploy. Node running as PID 1 receives no default signal handling from the kernel, so unless the app explicitly installs one it never sees SIGTERM and is always killed. Add handlers for SIGTERM and SIGINT that close the server and exit, and make sure the Dockerfile uses exec-form CMD (CMD ["node", "server.js"]) not shell form (CMD node server.js) -- the shell form puts /bin/sh at PID 1, which does not forward signals at all. This matters most for any app writing to dataDir or a database, which can otherwise be killed between a file write and its matching row.
+   - The container is stopped with SIGTERM, a 10-second grace period, then SIGKILL, on every single redeploy. Any process running as PID 1 (Node, Python, a Go binary) receives no default signal handling from the kernel, and Hostess does not pass --init, so unless the app or its server framework explicitly handles SIGTERM it never sees it and is always killed. Add handlers for SIGTERM and SIGINT that close the server and exit, and make sure the Dockerfile uses exec-form CMD (CMD ["node", "server.js"]) not shell form (CMD node server.js) -- the shell form puts /bin/sh at PID 1, which does not forward signals at all. This matters most for any app writing to dataDir or a database, which can otherwise be killed between a file write and its matching row.
    - Restart policy is unless-stopped, so a container that crashes at boot restarts forever. Confirm boot is idempotent and re-running it against an already-populated database or data volume is safe.
    - Auto-detection of env var names only scans .js/.mjs/.cjs/.ts files. If this app is Python, Go, Ruby or Rust, every env var it reads -- including APP_PIN and any AI vars -- must be listed explicitly in app.yaml's env: array or the operator will have no way to set it.
    - Declaring a name in env: creates an empty slot in the dashboard panel; it does not supply a value. Only DATABASE_URL/DB_* (with postgres: true), SEARXNG_URL (with search: true), SYNC_SECRET, the three LM_STUDIO_* vars, and the three NTFY_* vars (from Hostess's own push server) are given real values automatically.
+
+12. The same repo must deploy on Linux, macOS and Windows hosts. The container is always Linux, but the clone and the build happen on the host:
+   - CPU: Apple Silicon Macs build and run arm64 images. Do not pin --platform=linux/amd64, use base images published for both amd64 and arm64, and if the Dockerfile downloads a binary, pick it by TARGETARCH instead of hardcoding amd64/x86_64.
+   - Line endings: Git for Windows checks text files out with CRLF by default, and a shell script with CRLF fails inside the container with "no such file or directory" or "bad interpreter". Add a .gitattributes containing `* text=auto eol=lf`, or make sure no shell script is needed at build or start.
+   - Executable bit: a script committed from Windows is usually mode 644. Never rely on the bit -- run scripts as `sh script.sh` / `node file.js`, or `RUN chmod +x` them in the Dockerfile.
+   - File-name case: macOS and Windows are case-insensitive, the container is not. Every import, require, template and asset path must match the file's real case exactly, and no two paths in the repo may differ only by case.
+   - Names Windows cannot check out: no file or directory containing : * ? " &lt; &gt; | or ending in a dot or space, none named con, prn, aux, nul, com1-9 or lpt1-9, no committed symlinks, and no very deep paths (the clone lands under the user's home plus hostess/apps/, and Windows caps paths near 260 characters).
+   - Never copy node_modules, a virtualenv or compiled output from the host into the image (see #10): it was built for the host's OS and CPU. Install and compile inside the Dockerfile.
+   - Do not reach the host yourself: no host.docker.internal, no localhost expecting a host service (use the injected URLs such as LM_STUDIO_URL exactly as given), no host file paths, no bind mounts, no GPU, USB, Bluetooth or serial devices. Hostess runs one container per app plus shared Postgres, search and push. If the app needs the host, or a second backing service Hostess does not provide (Redis, MySQL, MongoDB, a separate worker container, a docker-compose stack), stop and report it instead of faking it.
+   - dataDir must be a directory that holds only data, never the app directory or a parent of code -- a volume mounted over /app keeps serving the first deploy's code forever. If the image runs as a non-root USER, create dataDir in the Dockerfile and chown it to that user before the USER line, or the volume is not writable.
+
+13. The app is reached through several different origins -- http://localhost:&lt;port&gt; on the machine itself, an https Tailscale address, and a temporary https tunnel address that changes -- and must work on all of them:
+   - No hardcoded origin, domain or port: API calls, redirects, asset URLs and the manifest's start_url/scope are relative or root-relative, WebSocket URLs take ws/wss and host from location, and there is no CORS allowlist or cookie Domain tied to one host. An OAuth or webhook callback that needs one fixed public URL cannot work unmodified: report it.
+   - Frontend values baked in at build time (VITE_*, NEXT_PUBLIC_*, REACT_APP_*) cannot come from Hostess, which only sets runtime env and passes no build args. Use relative URLs or fetch config from the server at runtime.
+   - Session cookie: HttpOnly, SameSite=Lax, and Secure only when the request arrived over https (trust X-Forwarded-Proto from the proxy in front). An unconditional Secure cookie is dropped by Safari on http://localhost, so unlocking silently loops on a Mac.
+   - Throttle PIN attempts, and not only per IP: through a tunnel every visitor arrives from the proxy's address, so add a global cap too.
+   - If the app is a PWA: the PIN gate must let the web manifest, the icons and the service worker file through unauthenticated -- the browser fetches the manifest without cookies, and a 401 there removes the install option. The service worker must never cache /api/ responses, anything behind the PIN, a 401, the PIN page as the app shell, or a request carrying a Range header. Version the cache name, and serve index.html and the service worker file with Cache-Control: no-cache so a redeploy reaches installed clients.
+   - Service workers and install prompts only exist in a secure context (localhost or https). The app must still function without its service worker.
+
+14. Verify, if Docker is available in this environment: run `docker build -t hostess-check .` from the repo root with no build args, then `docker run --rm -p 127.0.0.1:&lt;port&gt;:&lt;port&gt; hostess-check` with no env vars set. Confirm it answers on the port and that `docker stop` returns in well under 10 seconds, then remove the image. For a postgres: true app a failed database connection is expected in this test, but the process must not crash-loop. If Docker is not available, say plainly that the build was not tested.
 
 Full reference with explanations for all of the above: https://hostess.cmdward.xyz/rules.html</textarea>
 
