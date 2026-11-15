@@ -139,3 +139,30 @@ section > .code { background: var(--s-surface); margin-bottom: 16px; }
 @media (max-width: 760px) { .row { grid-template-columns: 1fr; gap: 4px; } }
 
 footer { padding-top: 16px; border-top: 1px solid var(--s-border); font-size: var(--fs-sm); color: var(--s-text-3); }
+
+/* ── Bitmap and ASCII at rest (hover states alone never show on a phone) ── */
+/* Pressables stand on a dithered drop shadow and sink into it when pressed. */
+.pills, .os-row, .cmd-actions { isolation: isolate; }
+.btn, .pill, .os-tabs { position: relative; }
+.pill, .os-tabs { background-color: var(--s-bg); }
+.btn::after, .pill::after, .os-tabs::after {
+  content: ''; position: absolute; inset: 0; z-index: -1; border-radius: inherit; pointer-events: none;
+  transform: translate(4px, 4px);
+  background: repeating-conic-gradient(rgba(255,255,255,0.3) 0 25%, transparent 0 50%) 0 0 / 4px 4px;
+}
+.btn:active, .pill:active { transform: translate(3px, 3px); }
+.btn:active::after, .pill:active::after { opacity: 0; }
+
+/* Section rules and the footer rule are a dither strip, not a hairline. */
+h2::after { height: 4px; background: repeating-conic-gradient(var(--s-border) 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
+footer { border-top: none; padding-top: 0; }
+footer::before { content: ''; display: block; height: 4px; margin-bottom: 16px; background: repeating-conic-gradient(var(--s-border) 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
+
+/* ASCII furniture. */
+.row { border-top: 1px dashed var(--s-border); }
+.req { border: none; padding: 0; letter-spacing: 0; text-transform: none; }
+.req::before { content: '['; }
+.req::after { content: ']'; }
+.steps li::before { content: counter(step, decimal-leading-zero); }
+.steps li { grid-template-columns: 30px 1fr; }
+h3::before { content: '// '; }
