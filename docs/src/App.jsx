@@ -418,8 +418,7 @@ export default function App() {
           <div className="os-tabs" role="tablist" aria-label="Operating system">
             {Object.entries(OS_DATA).map(([key, item]) => (
               <button key={key} role="tab" aria-selected={os === key} className={`os-tab ${os === key ? 'active' : ''}`} onClick={() => setOs(key)}>
-                {os === key && <motion.span layoutId="os-pill" className="os-pill" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
-                <span>{item.label}</span>
+                <span>{item.label}</span><span className="tab-caret" aria-hidden="true">_</span>
               </button>
             ))}
           </div>

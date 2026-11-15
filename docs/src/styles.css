@@ -87,14 +87,20 @@ h3 { font-size: var(--fs-xs); font-weight: 400; letter-spacing: 0.16em; text-tra
 /* ── Install ── */
 .os-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .os-tabs { display: inline-flex; gap: 12px; }
-.os-tab { position: relative; padding: 8px 18px; border: 1px solid var(--s-border); border-radius: 8px; background-color: var(--s-bg); font-size: var(--fs-md); color: var(--s-text-1); transition: color 0.12s; }
-.os-tab > span:last-child { position: relative; }
+.os-tab { position: relative; padding: 8px 12px 8px 18px; border: 1px solid var(--s-border); border-radius: 8px; background-color: var(--s-bg); font-size: var(--fs-md); color: var(--s-text-1); transition: color 0.12s; }
 .os-tab:hover { color: var(--s-text-0); }
 .os-tab:not(.active):hover { background: var(--dither-lit), var(--s-bg); }
-.os-tab.active { color: var(--s-bg); font-weight: 600; }
-.os-pill { position: absolute; inset: -1px; border-radius: 8px; background: var(--s-accent); }
+/* Selecting a tab is inverse video that lands in three hard dither frames, no slide or easing. */
+.os-tab.active { color: var(--s-bg); background: var(--s-accent); border-color: var(--s-accent); animation: tab-on 0.15s steps(1, end); }
+@keyframes tab-on {
+  0% { color: var(--s-text-0); background: conic-gradient(#fff 25%, transparent 0) 0 0 / 4px 4px, var(--s-bg); }
+  34% { color: var(--s-text-0); background: repeating-conic-gradient(#fff 0 25%, transparent 0 50%) 0 0 / 4px 4px, var(--s-bg); }
+  67% { color: var(--s-bg); background: conic-gradient(#000 25%, transparent 0) 0 0 / 4px 4px, var(--s-accent); }
+}
+.tab-caret { visibility: hidden; }
+.os-tab.active .tab-caret { visibility: visible; animation: blink 1s step-end infinite; }
 .os-meta { font-size: var(--fs-sm); color: var(--s-text-3); }
-@media (max-width: 640px) { .os-tabs { gap: 10px; } .os-tab { padding: 11px 15px; } }
+@media (max-width: 640px) { .os-tabs { gap: 10px; } .os-tab { padding: 11px 9px 11px 15px; } }
 
 .cmd { display: flex; gap: 12px; padding: 18px 20px; background: var(--s-bg); border-bottom: 1px solid var(--s-border); font-size: var(--fs-md); line-height: 1.7; }
 .cmd .prompt { color: var(--s-text-3); user-select: none; flex-shrink: 0; }
