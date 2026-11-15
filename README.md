@@ -53,6 +53,7 @@ Any repo you point it at needs two files at its root:
 name: my-app          # lowercase letters/numbers/hyphens, 2-50 chars
 port: 3000             # port your app listens on *inside* the container
 postgres: false        # true to get a DATABASE_URL env var wired to a shared Postgres
+search: false          # true to get a SEARXNG_URL env var wired to a shared, isolated SearXNG
 autoUpdate: false       # true to auto-redeploy whenever the source repo gets a new commit
 env:                   # optional — names Hostess will prompt for on the app card ("env" panel)
   - SOME_KEY
@@ -61,6 +62,11 @@ dataDir: /app/uploads  # optional — absolute container path to persist across 
                        # file storage survives redeploys; without it the container's writable
                        # layer is discarded on every `docker rm`/recreate. Omit if the app keeps
                        # no local state (e.g. everything lives in Postgres).
+publicGateway:         # optional — a second, narrow port Hostess can tunnel publicly when you
+  port: 3001           # allow sharing on the app's card; the app reads its public address
+                       # from /run/hostess-gateway/url
+description: One line  # optional — shown on the app's card, up to 200 characters
+icon: public/icon.svg  # optional — repo path to an .svg/.png/.ico used as the card logo
 ```
 
 **`Dockerfile`** — anything that builds and listens on `port`.

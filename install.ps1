@@ -2,6 +2,12 @@
 # hostess installer (Windows / PowerShell)
 # Usage:  iwr -useb https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.ps1 | iex
 
+# Set by the script itself when it re-launches elevated. On a standard account the UAC prompt is
+# answered with a different admin account, and the elevated window then runs as that admin:
+# without these, Hostess would install into the admin's profile and never start for the person
+# who ran it.
+param([string]$InstallUser, [string]$InstallProfile)
+
 $ErrorActionPreference = "Stop"
 
 Write-Host "== hostess installer (Windows) =="
@@ -11,18 +17,23 @@ $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
 $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     Write-Host "Re-launching as Administrator..."
+    $who = "-InstallUser `"$env:USERDOMAIN\$env:USERNAME`" -InstallProfile `"$env:USERPROFILE`""
     $scriptPath = $MyInvocation.MyCommand.Path
     if ($scriptPath) {
-        Start-Process powershell -Verb RunAs -ArgumentList "-NoExit -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`""
+        Start-Process powershell -Verb RunAs -ArgumentList "-NoExit -NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" $who"
     } else {
         # running via `iex` (no file on disk), re-download and run elevated
         $tmp = Join-Path $env:TEMP "hostess-install.ps1"
         Invoke-WebRequest -UseBasicParsing -Uri ("https://raw.githubusercontent.com/jessekward-prog/hostess/main/install.ps1?t=" + [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()) -OutFile $tmp
-        Start-Process powershell -Verb RunAs -ArgumentList "-NoExit -NoProfile -ExecutionPolicy Bypass -File `"$tmp`""
+        Start-Process powershell -Verb RunAs -ArgumentList "-NoExit -NoProfile -ExecutionPolicy Bypass -File `"$tmp`" $who"
     }
     Write-Host "Continuing in the new elevated window, check your taskbar for the UAC prompt / PowerShell icon."
     exit
 }
+
+# Who Hostess is being installed for: the person who started the script, not whoever elevated it.
+$TargetUser = if ($InstallUser) { $InstallUser } else { "$env:USERDOMAIN\$env:USERNAME" }
+$TargetProfile = if ($InstallProfile) { $InstallProfile } else { $env:USERPROFILE }
 
 function Refresh-Path {
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
@@ -93,9 +104,9 @@ if (-not (Get-Command cloudflared -ErrorAction SilentlyContinue)) {
 $addedToDockerUsers = $false
 try {
     if (Get-LocalGroup -Name "docker-users" -ErrorAction SilentlyContinue) {
-        if (-not (Get-LocalGroupMember -Group "docker-users" -Member $env:USERNAME -ErrorAction SilentlyContinue)) {
-            Write-Host "Adding $env:USERNAME to the docker-users group..."
-            Add-LocalGroupMember -Group "docker-users" -Member $env:USERNAME -ErrorAction SilentlyContinue
+        if (-not (Get-LocalGroupMember -Group "docker-users" -Member $TargetUser -ErrorAction SilentlyContinue)) {
+            Write-Host "Adding $TargetUser to the docker-users group..."
+            Add-LocalGroupMember -Group "docker-users" -Member $TargetUser -ErrorAction SilentlyContinue
             $addedToDockerUsers = $true
         }
     }
@@ -135,7 +146,7 @@ if (-not $dockerRunning) {
 
 # --- fetch the app ---
 $RepoUrl = "https://github.com/jessekward-prog/hostess.git"
-$InstallDir = if ($env:HOSTESS_DIR) { $env:HOSTESS_DIR } else { Join-Path $env:USERPROFILE "hostess" }
+$InstallDir = if ($env:HOSTESS_DIR) { $env:HOSTESS_DIR } else { Join-Path $TargetProfile "hostess" }
 
 $scriptDir = if ($MyInvocation.MyCommand.Path) { Split-Path -Parent $MyInvocation.MyCommand.Path } else { $null }
 $pkgJson = if ($scriptDir) { Join-Path $scriptDir "package.json" } else { $null }
@@ -156,6 +167,10 @@ Set-Location $InstallDir
 # execution policy refuses to run.
 npm.cmd install --omit=dev
 
+# Everything above ran elevated, so the files belong to the admin account. Git refuses to work in
+# a repository owned by someone else ("dubious ownership"), which would break every self-update.
+icacls $InstallDir /setowner $TargetUser /T /C /Q | Out-Null
+
 # --- scheduled task (survives logoff/reboot, runs hidden, auto-restarts on non-zero exit) ---
 $TaskName = "hostess"
 $action = New-ScheduledTaskAction -Execute "powershell.exe" `
@@ -163,7 +178,7 @@ $action = New-ScheduledTaskAction -Execute "powershell.exe" `
 $trigger = New-ScheduledTaskTrigger -AtLogOn
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
-$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
+$principal = New-ScheduledTaskPrincipal -UserId $TargetUser -LogonType Interactive -RunLevel Limited
 
 Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger `
     -Settings $settings -Principal $principal -Force | Out-Null
