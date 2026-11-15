@@ -88,14 +88,19 @@ h3 { font-size: var(--fs-xs); font-weight: 400; letter-spacing: 0.16em; text-tra
 .os-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .os-tabs { display: inline-flex; gap: 12px; }
 .os-tab { position: relative; padding: 8px 12px 8px 18px; border: 1px solid var(--s-border); border-radius: 8px; background-color: var(--s-bg); font-size: var(--fs-md); color: var(--s-text-1); transition: color 0.12s; }
-.os-tab:hover { color: var(--s-text-0); }
-.os-tab:not(.active):hover { background: var(--dither-lit), var(--s-bg); }
+/* PlayStation face-button colours: Linux = Triangle green, macOS = Square pink, Windows = Cross blue. */
+.os-tab[data-os="linux"] { --os: #3fb37f; }
+.os-tab[data-os="macos"] { --os: #e0559c; }
+.os-tab[data-os="windows"] { --os: #4f8fe0; }
+.os-tab { color: var(--os); border-color: color-mix(in srgb, var(--os) 50%, transparent); }
+.os-tab::after { background: repeating-conic-gradient(color-mix(in srgb, var(--os) 60%, transparent) 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
+.os-tab:not(.active):hover { background: conic-gradient(color-mix(in srgb, var(--os) 45%, transparent) 25%, transparent 0) 0 0 / 4px 4px, var(--s-bg); }
 /* Selecting a tab is inverse video that lands in three hard dither frames, no slide or easing. */
-.os-tab.active { color: var(--s-bg); background: var(--s-accent); border-color: var(--s-accent); animation: tab-on 0.15s steps(1, end); }
+.os-tab.active { color: var(--s-bg); background: var(--os); border-color: var(--os); animation: tab-on 0.15s steps(1, end); }
 @keyframes tab-on {
-  0% { color: var(--s-text-0); background: conic-gradient(#fff 25%, transparent 0) 0 0 / 4px 4px, var(--s-bg); }
-  34% { color: var(--s-text-0); background: repeating-conic-gradient(#fff 0 25%, transparent 0 50%) 0 0 / 4px 4px, var(--s-bg); }
-  67% { color: var(--s-bg); background: conic-gradient(#000 25%, transparent 0) 0 0 / 4px 4px, var(--s-accent); }
+  0% { color: var(--os); background: conic-gradient(var(--os) 25%, transparent 0) 0 0 / 4px 4px, var(--s-bg); }
+  34% { color: var(--os); background: repeating-conic-gradient(var(--os) 0 25%, transparent 0 50%) 0 0 / 4px 4px, var(--s-bg); }
+  67% { color: var(--s-bg); background: conic-gradient(#000 25%, transparent 0) 0 0 / 4px 4px, var(--os); }
 }
 .tab-caret { visibility: hidden; }
 .os-tab.active .tab-caret { visibility: visible; animation: blink 1s step-end infinite; }

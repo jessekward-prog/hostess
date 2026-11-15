@@ -142,10 +142,20 @@
     font-family: var(--mono); font-size: 11px; color: var(--text-3);
   }
 
-  /* ── AI compliance prompt: sidebar trigger + modal ── */
+  /* ── AI compliance prompt: card at the top of the page + modal ── */
+  .prompt-card {
+    display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+    border: 1px solid var(--ok); border-radius: 12px; background: color-mix(in srgb, var(--ok) 7%, var(--surface));
+    padding: 18px 20px; margin-bottom: 36px;
+  }
+  .prompt-card h2 { font-size: 1.05rem; margin: 0 0 4px; }
+  .prompt-card p { font-size: 13px; color: var(--text-1); margin: 0; max-width: 56ch; }
+  .prompt-card-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .prompt-view-btn { background: none; border: none; padding: 0; cursor: pointer; font-family: var(--mono); font-size: 12px; color: var(--text-2); text-decoration: underline; text-underline-offset: 3px; }
+  .prompt-view-btn:hover { color: var(--text-0); }
   .ai-prompt-btn {
-    display: flex; align-items: center; justify-content: center; gap: 9px; width: calc(100% - 24px);
-    margin: 16px 12px 6px; padding: 14px 12px; border-radius: 10px; border: none; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+    padding: 12px 18px; border-radius: 8px; border: none; cursor: pointer;
     background: var(--ok); color: #05170e; font-family: var(--mono); font-size: 12.5px; font-weight: 700;
     letter-spacing: 0.01em; line-height: 1.3; text-align: center; transition: background 0.12s, transform 0.08s;
   }
@@ -204,10 +214,6 @@
       <span class="mark"><svg width="14" height="14" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="42" stroke="#fff" stroke-width="6"/><g stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23"/><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23" transform="rotate(120,50,50)"/><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23" transform="rotate(240,50,50)"/></g><circle cx="50" cy="50" r="8" stroke="#fff" stroke-width="4.4"/><g stroke="#fff" stroke-width="4.4" stroke-linecap="round"><line x1="50" y1="44" x2="50" y2="56"/><line x1="50" y1="44" x2="50" y2="56" transform="rotate(60,50,50)"/><line x1="50" y1="44" x2="50" y2="56" transform="rotate(120,50,50)"/></g></svg></span>
       <div><strong>Hostess</strong><span>compliance rules</span></div>
     </div>
-    <button class="ai-prompt-btn" id="aiPromptBtn" type="button">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg>
-      Compliance Prompt for AI
-    </button>
     <nav>
       <span class="label">Checklist</span>
       <a href="#checklist"><span class="n">·</span>Quick checklist</a>
@@ -230,6 +236,20 @@
   </aside>
 
   <main>
+
+    <div class="prompt-card">
+      <div>
+        <h2>Use this prompt with AI to make a repo work with Hostess</h2>
+        <p>Paste it into an AI coding tool with your repo open. It checks the repo against every rule on this page and fixes what doesn't comply.</p>
+      </div>
+      <div class="prompt-card-actions">
+        <button class="ai-prompt-btn" id="copyPromptTopBtn" type="button">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          <span id="copyPromptTopLabel">Copy prompt</span>
+        </button>
+        <button class="prompt-view-btn" id="aiPromptBtn" type="button">read it first</button>
+      </div>
+    </div>
 
     <header class="top">
       <div class="eyebrow">Pre-flight — read before creating or updating a repo</div>
@@ -849,17 +869,25 @@ Full reference with explanations for all of the above: https://hostess.cmdward.x
   // when the browser wants to prompt for permission and can't (some embedded/
   // sandboxed contexts) -- race it against a short timeout so the button
   // always resolves to the reliable execCommand fallback instead of hanging.
-  copyPromptBtn.addEventListener('click', () => {
+  function wireCopy(btn, label) {
+    const rest = label.textContent;
+    btn.addEventListener('click', () => copyPrompt(btn, label, rest));
+  }
+  wireCopy(copyPromptBtn, copyPromptLabel);
+  wireCopy(document.getElementById('copyPromptTopBtn'), document.getElementById('copyPromptTopLabel'));
+
+  function copyPrompt(btn, label, rest) {
     let settled = false;
     const finish = () => {
       if (settled) return;
       settled = true;
-      copyPromptLabel.textContent = 'Copied!';
-      copyPromptBtn.classList.add('copied');
-      setTimeout(() => { copyPromptLabel.textContent = 'Copy all'; copyPromptBtn.classList.remove('copied'); }, 1600);
+      label.textContent = 'Copied!';
+      btn.classList.add('copied');
+      setTimeout(() => { label.textContent = rest; btn.classList.remove('copied'); }, 1600);
     };
     const fallback = () => {
       if (settled) return;
+      openPrompt(); // the textarea must be visible for select() + execCommand to work
       promptText.select();
       try { document.execCommand('copy'); } catch {}
       finish();
@@ -870,7 +898,7 @@ Full reference with explanations for all of the above: https://hostess.cmdward.x
     } else {
       fallback();
     }
-  });
+  }
 </script>
 </body>
 </html>
