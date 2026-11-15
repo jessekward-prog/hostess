@@ -432,7 +432,14 @@ export default function App() {
             <pre>{cur.cmd}</pre>
           </div>
           <div className="cmd-actions">
-            <button className="btn" onClick={() => copy(cur.cmd, 'install')}>{copiedKey === 'install' ? 'Copied' : 'Copy command'}</button>
+            <button className="btn" onClick={() => copy(cur.cmd, 'install')}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="miter" shapeRendering="crispEdges" aria-hidden="true">
+                {copiedKey === 'install'
+                  ? <path d="M4 12l6 6L20 6" />
+                  : <><rect x="9" y="9" width="12" height="12" /><path d="M5 15H3V3h12v2" /></>}
+              </svg>
+              <span>{copiedKey === 'install' ? 'Copied' : 'Copy command'}</span>
+            </button>
             <span className="note">Safe to re-run. Read it first: <a href={cur.sourceUrl} target="_blank" rel="noopener">{cur.sourceLabel} ↗</a></span>
           </div>
 
