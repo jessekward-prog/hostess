@@ -505,8 +505,8 @@
           <div class="myai-presets" id="theme-options"></div>
           <div class="bg-slider"><span class="myai-label">INTENSITY</span><span class="myai-label" id="bg-intensity-v"></span></div>
           <input type="range" class="bg-range" id="bg-intensity" min="0.3" max="3" step="0.1" value="1" aria-label="Background intensity">
-          <div class="bg-slider"><span class="myai-label">COLOUR</span><span class="myai-label"><span id="bg-hue-v"></span> <button type="button" class="bg-reset" id="bg-hue-reset" hidden>reset</button></span></div>
-          <input type="range" class="bg-range hue" id="bg-hue" min="0" max="360" step="1" value="35" aria-label="Background accent colour">
+          <div class="bg-slider"><span class="myai-label">ACCENT COLOUR</span><span class="myai-label"><span id="bg-hue-v"></span> <button type="button" class="bg-reset" id="bg-hue-reset" hidden>reset</button></span></div>
+          <input type="range" class="bg-range hue" id="bg-hue" min="0" max="360" step="1" value="35" aria-label="Accent colour">
         </div>
       </div>
     </div>
@@ -1665,16 +1665,16 @@ myaiModelSelect.addEventListener('change', async () => {
 // ASCII themes share one grid renderer. glyph(c, r, o) returns '' or a char, or [char, alpha];
 // step(o) runs once per redraw for stateful ones (rain, life). o = {cols, rows, t, f, state}.
 function asciiTheme(label, every, glyph, step) {
-  return { label, group: 'ASCII', px: 1, every, draw({ ctx, W, H, f, state, rgb }) {
+  return { label, group: 'ASCII', px: 1, every, draw({ ctx, W, H, f, state }) {
     const cols = Math.ceil(W / 8), rows = Math.ceil(H / 12), o = { cols, rows, t: f * 0.01, f, state };
     if (step) step(o);
     ctx.font = '11px "JetBrains Mono", monospace'; ctx.textBaseline = 'top';
-    const fg = (rgb || [176, 176, 176]).join(','); let last = null;
+    let last = null;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       let g = glyph(c, r, o); if (!g) continue;
       const [ch, a] = Array.isArray(g) ? g : [g, 0.2];
       if (!ch || ch === ' ') continue;
-      if (a !== last) { ctx.fillStyle = `rgba(${fg},${a})`; last = a; }
+      if (a !== last) { ctx.fillStyle = `rgba(176,176,176,${a})`; last = a; }
       ctx.fillText(ch, c * 8, r * 12);
     }
   } };
@@ -1733,15 +1733,14 @@ const BG_THEMES = {
   } },
 
   fog: { label: 'Fog', px: 4,
-    draw({ ctx, W, H, f, state, rgb }) {
-      const [cr, cg, cb] = rgb || [255, 255, 255], col = ((0x0f << 24) | (cb << 16) | (cg << 8) | cr) >>> 0;
+    draw({ ctx, W, H, f, state }) {
       if (!state.img || state.img.width !== W || state.img.height !== H) state.img = ctx.createImageData(W, H);
       const BAYER = [[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
       const px = new Uint32Array(state.img.data.buffer);
       const t = f * 0.004;
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
         const v = (Math.sin(x * 0.09 + t * 1.3) + Math.sin(y * 0.07 - t) + Math.sin((x + y) * 0.05 + t * 0.7) + Math.sin(Math.hypot(x, y) * 0.06 - t)) / 8 + 0.5; // 0..1
-        px[y * W + x] = v * 0.32 > BAYER[y & 3][x & 3] / 16 ? col : 0;
+        px[y * W + x] = v * 0.32 > BAYER[y & 3][x & 3] / 16 ? 0x0fffffff : 0;
       }
       ctx.putImageData(state.img, 0, 0);
     } },
@@ -1791,10 +1790,9 @@ const BG_THEMES = {
     if (hy !== null) { ctx.fillStyle = `rgba(${A[0]},${A[1]},${A[2]},0.7)`; ctx.fillRect(Math.max(0, state.x - 2), hy - 1, 2, 3); }
   }),
 
-  sigil: { label: 'Sigil', px: 2, draw({ ctx, W, H, f, rgb }) {
-    const fg = (rgb || [255, 255, 255]).join(',');
+  sigil: { label: 'Sigil', px: 2, draw({ ctx, W, H, f }) {
     const cx = W / 2, cy = H * 0.58, R = Math.min(W * 0.46, H * 0.4), rot = f * 0.0006;
-    const dot = (x, y, a) => { x = Math.round(x); y = Math.round(y); if ((x + y) & 1) return; ctx.fillStyle = `rgba(${fg},${a})`; ctx.fillRect(x, y, 1, 1); };
+    const dot = (x, y, a) => { x = Math.round(x); y = Math.round(y); if ((x + y) & 1) return; ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.fillRect(x, y, 1, 1); };
     for (let a = 0; a < 6.283; a += 0.5 / R) { dot(cx + Math.cos(a) * R, cy + Math.sin(a) * R, 0.2); dot(cx + Math.cos(a) * R * 0.14, cy + Math.sin(a) * R * 0.14, 0.2); }
     for (let k = 0; k < 3; k++) for (let th = 0; th < 3.2; th += 0.4 / R * 4) { // three spiral arms, 120° apart
       const ang = th + rot + k * 2.094, r = R * (0.14 + 0.78 * th / 3.2);
@@ -1857,12 +1855,11 @@ const BG_THEMES = {
     state.g = nx; state.age++;
   }),
 
-  sweep: { label: 'Sweep', px: 2, draw({ ctx, W, H, f, rgb }) {
-    const fg = (rgb || [255, 255, 255]).join(',');
+  sweep: { label: 'Sweep', px: 2, draw({ ctx, W, H, f }) {
     const trail = 50, y0 = Math.floor((f * 0.35) % (H + trail));
     for (let d = 0; d < trail; d++) {
       const y = y0 - d; if (y < 0 || y >= H) continue;
-      ctx.fillStyle = `rgba(${fg},${d === 0 ? 0.16 : 0.07 * (1 - d / trail)})`;
+      ctx.fillStyle = `rgba(255,255,255,${d === 0 ? 0.16 : 0.07 * (1 - d / trail)})`;
       if (d === 0) ctx.fillRect(0, y, W, 1);
       else for (let x = y & 1; x < W; x += 2) ctx.fillRect(x, y, 1, 1);
     }
@@ -1876,7 +1873,7 @@ function hslToRgb(h) { // hue 0-360 at fixed 75% / 60% so every pick is a readab
   return [f(0), f(8), f(4)];
 }
 
-function mountBackground(container, name, cfg) {
+function mountBackground(container, name) {
   const theme = BG_THEMES[name];
   if (!theme || !theme.draw) return () => {};
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1894,7 +1891,7 @@ function mountBackground(container, name, cfg) {
     f += reduceMotion ? 0.2 : 1;
     if (!theme.every || Math.floor(f) % theme.every === 0) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      theme.draw({ ctx, W: canvas.width, H: canvas.height, f: Math.floor(f), PX, A: cfg.rgb || [232, 132, 10], rgb: cfg.rgb, state });
+      theme.draw({ ctx, W: canvas.width, H: canvas.height, f: Math.floor(f), PX, A: [232, 132, 10], state });
     }
     raf = requestAnimationFrame(loop);
   })();
@@ -1907,13 +1904,12 @@ function mountBackground(container, name, cfg) {
   const intIn = document.getElementById('bg-intensity'), hueIn = document.getElementById('bg-hue');
   const store = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
   const load = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
-  const cfg = { rgb: null }; // rgb is read every frame, so the hue slider recolours live
   let current = BG_THEMES[load('hostess-bg')] ? load('hostess-bg') : 'waves';
   let stop = () => {};
 
   function apply(name) {
     stop(); current = name;
-    stop = mountBackground(sidebar, name, cfg);
+    stop = mountBackground(sidebar, name);
     store('hostess-bg', name);
     wrap.querySelectorAll('.myai-preset').forEach((b) => b.classList.toggle('active', b.dataset.bg === name));
   }
@@ -1922,11 +1918,20 @@ function mountBackground(container, name, cfg) {
     document.getElementById('bg-intensity-v').textContent = `${Math.round(v * 100)}%`;
     store('hostess-bg-int', v);
   }
-  function setHue(h) { // null = neutral (each theme's own grey/amber)
-    cfg.rgb = h === null ? null : hslToRgb(h);
-    document.getElementById('bg-hue-v').textContent = h === null ? 'neutral' : `${h}°`;
+  function setHue(h) { // null = the stock look (white accent, CRT-green Open App)
+    const root = document.documentElement.style;
+    if (h === null) ['--s-accent', '--s-accent-faint', '--s-accent-glow', '--crt-green', '--crt-green-rgb'].forEach((v) => root.removeProperty(v));
+    else {
+      const [r, g, b] = hslToRgb(h);
+      root.setProperty('--s-accent', `rgb(${r},${g},${b})`);
+      root.setProperty('--s-accent-faint', `rgba(${r},${g},${b},0.07)`);
+      root.setProperty('--s-accent-glow', `rgba(${r},${g},${b},0.18)`);
+      root.setProperty('--crt-green', `rgb(${r},${g},${b})`);
+      root.setProperty('--crt-green-rgb', `${r},${g},${b}`);
+    }
+    document.getElementById('bg-hue-v').textContent = h === null ? 'default' : `${h}°`;
     document.getElementById('bg-hue-reset').hidden = h === null;
-    if (h !== null) store('hostess-bg-hue', h); else store('hostess-bg-hue', '');
+    store('hostess-bg-hue', h === null ? '' : h);
   }
 
   const groups = {};
