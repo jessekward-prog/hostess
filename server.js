@@ -44,11 +44,30 @@ app.post('/api/auth/setup', (req, res) => {
   }
 });
 
+// Go Online puts this login on the public internet, so wrong guesses are limited: per caller
+// (5 free tries, then a wait that doubles from 30s up to 15 min) and, for tunnel traffic only,
+// a cap across all callers so rotating addresses doesn't help. Local logins never hit the
+// shared cap, so a stranger can't lock the owner out of their own machine.
+const loginFails = new Map(); // caller -> { fails, until }
+let tunnelFails = [];
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body || {};
+  const viaTunnel = req.headers['cf-connecting-ip'];
+  const caller = viaTunnel || req.socket.remoteAddress;
+  const now = Date.now();
+  tunnelFails = tunnelFails.filter((t) => now - t < 10 * 60 * 1000);
+  const rec = loginFails.get(caller) || { fails: 0, until: 0 };
+  if (now < rec.until || (viaTunnel && tunnelFails.length >= 50)) {
+    return res.status(429).json({ error: 'Too many wrong attempts. Wait a little and try again.' });
+  }
   if (!auth.verifyLogin(String(username || '').trim(), String(password || ''))) {
+    rec.fails += 1;
+    if (rec.fails >= 5) rec.until = now + Math.min(30000 * 2 ** (rec.fails - 5), 15 * 60 * 1000);
+    loginFails.set(caller, rec);
+    if (viaTunnel) tunnelFails.push(now);
     return res.status(401).json({ error: 'Wrong username or password' });
   }
+  loginFails.delete(caller);
   auth.setSessionCookie(res);
   res.json({ ok: true });
 });
@@ -433,6 +452,10 @@ app.post('/api/forge/projects/:name/install', async (req, res) => {
   }
   res.end();
 });
+
+for (const f of ['registry.json', 'settings.json', 'auth.json']) {
+  try { fs.chmodSync(path.join(__dirname, f), 0o600); } catch { /* not created yet, or Windows */ }
+}
 
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`hostess dashboard: http://localhost:${PORT}`);

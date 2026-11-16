@@ -124,10 +124,15 @@ if ($wslExit -ne 0) {
     exit 0
 }
 
+# Docker Desktop runs inside one person's Windows session. If the UAC prompt was answered with a
+# different admin account, starting it here would start it for that admin, not for $TargetUser.
+$sameUser = ($TargetUser -eq "$env:USERDOMAIN\$env:USERNAME")
 $dockerRunning = Test-DockerRunning
-if (-not $dockerRunning) {
+if (-not $dockerRunning -and -not $sameUser) {
+    Write-Warning "Docker Desktop isn't running. Start it from the Start menu as $TargetUser and finish its first-run setup; Hostess will pick it up."
+} elseif (-not $dockerRunning) {
     Write-Host "Starting Docker Desktop..."
-    Start-Process "C:\Program Files\Docker\Docker\Docker Desktop.exe"
+    Start-Process (Join-Path $env:ProgramFiles "Docker\Docker\Docker Desktop.exe")
     Write-Host -NoNewline "Waiting for Docker to be ready (first run needs you to click through its setup)..."
     $attempts = 0
     do {
@@ -171,10 +176,11 @@ npm.cmd install --omit=dev
 # a repository owned by someone else ("dubious ownership"), which would break every self-update.
 icacls $InstallDir /setowner $TargetUser /T /C /Q | Out-Null
 
-# --- scheduled task (survives logoff/reboot, runs hidden, auto-restarts on non-zero exit) ---
+# --- scheduled task (starts at logon, runs hidden, auto-restarts on non-zero exit) ---
 $TaskName = "hostess"
+$dirQ = $InstallDir -replace "'", "''"   # a profile such as C:\Users\O'Brien must not end the quoted path
 $action = New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"Set-Location '$InstallDir'; while (`$true) { node server.js; if (`$LASTEXITCODE -eq 0) { break }; Start-Sleep -Seconds 2 }`""
+    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"Set-Location '$dirQ'; while (`$true) { node server.js; if (`$LASTEXITCODE -eq 0) { break }; Start-Sleep -Seconds 2 }`""
 $trigger = New-ScheduledTaskTrigger -AtLogOn
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
@@ -189,7 +195,7 @@ Start-ScheduledTask -TaskName $TaskName
 # that would also kill the user's own unrelated Node servers.
 $UpdateTaskName = "hostess-update"
 $updateAction = New-ScheduledTaskAction -Execute "powershell.exe" `
-    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"`$old = git -C '$InstallDir' rev-parse HEAD; git -C '$InstallDir' pull --ff-only; if (`$LASTEXITCODE -eq 0 -and (git -C '$InstallDir' rev-parse HEAD) -ne `$old) { npm.cmd --prefix '$InstallDir' install --omit=dev; Get-NetTCPConnection -LocalPort 5300 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id `$_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-ScheduledTask -TaskName hostess }`""
+    -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -Command `"`$old = git -C '$dirQ' rev-parse HEAD; git -C '$dirQ' pull --ff-only; if (`$LASTEXITCODE -eq 0 -and (git -C '$dirQ' rev-parse HEAD) -ne `$old) { npm.cmd --prefix '$dirQ' install --omit=dev; Get-NetTCPConnection -LocalPort 5300 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id `$_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-ScheduledTask -TaskName hostess }`""
 $updateTrigger = New-ScheduledTaskTrigger -RepetitionInterval (New-TimeSpan -Hours 1) -Once -At (Get-Date)
 $updateSettings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries `
     -ExecutionTimeLimit (New-TimeSpan -Minutes 10)
@@ -203,4 +209,4 @@ if ($addedToDockerUsers) {
     Write-Warning "You were just added to the docker-users group. Sign out of Windows and back in once, or deploys will fail with a Docker permission error."
 }
 Start-Sleep -Seconds 1
-Start-Process "http://localhost:5300"
+if ($sameUser) { Start-Process "http://localhost:5300" }

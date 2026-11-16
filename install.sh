@@ -7,6 +7,12 @@ SERVICE_NAME="hostess"
 
 echo "== hostess installer =="
 
+USER="${USER:-$(id -un)}" # unset in some minimal shells, and set -u would abort on it
+if [ "$(id -u)" = "0" ]; then
+  echo "Warning: running as root. Hostess, and every build of every repo you deploy, will run as root." >&2
+  echo "Prefer running this as your normal user; it asks for sudo when it needs it." >&2
+fi
+
 SUDO=""
 if command -v sudo >/dev/null 2>&1; then SUDO="sudo"; fi
 
@@ -58,15 +64,17 @@ fi
 # Go Online opens its links with cloudflared. Optional: everything else works without it.
 if ! command -v cloudflared >/dev/null 2>&1; then
   echo "Installing cloudflared (used by Go Online)..."
-  deb="$(mktemp)"
-  if command -v dpkg >/dev/null 2>&1 \
-    && curl -fsSL -o "$deb" "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-$(dpkg --print-architecture).deb" \
-    && $SUDO dpkg -i "$deb" >/dev/null; then
+  # From Cloudflare's own signed apt repository, so apt verifies it and keeps it updated. A
+  # one-off .deb download would be unverified and would never receive a security update.
+  if command -v apt-get >/dev/null 2>&1 \
+    && $SUDO mkdir -p --mode=0755 /usr/share/keyrings \
+    && curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | $SUDO tee /usr/share/keyrings/cloudflare-main.gpg >/dev/null \
+    && echo 'deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared any main' | $SUDO tee /etc/apt/sources.list.d/cloudflared.list >/dev/null \
+    && $SUDO apt-get update -y >/dev/null && $SUDO apt-get install -y cloudflared >/dev/null; then
     :
   else
     echo "Couldn't install cloudflared. Go Online stays unavailable until you install it; everything else works." >&2
   fi
-  rm -f "$deb"
 fi
 
 # --- fetch the app ---

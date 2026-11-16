@@ -30,6 +30,11 @@ fi
 # prefers Homebrew's bin over any older/system node, git, etc. on PATH.
 eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || /usr/local/bin/brew shellenv)"
 
+# Docker Desktop can install its CLI per user (~/.docker/bin) and always ships one inside the app.
+# Without these on PATH, the wait below can time out with Docker already running.
+DOCKER_BINS="$HOME/.docker/bin:/Applications/Docker.app/Contents/Resources/bin"
+export PATH="$PATH:$DOCKER_BINS"
+
 # --- prerequisites ---
 if ! command -v git >/dev/null 2>&1; then
   echo "Installing git..."
@@ -90,8 +95,10 @@ fi
 cd "$INSTALL_DIR"
 npm install --omit=dev
 
-# --- launchd agent (survives logout/reboot) ---
-mkdir -p "$HOME/Library/LaunchAgents"
+# --- launchd agent (starts at login) ---
+mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs"
+# Not /tmp: that is shared with every user on the Mac, and deploy logs don't belong there.
+LOG_PATH="$HOME/Library/Logs/hostess.log"
 cat > "$PLIST_PATH" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -106,11 +113,11 @@ cat > "$PLIST_PATH" <<EOF
   <key>WorkingDirectory</key><string>${INSTALL_DIR}</string>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
-  <key>StandardOutPath</key><string>/tmp/hostess.log</string>
-  <key>StandardErrorPath</key><string>/tmp/hostess.log</string>
+  <key>StandardOutPath</key><string>${LOG_PATH}</string>
+  <key>StandardErrorPath</key><string>${LOG_PATH}</string>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>PATH</key><string>${HOME}/.docker/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${DOCKER_BINS}</string>
   </dict>
 </dict>
 </plist>
@@ -135,7 +142,7 @@ cat > "$UPDATE_PLIST_PATH" <<EOF
   <key>RunAtLoad</key><false/>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>PATH</key><string>${HOME}/.docker/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:${DOCKER_BINS}</string>
   </dict>
 </dict>
 </plist>
@@ -149,6 +156,6 @@ launchctl load -w "$UPDATE_PLIST_PATH"
 echo ""
 echo "hostess is running at http://localhost:5300"
 echo "Manage it with: launchctl {unload,load -w} $PLIST_PATH"
-echo "Logs: /tmp/hostess.log"
+echo "Logs: $LOG_PATH"
 sleep 1
 open "http://localhost:5300" 2>/dev/null || true
