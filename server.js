@@ -166,6 +166,11 @@ app.post('/api/apps/:name/expose', async (req, res) => {
   }
 });
 
+app.get('/api/stats', (req, res) => {
+  const os = require('os');
+  res.json({ cpu: Math.min(1, os.loadavg()[0] / os.cpus().length), mem: 1 - os.freemem() / os.totalmem() });
+});
+
 app.get('/api/apps', async (req, res) => {
   try {
     const apps = await engine.listApps();
