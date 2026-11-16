@@ -18,7 +18,11 @@ const marketplace = require('./lib/marketplace');
 const forge = require('./lib/forge');
 
 const app = express();
+const manifest = require('./lib/manifest');
 const PORT = Number(process.env.HOSTESS_PORT) || 5300;
+// For files that came from a deployed repo or an upload and are served from this origin.
+const SAFE_INLINE_RE = /^(image\/(png|jpeg|gif|webp)|application\/pdf)\s*(;|$)/i;
+const UNTRUSTED_FILE_HEADERS = { 'Content-Security-Policy': "sandbox; default-src 'none'; style-src 'unsafe-inline'", 'X-Content-Type-Options': 'nosniff' };
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public'), {
@@ -269,8 +273,12 @@ app.post('/api/apps/:name/describe', async (req, res) => {
 
 app.get('/api/apps/:name/logo', (req, res) => {
   const record = registry.get(req.params.name);
-  if (!record || !record.logo) return res.status(404).end();
-  res.sendFile(path.join(__dirname, 'apps', req.params.name, record.logo), (err) => {
+  const appDir = path.join(__dirname, 'apps', req.params.name);
+  if (!record || !record.logo || !manifest.insideDir(appDir, record.logo)) return res.status(404).end();
+  // An SVG can carry script. Sandboxed, it still renders as an image but cannot run with the
+  // dashboard's login if someone opens this URL directly.
+  res.set(UNTRUSTED_FILE_HEADERS);
+  res.sendFile(path.join(appDir, record.logo), (err) => {
     if (err && !res.headersSent) res.status(404).end();
   });
 });
@@ -420,7 +428,9 @@ app.post('/api/forge/files', express.raw({ type: () => true, limit: '25mb' }), (
 app.get('/forge-files/:id', (req, res) => {
   const f = previewFiles.get(req.params.id);
   if (!f) return res.status(404).end();
-  res.set({ 'Content-Type': f.type, 'Content-Disposition': `inline; filename="${f.name.replace(/"/g, '')}"` }).send(f.body);
+  // Photos and PDFs open in the page; anything that could run as a page here (HTML, SVG) downloads.
+  const how = SAFE_INLINE_RE.test(f.type) ? 'inline' : 'attachment';
+  res.set({ 'X-Content-Type-Options': 'nosniff', 'Content-Type': f.type, 'Content-Disposition': `${how}; filename="${f.name.replace(/"/g, '')}"` }).send(f.body);
 });
 
 app.get('/api/forge/projects', (req, res) => res.json(forge.listProjects()));
