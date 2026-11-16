@@ -1652,7 +1652,7 @@ function mountWaveBackground(container, accentRgb) {
     { amp: 65, len: 0.6, sp: 0.12, y: 0.6, a: 0.05, color: '102,102,102' },
     { amp: 85, len: 0.4, sp: 0.08, y: 0.7, a: 0.035, color: '68,68,68' },
   ];
-  const PX = 4;
+  const PX = 2;
   let t = 0;
 
   function size() {
@@ -1664,7 +1664,7 @@ function mountWaveBackground(container, accentRgb) {
   new ResizeObserver(size).observe(container);
 
   function draw() {
-    t += reduceMotion ? 0.00002 : 0.0001; // 10x slower than the original
+    t += reduceMotion ? 0.00004 : 0.0002; // 5x slower than the original
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
