@@ -1664,12 +1664,12 @@ function mountWaveBackground(container, accentRgb) {
   new ResizeObserver(size).observe(container);
 
   function draw() {
-    t += reduceMotion ? 0.00075 : 0.001; // speed: slower than chat-cmd's 'normal' (half)
+    t += reduceMotion ? 0.00005 : 0.00025; // ~4x slower than before
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
     bands.forEach((b) => {
-      ctx.fillStyle = `rgba(${b.color},${Math.min(b.a * 5, 0.9)})`;
+      ctx.fillStyle = `rgba(${b.color},${b.a * 2.5})`;
       let prev = null;
       for (let x = 0; x < W; x++) {
         const p = x / W;
@@ -1680,9 +1680,9 @@ function mountWaveBackground(container, accentRgb) {
       }
     });
 
-    ctx.fillStyle = `rgba(${A[0]},${A[1]},${A[2]},0.16)`;
+    ctx.fillStyle = `rgba(${A[0]},${A[1]},${A[2]},0.1)`;
     parts.forEach((p) => {
-      p.y -= p.s * 0.002;
+      p.y -= p.s * 0.0005;
       if (p.y < -0.02) { p.y = 1.02; p.x = Math.random(); }
       ctx.fillRect(Math.round(p.x * W), Math.round(p.y * H), 1, 1);
     });
