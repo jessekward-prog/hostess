@@ -216,6 +216,10 @@
   @media (max-width: 640px) {
     .header-row { grid-template-columns: 1fr; row-gap: 20px; }
     .conn-status { white-space: normal; }
+    .conn-bar { justify-self: stretch; max-width: none; align-items: stretch; gap: 16px; }
+    .conn-actions { flex-direction: row; flex-wrap: wrap; gap: 10px; }
+    .conn-btn { flex: 1 1 0; width: auto; min-width: 0; min-height: 44px; padding: 6px 8px; white-space: nowrap; }
+    .conn-hint { flex-basis: 100%; }
   }
 
   h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 20px; letter-spacing: -0.01em; color: var(--s-text-0); margin: 0 0 14px; display: flex; align-items: center; gap: 14px; }
