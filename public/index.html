@@ -408,6 +408,10 @@
   .app-logo, .app-logo-fallback, h1 .mark { border-radius: 3px; }
   #online-panel, #ts-panel { padding: 16px 18px; border-radius: 4px; }
   #online-panel img, #ts-panel img { border-radius: 3px !important; }
+
+  /* Sidebar rows: quieter dither on hover/press so the label stays readable. */
+  .row:hover, .myai-toggle:hover { background: conic-gradient(rgba(255,255,255,0.06) 25%, transparent 0) 0 0 / 4px 4px; }
+  .row:active, .myai-toggle:active { background: repeating-conic-gradient(rgba(255,255,255,0.06) 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
 </style>
 </head>
 <body>
