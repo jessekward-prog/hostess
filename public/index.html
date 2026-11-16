@@ -507,6 +507,8 @@
           <input type="range" class="bg-range" id="bg-intensity" min="0.3" max="3" step="0.1" value="1" aria-label="Background intensity">
           <div class="bg-slider"><span class="myai-label">ACCENT COLOUR</span><span class="myai-label"><span id="bg-hue-v"></span> <button type="button" class="bg-reset" id="bg-hue-reset" hidden>reset</button></span></div>
           <input type="range" class="bg-range hue" id="bg-hue" min="0" max="360" step="1" value="35" aria-label="Accent colour">
+          <div class="bg-slider"><span class="myai-label">ACCENT INTENSITY</span><span class="myai-label" id="accent-sat-v"></span></div>
+          <input type="range" class="bg-range" id="accent-sat" min="0" max="100" step="1" value="100" aria-label="Accent colour intensity">
         </div>
       </div>
     </div>
@@ -1868,8 +1870,9 @@ const BG_THEMES = {
   off: { label: 'Off' },
 };
 
-function hslToRgb(h) { // hue 0-360 at fixed 75% / 60% so every pick is a readable accent
-  const f = (n) => { const k = (n + h / 30) % 12; return Math.round(255 * (0.6 - 0.45 * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); };
+function hslToRgb(h, sat = 100) { // lightness fixed at 60% so every pick stays readable on black
+  const a = (sat / 100) * 0.4;
+  const f = (n) => { const k = (n + h / 30) % 12; return Math.round(255 * (0.6 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); };
   return [f(0), f(8), f(4)];
 }
 
@@ -1901,7 +1904,7 @@ function mountBackground(container, name) {
 (function mountThemePicker() {
   const sidebar = document.querySelector('aside.sidebar');
   const wrap = document.getElementById('theme-options');
-  const intIn = document.getElementById('bg-intensity'), hueIn = document.getElementById('bg-hue');
+  const intIn = document.getElementById('bg-intensity'), hueIn = document.getElementById('bg-hue'), satIn = document.getElementById('accent-sat');
   const store = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
   const load = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
   let current = BG_THEMES[load('hostess-bg')] ? load('hostess-bg') : 'waves';
@@ -1922,7 +1925,7 @@ function mountBackground(container, name) {
     const root = document.documentElement.style;
     if (h === null) ['--s-accent', '--s-accent-faint', '--s-accent-glow', '--crt-green', '--crt-green-rgb'].forEach((v) => root.removeProperty(v));
     else {
-      const [r, g, b] = hslToRgb(h);
+      const [r, g, b] = hslToRgb(h, +satIn.value);
       root.setProperty('--s-accent', `rgb(${r},${g},${b})`);
       root.setProperty('--s-accent-faint', `rgba(${r},${g},${b},0.07)`);
       root.setProperty('--s-accent-glow', `rgba(${r},${g},${b},0.18)`);
@@ -1945,10 +1948,13 @@ function mountBackground(container, name) {
   toggle.addEventListener('click', () => { toggle.classList.toggle('open'); panel.classList.toggle('open'); });
   intIn.addEventListener('input', () => setIntensity(+intIn.value));
   hueIn.addEventListener('input', () => setHue(+hueIn.value));
-  document.getElementById('bg-hue-reset').addEventListener('click', () => setHue(null));
+  satIn.addEventListener('input', () => { setHue(+hueIn.value); store('hostess-accent-sat', satIn.value); document.getElementById('accent-sat-v').textContent = `${satIn.value}%`; });
+  document.getElementById('bg-hue-reset').addEventListener('click', () => { satIn.value = 100; document.getElementById('accent-sat-v').textContent = '100%'; store('hostess-accent-sat', 100); setHue(null); });
 
   const si = parseFloat(load('hostess-bg-int')), sh = load('hostess-bg-hue');
   intIn.value = Number.isFinite(si) ? si : 1; setIntensity(+intIn.value);
+  const ss = load('hostess-accent-sat'); if (ss) satIn.value = ss;
+  document.getElementById('accent-sat-v').textContent = `${satIn.value}%`;
   if (sh !== null && sh !== '') { hueIn.value = sh; setHue(+sh); } else setHue(null);
   apply(current);
 })();
