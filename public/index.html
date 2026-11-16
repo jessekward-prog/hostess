@@ -1641,7 +1641,7 @@ myaiModelSelect.addEventListener('change', async () => {
 function mountWaveBackground(container, accentRgb) {
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const canvas = document.createElement('canvas');
-  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;';
+  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;image-rendering:pixelated;';
   container.prepend(canvas);
   const ctx = canvas.getContext('2d');
   const A = accentRgb.split(',').map(Number);
@@ -1652,41 +1652,39 @@ function mountWaveBackground(container, accentRgb) {
     { amp: 65, len: 0.6, sp: 0.12, y: 0.6, a: 0.05, color: '102,102,102' },
     { amp: 85, len: 0.4, sp: 0.08, y: 0.7, a: 0.035, color: '68,68,68' },
   ];
+  const PX = 4;
   let t = 0;
 
   function size() {
-    const d = window.devicePixelRatio || 1;
-    canvas.width = container.clientWidth * d;
-    canvas.height = container.clientHeight * d;
-    ctx.setTransform(d, 0, 0, d, 0, 0);
+    // Bitmap look: canvas is PX times smaller than its box and scaled up with pixelated sampling.
+    canvas.width = Math.ceil(container.clientWidth / PX);
+    canvas.height = Math.ceil(container.clientHeight / PX);
   }
   size();
   new ResizeObserver(size).observe(container);
 
   function draw() {
     t += reduceMotion ? 0.00075 : 0.001; // speed: slower than chat-cmd's 'normal' (half)
-    const W = container.clientWidth, H = container.clientHeight;
+    const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
     bands.forEach((b) => {
-      ctx.beginPath();
-      for (let x = 0; x <= W; x += 8) {
+      ctx.fillStyle = `rgba(${b.color},${Math.min(b.a * 5, 0.9)})`;
+      let prev = null;
+      for (let x = 0; x < W; x++) {
         const p = x / W;
-        const y = H * b.y + Math.sin(p * 6.28 * b.len + t / b.sp) * b.amp + Math.sin(p * 15.7 * b.len - (t / b.sp) * 1.7) * b.amp * 0.3;
-        x === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        const y = Math.round(H * b.y + Math.sin(p * 6.28 * b.len + t / b.sp) * (b.amp / PX) + Math.sin(p * 15.7 * b.len - (t / b.sp) * 1.7) * (b.amp / PX) * 0.3);
+        const from = prev === null ? y : Math.min(prev, y), to = prev === null ? y : Math.max(prev, y);
+        ctx.fillRect(x, from, 1, to - from + 1); // fill the vertical gap so steep slopes stay connected
+        prev = y;
       }
-      ctx.strokeStyle = `rgba(${b.color},${Math.min(b.a * 5, 0.9)})`; // style: outline
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
     });
 
+    ctx.fillStyle = `rgba(${A[0]},${A[1]},${A[2]},0.16)`;
     parts.forEach((p) => {
       p.y -= p.s * 0.002;
       if (p.y < -0.02) { p.y = 1.02; p.x = Math.random(); }
-      ctx.beginPath();
-      ctx.arc(p.x * W, p.y * H, p.r, 0, 6.28);
-      ctx.fillStyle = `rgba(${A[0]},${A[1]},${A[2]},0.16)`;
-      ctx.fill();
+      ctx.fillRect(Math.round(p.x * W), Math.round(p.y * H), 1, 1);
     });
 
     requestAnimationFrame(draw);
