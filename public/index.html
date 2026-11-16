@@ -1664,7 +1664,7 @@ function mountWaveBackground(container, accentRgb) {
   new ResizeObserver(size).observe(container);
 
   function draw() {
-    t += reduceMotion ? 0.00005 : 0.00025; // ~4x slower than before
+    t += reduceMotion ? 0.00002 : 0.0001; // 10x slower than the original
     const W = canvas.width, H = canvas.height;
     ctx.clearRect(0, 0, W, H);
 
