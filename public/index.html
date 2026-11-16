@@ -412,9 +412,19 @@
   /* Sidebar rows: quieter dither on hover/press so the label stays readable. */
   .row:hover, .myai-toggle:hover { background: conic-gradient(rgba(255,255,255,0.06) 25%, transparent 0) 0 0 / 4px 4px; }
   .row:active, .myai-toggle:active { background: repeating-conic-gradient(rgba(255,255,255,0.06) 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
+
+  #theme-panel.open { max-height: 900px; }
+  .bg-slider { display: flex; justify-content: space-between; align-items: baseline; margin-top: 6px; }
+  .bg-range { -webkit-appearance: none; appearance: none; width: 100%; height: 6px; margin: 4px 0 2px; border: 1px solid var(--s-border); border-radius: 3px; background: var(--s-bg); cursor: pointer; }
+  .bg-range.hue { background: linear-gradient(90deg, hsl(0,75%,60%), hsl(60,75%,60%), hsl(120,75%,60%), hsl(180,75%,60%), hsl(240,75%,60%), hsl(300,75%,60%), hsl(360,75%,60%)); }
+  .bg-range::-webkit-slider-thumb { -webkit-appearance: none; width: 10px; height: 16px; border-radius: 2px; background: var(--s-accent); border: 1px solid var(--s-bg); }
+  .bg-range::-moz-range-thumb { width: 10px; height: 16px; border-radius: 2px; background: var(--s-accent); border: 1px solid var(--s-bg); }
+  .bg-reset { font-size: var(--fs-xs); color: var(--s-text-1); text-decoration: underline; }
+  .bg-reset:hover { color: var(--s-accent); }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="bg-gain" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncA id="bg-gain-a" type="linear" slope="1"/></feComponentTransfer></filter></svg>
 <div class="shell">
 
   <aside class="sidebar">
@@ -493,6 +503,10 @@
         <div class="myai-body">
           <span class="myai-label">SIDEBAR BACKGROUND</span>
           <div class="myai-presets" id="theme-options"></div>
+          <div class="bg-slider"><span class="myai-label">INTENSITY</span><span class="myai-label" id="bg-intensity-v"></span></div>
+          <input type="range" class="bg-range" id="bg-intensity" min="0.3" max="3" step="0.1" value="1" aria-label="Background intensity">
+          <div class="bg-slider"><span class="myai-label">COLOUR</span><span class="myai-label"><span id="bg-hue-v"></span> <button type="button" class="bg-reset" id="bg-hue-reset" hidden>reset</button></span></div>
+          <input type="range" class="bg-range hue" id="bg-hue" min="0" max="360" step="1" value="35" aria-label="Background accent colour">
         </div>
       </div>
     </div>
@@ -1651,16 +1665,16 @@ myaiModelSelect.addEventListener('change', async () => {
 // ASCII themes share one grid renderer. glyph(c, r, o) returns '' or a char, or [char, alpha];
 // step(o) runs once per redraw for stateful ones (rain, life). o = {cols, rows, t, f, state}.
 function asciiTheme(label, every, glyph, step) {
-  return { label, px: 1, every, draw({ ctx, W, H, f, state }) {
+  return { label, group: 'ASCII', px: 1, every, draw({ ctx, W, H, f, state, rgb }) {
     const cols = Math.ceil(W / 8), rows = Math.ceil(H / 12), o = { cols, rows, t: f * 0.01, f, state };
     if (step) step(o);
     ctx.font = '11px "JetBrains Mono", monospace'; ctx.textBaseline = 'top';
-    let last = null;
+    const fg = (rgb || [176, 176, 176]).join(','); let last = null;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       let g = glyph(c, r, o); if (!g) continue;
       const [ch, a] = Array.isArray(g) ? g : [g, 0.2];
       if (!ch || ch === ' ') continue;
-      if (a !== last) { ctx.fillStyle = `rgba(176,176,176,${a})`; last = a; }
+      if (a !== last) { ctx.fillStyle = `rgba(${fg},${a})`; last = a; }
       ctx.fillText(ch, c * 8, r * 12);
     }
   } };
@@ -1668,7 +1682,7 @@ function asciiTheme(label, every, glyph, step) {
 
 // Scope themes share one poller (/api/stats every 2s) and a rolling CPU/MEM history; each variant only draws.
 function scopeTheme(label, render) {
-  return { label, px: 2,
+  return { label, group: 'SCOPE', px: 2,
     init({ state }) {
       state.cpu = []; state.mem = [];
       const poll = async () => { try { const r = await fetch('/api/stats'); if (r.ok) state.last = await r.json(); } catch {} };
@@ -1719,14 +1733,15 @@ const BG_THEMES = {
   } },
 
   fog: { label: 'Fog', px: 4,
-    draw({ ctx, W, H, f, state }) {
+    draw({ ctx, W, H, f, state, rgb }) {
+      const [cr, cg, cb] = rgb || [255, 255, 255], col = ((0x0f << 24) | (cb << 16) | (cg << 8) | cr) >>> 0;
       if (!state.img || state.img.width !== W || state.img.height !== H) state.img = ctx.createImageData(W, H);
       const BAYER = [[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
       const px = new Uint32Array(state.img.data.buffer);
       const t = f * 0.004;
       for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
         const v = (Math.sin(x * 0.09 + t * 1.3) + Math.sin(y * 0.07 - t) + Math.sin((x + y) * 0.05 + t * 0.7) + Math.sin(Math.hypot(x, y) * 0.06 - t)) / 8 + 0.5; // 0..1
-        px[y * W + x] = v * 0.32 > BAYER[y & 3][x & 3] / 16 ? 0x0fffffff : 0;
+        px[y * W + x] = v * 0.32 > BAYER[y & 3][x & 3] / 16 ? col : 0;
       }
       ctx.putImageData(state.img, 0, 0);
     } },
@@ -1776,9 +1791,10 @@ const BG_THEMES = {
     if (hy !== null) { ctx.fillStyle = `rgba(${A[0]},${A[1]},${A[2]},0.7)`; ctx.fillRect(Math.max(0, state.x - 2), hy - 1, 2, 3); }
   }),
 
-  sigil: { label: 'Sigil', px: 2, draw({ ctx, W, H, f }) {
+  sigil: { label: 'Sigil', px: 2, draw({ ctx, W, H, f, rgb }) {
+    const fg = (rgb || [255, 255, 255]).join(',');
     const cx = W / 2, cy = H * 0.58, R = Math.min(W * 0.46, H * 0.4), rot = f * 0.0006;
-    const dot = (x, y, a) => { x = Math.round(x); y = Math.round(y); if ((x + y) & 1) return; ctx.fillStyle = `rgba(255,255,255,${a})`; ctx.fillRect(x, y, 1, 1); };
+    const dot = (x, y, a) => { x = Math.round(x); y = Math.round(y); if ((x + y) & 1) return; ctx.fillStyle = `rgba(${fg},${a})`; ctx.fillRect(x, y, 1, 1); };
     for (let a = 0; a < 6.283; a += 0.5 / R) { dot(cx + Math.cos(a) * R, cy + Math.sin(a) * R, 0.2); dot(cx + Math.cos(a) * R * 0.14, cy + Math.sin(a) * R * 0.14, 0.2); }
     for (let k = 0; k < 3; k++) for (let th = 0; th < 3.2; th += 0.4 / R * 4) { // three spiral arms, 120° apart
       const ang = th + rot + k * 2.094, r = R * (0.14 + 0.78 * th / 3.2);
@@ -1802,6 +1818,31 @@ const BG_THEMES = {
     const v = (Math.sin(c * 0.12 + o.t * 0.5) + Math.sin(r * 0.1 - o.t * 0.3) + Math.sin((c * 0.6 + r) * 0.07 + o.t * 0.2) + Math.sin(Math.hypot(c - o.cols / 2, r - o.rows / 2) * 0.15)) / 8 + 0.5, fr = (v * 9) % 1;
     return fr < 0.14 ? '+' : fr < 0.3 ? '-' : '';
   }),
+  ripple: asciiTheme('Ripple', 5, (c, r, o) => {
+    const d = Math.hypot((c - o.cols / 2) * 8, (r - o.rows * 0.6) * 12) / 10, v = (Math.sin(d - o.t * 6) + 1) / 2;
+    return ' ··:oO'[Math.floor(v * v * v * 6)];
+  }),
+  stars: asciiTheme('Stars', 6, (c, r, o) => {
+    const h = (((c * 73856093) ^ (r * 19349663)) >>> 0) % 1000;
+    return h < 22 ? '.·+*'[Math.floor((Math.sin(o.f * 0.012 + h) + 1) / 2 * 3.99)] : '';
+  }),
+  sea: asciiTheme('Sea', 6, (c, r, o) => {
+    const yw = o.rows * 0.55 + Math.sin(c * 0.2 + o.t * 2) * 2.5 + Math.sin(c * 0.07 - o.t) * 2;
+    if (Math.round(yw) === r) return '~';
+    return r > yw && (c + r * 3 + Math.floor(o.t * 4)) % 7 === 0 ? '·' : '';
+  }),
+  fire: asciiTheme('Fire', 4, (c, r, o) => {
+    const h = o.state.h[r * o.cols + c];
+    return h < 3 ? '' : [' .:-=+*#%@'[Math.min(9, Math.floor(h / 2.6))], 0.1 + h / 24 * 0.22];
+  }, ({ cols, rows, state }) => {
+    if (!state.h || state.h.length !== cols * rows) state.h = new Uint8Array(cols * rows);
+    const h = state.h;
+    for (let c = 0; c < cols; c++) h[(rows - 1) * cols + c] = Math.random() < 0.7 ? 24 : 6;
+    for (let r = 0; r < rows - 1; r++) for (let c = 0; c < cols; c++) {
+      const src = h[(r + 1) * cols + Math.min(cols - 1, Math.max(0, c + Math.floor(Math.random() * 3) - 1))];
+      h[r * cols + c] = Math.max(0, src - Math.floor(Math.random() * 3));
+    }
+  }),
   life: asciiTheme('Life', 12, (c, r, o) => (o.state.g[r * o.cols + c] ? ['#', 0.28] : ''), ({ cols, rows, state }) => {
     const n = cols * rows;
     if (!state.g || state.g.length !== n || state.age > 300 || state.g.reduce((a, b) => a + b, 0) < 6) {
@@ -1816,11 +1857,12 @@ const BG_THEMES = {
     state.g = nx; state.age++;
   }),
 
-  sweep: { label: 'Sweep', px: 2, draw({ ctx, W, H, f }) {
+  sweep: { label: 'Sweep', px: 2, draw({ ctx, W, H, f, rgb }) {
+    const fg = (rgb || [255, 255, 255]).join(',');
     const trail = 50, y0 = Math.floor((f * 0.35) % (H + trail));
     for (let d = 0; d < trail; d++) {
       const y = y0 - d; if (y < 0 || y >= H) continue;
-      ctx.fillStyle = `rgba(255,255,255,${d === 0 ? 0.16 : 0.07 * (1 - d / trail)})`;
+      ctx.fillStyle = `rgba(${fg},${d === 0 ? 0.16 : 0.07 * (1 - d / trail)})`;
       if (d === 0) ctx.fillRect(0, y, W, 1);
       else for (let x = y & 1; x < W; x += 2) ctx.fillRect(x, y, 1, 1);
     }
@@ -1829,15 +1871,20 @@ const BG_THEMES = {
   off: { label: 'Off' },
 };
 
-function mountBackground(container, name, accentRgb) {
+function hslToRgb(h) { // hue 0-360 at fixed 75% / 60% so every pick is a readable accent
+  const f = (n) => { const k = (n + h / 30) % 12; return Math.round(255 * (0.6 - 0.45 * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); };
+  return [f(0), f(8), f(4)];
+}
+
+function mountBackground(container, name, cfg) {
   const theme = BG_THEMES[name];
   if (!theme || !theme.draw) return () => {};
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const canvas = document.createElement('canvas');
-  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;' + (theme.px > 1 ? 'image-rendering:pixelated;' : '');
+  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;filter:url(#bg-gain);' + (theme.px > 1 ? 'image-rendering:pixelated;' : '');
   container.prepend(canvas);
   const ctx = canvas.getContext('2d');
-  const PX = theme.px, A = accentRgb.split(',').map(Number), state = {};
+  const PX = theme.px, state = {};
   const size = () => { canvas.width = Math.ceil(container.clientWidth / PX); canvas.height = Math.ceil(container.clientHeight / PX); };
   size();
   const ro = new ResizeObserver(size); ro.observe(container);
@@ -1847,7 +1894,7 @@ function mountBackground(container, name, accentRgb) {
     f += reduceMotion ? 0.2 : 1;
     if (!theme.every || Math.floor(f) % theme.every === 0) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      theme.draw({ ctx, W: canvas.width, H: canvas.height, f: Math.floor(f), PX, A, state });
+      theme.draw({ ctx, W: canvas.width, H: canvas.height, f: Math.floor(f), PX, A: cfg.rgb || [232, 132, 10], rgb: cfg.rgb, state });
     }
     raf = requestAnimationFrame(loop);
   })();
@@ -1857,19 +1904,47 @@ function mountBackground(container, name, accentRgb) {
 (function mountThemePicker() {
   const sidebar = document.querySelector('aside.sidebar');
   const wrap = document.getElementById('theme-options');
-  let current = 'waves';
-  try { const saved = localStorage.getItem('hostess-bg'); if (BG_THEMES[saved]) current = saved; } catch {}
+  const intIn = document.getElementById('bg-intensity'), hueIn = document.getElementById('bg-hue');
+  const store = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  const load = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const cfg = { rgb: null }; // rgb is read every frame, so the hue slider recolours live
+  let current = BG_THEMES[load('hostess-bg')] ? load('hostess-bg') : 'waves';
   let stop = () => {};
+
   function apply(name) {
     stop(); current = name;
-    stop = mountBackground(sidebar, name, '232,132,10'); // chat-cmd's phosphor amber
-    try { localStorage.setItem('hostess-bg', name); } catch {}
+    stop = mountBackground(sidebar, name, cfg);
+    store('hostess-bg', name);
     wrap.querySelectorAll('.myai-preset').forEach((b) => b.classList.toggle('active', b.dataset.bg === name));
   }
-  wrap.innerHTML = Object.entries(BG_THEMES).map(([k, v]) => `<button type="button" class="myai-preset" data-bg="${k}">${v.label}</button>`).join('');
+  function setIntensity(v) {
+    document.getElementById('bg-gain-a').setAttribute('slope', v);
+    document.getElementById('bg-intensity-v').textContent = `${Math.round(v * 100)}%`;
+    store('hostess-bg-int', v);
+  }
+  function setHue(h) { // null = neutral (each theme's own grey/amber)
+    cfg.rgb = h === null ? null : hslToRgb(h);
+    document.getElementById('bg-hue-v').textContent = h === null ? 'neutral' : `${h}°`;
+    document.getElementById('bg-hue-reset').hidden = h === null;
+    if (h !== null) store('hostess-bg-hue', h); else store('hostess-bg-hue', '');
+  }
+
+  const groups = {};
+  Object.entries(BG_THEMES).forEach(([k, v]) => (groups[v.group || 'OTHER'] ||= []).push([k, v.label]));
+  wrap.innerHTML = ['ASCII', 'SCOPE', 'OTHER'].filter((g) => groups[g]).map((g) =>
+    `<span class="myai-label" style="width:100%;margin-top:4px;">${g}</span>` +
+    groups[g].map(([k, l]) => `<button type="button" class="myai-preset" data-bg="${k}">${l}</button>`).join('')).join('');
+  wrap.addEventListener('click', (e) => { const b = e.target.closest('[data-bg]'); if (b) apply(b.dataset.bg); });
+
   const toggle = document.getElementById('theme-toggle'), panel = document.getElementById('theme-panel');
   toggle.addEventListener('click', () => { toggle.classList.toggle('open'); panel.classList.toggle('open'); });
-  wrap.addEventListener('click', (e) => { const b = e.target.closest('[data-bg]'); if (b) apply(b.dataset.bg); });
+  intIn.addEventListener('input', () => setIntensity(+intIn.value));
+  hueIn.addEventListener('input', () => setHue(+hueIn.value));
+  document.getElementById('bg-hue-reset').addEventListener('click', () => setHue(null));
+
+  const si = parseFloat(load('hostess-bg-int')), sh = load('hostess-bg-hue');
+  intIn.value = Number.isFinite(si) ? si : 1; setIntensity(+intIn.value);
+  if (sh !== null && sh !== '') { hueIn.value = sh; setHue(+sh); } else setHue(null);
   apply(current);
 })();
 
