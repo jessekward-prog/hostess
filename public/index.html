@@ -399,6 +399,15 @@
   @keyframes pulse { 50% { opacity: 0.35; } }
   .app-foot { border-top-style: dashed; border-top-color: var(--s-border); }
   .sidebar-stats .stat-row .v { color: var(--s-text-0); }
+
+  /* Near-square corners everywhere (3-4px), and breathing room in the connection panels. */
+  .card, #marketplace-overlay { border-radius: 4px; }
+  .conn-btn, .deploy-btn, .open-app-btn, .deploy-row input, .deploy-error, .log-box, .menu-btn,
+  .row, .myai-toggle, .icon-btn, .push-setup-btn, .myai-tutorial, .gateway-toggle-row { border-radius: 4px; }
+  .chip, .status-pill, .myai-preset, .myai-input, .myai-select, .myai-save { border-radius: 3px; }
+  .app-logo, .app-logo-fallback, h1 .mark { border-radius: 3px; }
+  #online-panel, #ts-panel { padding: 16px 18px; border-radius: 4px; }
+  #online-panel img, #ts-panel img { border-radius: 3px !important; }
 </style>
 </head>
 <body>
