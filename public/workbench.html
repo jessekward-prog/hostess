@@ -30,6 +30,7 @@
   .app { position: relative; display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr); height: 100dvh; }
   /* The dashboard's chosen sidebar theme (bg-themes.js) paints behind everything; the bars sit above it. */
   .app > :not(canvas) { position: relative; z-index: 1; }
+  .app > header.top { z-index: 3; } /* above the stage, so the recent-folders menu overlaps the previews */
   header.top { display: flex; align-items: center; gap: 12px; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); border-bottom: 1px solid var(--s-border); background: var(--s-surface); flex-wrap: wrap; }
   .back { display: inline-flex; align-items: center; gap: 6px; color: var(--s-text-3); text-decoration: none; font-size: var(--fs-sm); min-height: 44px; }
   .back:hover { color: var(--s-text-0); }
@@ -38,7 +39,7 @@
   @keyframes blink { 50% { opacity: 0; } }
   .folder { flex: 1; min-width: 240px; display: flex; gap: 8px; }
   .field { position: relative; flex: 1; min-width: 0; display: flex; }
-  .folder input { flex: 1; min-width: 0; height: 44px; padding: 0 48px 0 12px; border-radius: 8px; border: 1px solid var(--s-border); background: var(--s-bg); color: var(--s-text-0); font-size: var(--fs-md); }
+  .folder input { flex: 1; min-width: 0; height: 44px; padding: 0 88px 0 12px; border-radius: 8px; border: 1px solid var(--s-border); background: var(--s-bg); color: var(--s-text-0); font-size: var(--fs-md); }
   .folder input:focus { outline: none; border-color: var(--s-text-3); }
   /* Watch toggle inside the address bar: open eye = this folder is live, click to stop. */
   .eye { position: absolute; top: 0; right: 0; bottom: 0; width: 44px; display: grid; place-items: center; border-radius: 0 8px 8px 0; color: var(--s-text-3); transition: color 0.15s, transform 0.1s; }
@@ -50,6 +51,25 @@
   @keyframes phosphor { 0%, 100% { opacity: 1; } 47% { opacity: 0.86; } 48% { opacity: 1; } 83% { opacity: 0.93; } 84% { opacity: 1; } }
   .eye svg { width: 18px; height: 18px; }
   .eye .on, .eye[aria-pressed="true"] .off { display: none; }
+  /* Recent folders: a menu under the address bar. */
+  .chev { position: absolute; top: 0; bottom: 0; right: 44px; width: 40px; display: grid; place-items: center; color: var(--s-text-3); }
+  .chev:hover, .chev[aria-expanded="true"] { color: var(--s-text-0); }
+  .chev svg { width: 16px; height: 16px; transition: transform 0.2s var(--ease); }
+  .chev[aria-expanded="true"] svg { transform: rotate(180deg); }
+  .recent { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 60; max-height: min(420px, 60vh); overflow-y: auto; padding: 6px; border-radius: 10px; background: var(--s-surface); border: 1px solid var(--s-border); box-shadow: 0 16px 44px rgba(0,0,0,0.65); animation: drop 0.18s var(--ease); }
+  @keyframes drop { from { opacity: 0; transform: translateY(-4px); } }
+  .recent-head { padding: 6px 10px 8px; font-size: var(--fs-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--s-text-3); }
+  .recent-empty { padding: 10px; font-size: var(--fs-sm); color: var(--s-text-3); }
+  .recent-row { display: flex; align-items: stretch; border-radius: 8px; }
+  .recent-row:hover, .recent-row.hi { background: var(--s-surface-2); }
+  .recent-pick { flex: 1; min-width: 0; display: grid; grid-template-columns: 10px 1fr auto; column-gap: 10px; align-items: center; padding: 8px 10px; min-height: 48px; text-align: left; }
+  .recent-pick .dot { width: 6px; height: 6px; border-radius: 50%; background: transparent; }
+  .recent-row.live .dot { background: var(--crt-green); box-shadow: 0 0 6px rgba(var(--crt-green-rgb),0.8); }
+  .recent-pick b { color: var(--s-text-0); font-weight: 500; font-size: var(--fs-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .recent-pick small { grid-column: 2; color: var(--s-text-3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+  .recent-pick time { grid-row: 1; grid-column: 3; color: var(--s-text-3); font-size: var(--fs-xs); }
+  .recent-x { width: 40px; flex-shrink: 0; color: var(--s-text-3); border-radius: 8px; }
+  .recent-x:hover { color: #ff8a84; }
   .eye[aria-pressed="true"] .on { display: block; }
   .btn { height: 44px; padding: 0 16px; border-radius: 8px; background: var(--s-accent); color: #000; font-weight: 600; font-size: var(--fs-md); transition: transform 0.1s; white-space: nowrap; }
   .btn:active:not(:disabled) { transform: scale(0.97); }
@@ -126,6 +146,8 @@
     <form class="folder" id="folderForm">
       <div class="field">
         <input id="dir" placeholder="/home/you/my-app" autocomplete="off" spellcheck="false" aria-label="App folder">
+        <button class="chev" type="button" id="chevBtn" aria-label="Recent folders" title="Recent folders" aria-expanded="false" aria-controls="recentMenu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></button>
+        <div class="recent" id="recentMenu" hidden></div>
         <button class="eye" type="button" id="eyeBtn" aria-pressed="false" aria-label="Watch this folder" title="Watch this folder">
           <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
           <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -399,6 +421,63 @@ $('copyBtn').onclick = async () => {
   $('copyBtn').textContent = 'Copied';
   setTimeout(() => { $('copyBtn').textContent = 'Copy'; }, 1500);
 };
+
+// Recent folders (newest first, kept by the server in settings.json). Picking one switches the single
+// preview over to it; nothing else keeps running.
+let recentList = [], recentHi = -1;
+const ago = (t) => { const m = Math.round((Date.now() - t) / 60000); return m < 1 ? 'now' : m < 60 ? `${m}m` : m < 1440 ? `${Math.round(m / 60)}h` : `${Math.round(m / 1440)}d`; };
+function drawRecent() {
+  const menu = $('recentMenu');
+  if (!recentList.length) { menu.innerHTML = '<div class="recent-empty">Folders you watch show up here.</div>'; return; }
+  menu.replaceChildren(Object.assign(document.createElement('div'), { className: 'recent-head', textContent: 'Recent' }), ...recentList.map((r, i) => {
+    const row = document.createElement('div');
+    row.className = 'recent-row' + (current.status !== 'idle' && r.dir === current.dir ? ' live' : '') + (i === recentHi ? ' hi' : '');
+    const pick = document.createElement('button');
+    pick.type = 'button'; pick.className = 'recent-pick';
+    pick.innerHTML = '<i class="dot"></i><b></b><time></time><small></small>';
+    pick.querySelector('b').textContent = r.name;
+    pick.querySelector('small').textContent = `\u200E${r.dir}\u200E`; // LRM: rtl only moves the ellipsis to the left
+    pick.querySelector('time').textContent = ago(r.at);
+    pick.onclick = () => openRecent(r.dir);
+    const x = document.createElement('button');
+    x.type = 'button'; x.className = 'recent-x'; x.textContent = '×';
+    x.setAttribute('aria-label', `Remove ${r.name} from recent`);
+    x.onclick = async () => { recentList = await api('/api/workbench/recent', { method: 'DELETE', body: JSON.stringify({ dir: r.dir }) }); drawRecent(); };
+    row.append(pick, x);
+    return row;
+  }));
+}
+async function setRecent(open) {
+  $('recentMenu').hidden = !open;
+  $('chevBtn').setAttribute('aria-expanded', open);
+  if (!open) return;
+  recentHi = -1;
+  drawRecent();
+  try { recentList = (await api('/api/workbench')).recent || []; drawRecent(); } catch {}
+}
+function openRecent(dir) {
+  setRecent(false);
+  $('dir').value = dir;
+  if (!(current.status !== 'idle' && dir === current.dir)) $('folderForm').requestSubmit();
+  syncEye();
+}
+$('chevBtn').onclick = () => setRecent($('recentMenu').hidden);
+$('dir').addEventListener('focus', () => setRecent(true));
+$('dir').addEventListener('keydown', (e) => {
+  const open = !$('recentMenu').hidden;
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    if (!open) return setRecent(true);
+    const n = recentList.length;
+    if (!n) return;
+    recentHi = e.key === 'ArrowDown' ? (recentHi + 1) % n : recentHi <= 0 ? n - 1 : recentHi - 1;
+    drawRecent();
+  } else if (e.key === 'Enter' && open && recentHi >= 0) {
+    e.preventDefault(); openRecent(recentList[recentHi].dir);
+  } else if (e.key === 'Escape') setRecent(false);
+  else if (e.key !== 'Tab') setRecent(false); // typing a path of your own
+});
+document.addEventListener('pointerdown', (e) => { if (!e.target.closest('.field')) setRecent(false); });
 
 // Pick up where it left off: the last folder starts watching again on open.
 api('/api/workbench').then((s) => {

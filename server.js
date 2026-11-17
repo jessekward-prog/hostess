@@ -452,6 +452,8 @@ app.post('/api/workbench/prompt', async (req, res) => {
   res.end();
 });
 
+app.delete('/api/workbench/recent', (req, res) => { workbench.forget(String((req.body || {}).dir || '')); res.json(workbench.status().recent); });
+
 app.post('/api/workbench/pick', async (req, res) => {
   try { res.json({ dir: await workbench.pickFolder() }); }
   catch (err) { res.status(400).json({ error: err.message }); }
