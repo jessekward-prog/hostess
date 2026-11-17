@@ -243,16 +243,14 @@
     padding: 9px 12px; font-size: var(--fs-base); color: var(--s-text-0); outline: none;
   }
   .folder-btn { display: inline-flex; align-items: center; background: var(--s-surface-2); color: var(--s-text-0); border: 1px solid var(--s-border); cursor: pointer; white-space: nowrap; }
-  /* Each task gets a PlayStation face-button colour (same palette as the OS accents on the docs page).
+  /* Each task gets its own colour (the docs page's OS-accent palette).
      The bar is a looping fill, not a measurement: it fills slowly, fades, and starts over while the task runs. */
-  #deploy-progress { --ps-cross: #4f8fe0; --ps-circle: #e5645f; --ps-triangle: #3fb37f; --ps-square: #e0559c; margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
-  .pg-step[data-ps="cross"] { --pg: var(--ps-cross); }
-  .pg-step[data-ps="circle"] { --pg: var(--ps-circle); }
-  .pg-step[data-ps="triangle"] { --pg: var(--ps-triangle); }
-  .pg-step[data-ps="square"] { --pg: var(--ps-square); }
+  #deploy-progress { --hue-blue: #4f8fe0; --hue-red: #e5645f; --hue-green: #3fb37f; --hue-pink: #e0559c; margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .pg-step[data-hue="blue"] { --pg: var(--hue-blue); }
+  .pg-step[data-hue="red"] { --pg: var(--hue-red); }
+  .pg-step[data-hue="green"] { --pg: var(--hue-green); }
+  .pg-step[data-hue="pink"] { --pg: var(--hue-pink); }
   .pg-head { display: flex; align-items: baseline; gap: 8px; font-size: var(--fs-md); }
-  .pg-glyph { color: var(--pg); width: 1.2em; text-align: center; opacity: 0.35; }
-  .pg-step.active .pg-glyph, .pg-step.done .pg-glyph { opacity: 1; }
   .pg-label { color: var(--s-text-0); white-space: nowrap; }
   .pg-step.pending .pg-label { color: var(--s-text-3); }
   .pg-detail { margin-left: auto; min-width: 0; color: var(--s-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -261,7 +259,7 @@
   .pg-step.active .pg-fill { animation: pg-loop 2.8s ease-in-out infinite; box-shadow: 0 0 10px var(--pg); }
   .pg-step.done .pg-fill { width: 100%; opacity: 0.55; }
   .pg-step.failed .pg-fill { width: 100%; background: var(--danger); }
-  .pg-step.failed .pg-label, .pg-step.failed .pg-glyph { color: #ff9a90; opacity: 1; }
+  .pg-step.failed .pg-label { color: #ff9a90; }
   @keyframes pg-loop { 0% { width: 0; opacity: 1; } 80% { width: 100%; opacity: 1; } 100% { width: 100%; opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { .pg-step.active .pg-fill { animation: none; width: 100%; opacity: 0.6; } }
   .upload-eyebrow { margin-top: 18px; }
@@ -1319,6 +1317,7 @@ async function load() {
   installedAppNames = new Set(apps.map((a) => a.name));
   renderMarketplaceGrid();
 
+  clearPlaceholder();
   grid.innerHTML = '';
   sidebarApps.innerHTML = '';
   emptyState.hidden = apps.length > 0;
@@ -1345,14 +1344,12 @@ async function load() {
 // server.js); each step gets a bar: real percentage for the image build, a sliding stripe otherwise.
 const progEl = document.getElementById('deploy-progress');
 let prog = null;
-const PS = { read: ['✕', 'cross'], check: ['✕', 'cross'], build: ['△', 'triangle'], db: ['□', 'square'], push: ['○', 'circle'], search: ['○', 'circle'], start: ['△', 'triangle'] };
+const HUE = { read: 'blue', check: 'blue', build: 'green', db: 'pink', push: 'red', search: 'red', start: 'green' };
 function progRow(id, label) {
-  const [glyph, colour] = PS[id] || PS.check;
   const row = document.createElement('div');
   row.className = 'pg-step pending';
-  row.dataset.ps = colour;
-  row.innerHTML = '<div class="pg-head"><span class="pg-glyph"></span><span class="pg-label"></span><span class="pg-detail"></span></div><div class="pg-bar"><div class="pg-fill"></div></div>';
-  row.querySelector('.pg-glyph').textContent = glyph;
+  row.dataset.hue = HUE[id] || HUE.check;
+  row.innerHTML = '<div class="pg-head"><span class="pg-label"></span><span class="pg-detail"></span></div><div class="pg-bar"><div class="pg-fill"></div></div>';
   row.querySelector('.pg-label').textContent = label;
   progEl.appendChild(row);
   prog.rows.set(id, { row, detail: row.querySelector('.pg-detail') });
@@ -1416,6 +1413,38 @@ async function runDeploy(path, opts) {
   return record;
 }
 
+// A new app's card: once the bars finish, hold a rippling placeholder in the grid until the real card
+// replaces it (load() swaps it out). Apps that already have a card (redeploys) skip this.
+let placeholder = null;
+function clearPlaceholder() {
+  if (!placeholder) return;
+  placeholder.stop();
+  placeholder.el.remove();
+  placeholder = null;
+}
+function showPlaceholder(name) {
+  clearPlaceholder();
+  const el = document.createElement('div');
+  el.className = 'card';
+  el.innerHTML = '<div class="card-content"><div class="app-card-head"><div class="app-title-row"><span class="app-logo-fallback"></span><p class="app-title"></p></div><span class="status-pill created">starting</span></div><p class="app-desc">Starting up…</p><button class="open-app-btn" type="button" disabled><span class="open-app-btn-label"><span>Almost there</span></span></button></div>';
+  el.querySelector('.app-logo-fallback').textContent = name[0].toUpperCase();
+  el.querySelector('.app-title').textContent = name;
+  grid.appendChild(el);
+  placeholder = { el, stop: mountRippleField(el, RIPPLE_COLOR.ok) };
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+async function revealNewApp(name) {
+  try {
+    if (!installedAppNames.has(name)) {
+      showPlaceholder(name);
+      await new Promise((ok) => setTimeout(ok, 1500)); // long enough for the ripples to read as a card spinning up
+    }
+    await load();
+  } finally {
+    clearPlaceholder();
+  }
+}
+
 deployForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   showError('');
@@ -1427,7 +1456,7 @@ deployForm.addEventListener('submit', async (e) => {
     deployLog.textContent = `Deployed "${rec.name}".`;
     deployLog.hidden = false;
     sourceInput.value = '';
-    await load();
+    await revealNewApp(rec.name);
   } catch (err) {
     showError(err.message);
   } finally {
@@ -1517,7 +1546,7 @@ async function sendImport(btn, idleText, path, opts) {
     const rec = await runDeploy(path, { method: 'POST', ...opts });
     deployLog.textContent = `${rec.updated ? 'Updated' : 'Deployed'} "${rec.name}".`;
     deployLog.hidden = false;
-    await load();
+    await revealNewApp(rec.name);
     return true;
   } catch (err) {
     showError(err.message);
