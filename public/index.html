@@ -591,6 +591,7 @@
           <div class="conn-actions">
             <button id="tsBtn" class="conn-btn" type="button">Private Link</button>
             <button id="onlineBtn" class="conn-btn" type="button">Go Online</button>
+            <button id="updateBtn" class="conn-btn" type="button">Update Hostess</button>
             <button id="installBtn" class="conn-btn" type="button" style="display:none;">Install as App</button>
             <span id="installHint" class="conn-hint" style="display:none;">tap Share, then "Add to Home Screen"</span>
           </div>
@@ -1330,6 +1331,28 @@ deployForm.addEventListener('submit', async (e) => {
   } finally {
     deployBtn.disabled = false;
     deployBtn.textContent = 'Deploy';
+  }
+});
+
+// ── Update Hostess: pull the latest version from GitHub; the server restarts itself if there was one.
+const updateBtn = document.getElementById('updateBtn');
+updateBtn.addEventListener('click', async () => {
+  updateBtn.disabled = true;
+  updateBtn.textContent = 'Checking…';
+  try {
+    const r = await api('/api/update', { method: 'POST' });
+    if (!r.changed) { updateBtn.textContent = 'Up to date ✓'; return; }
+    updateBtn.textContent = 'Updated, restarting…';
+    for (let i = 0; i < 30; i++) {
+      await new Promise((ok) => setTimeout(ok, 1000));
+      if (await fetch('/api/auth/status').then((x) => x.ok, () => false)) { location.reload(); return; }
+    }
+    updateBtn.textContent = 'Updated. Reload this page.';
+  } catch (err) {
+    updateBtn.textContent = 'Update failed';
+    showError(err.message);
+  } finally {
+    setTimeout(() => { if (!updateBtn.textContent.startsWith('Updated')) { updateBtn.textContent = 'Update Hostess'; } updateBtn.disabled = false; }, 4000);
   }
 });
 

@@ -200,6 +200,17 @@ app.post('/api/apps/:name/gateway/disable', (req, res) => {
   res.json({ ok: true });
 });
 
+// Manual "Update Hostess": the same pull-and-restart the 10-minute poll does, on demand.
+app.post('/api/update', async (req, res) => {
+  try {
+    const r = await selfupdate.apply(console.log);
+    res.json(r);
+    if (r.changed) setTimeout(selfupdate.restart, 300);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 app.get('/api/marketplace', (req, res) => {
   res.json(marketplace.list());
 });
