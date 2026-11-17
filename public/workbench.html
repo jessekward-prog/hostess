@@ -57,7 +57,14 @@
   .btn.ghost:hover:not(:disabled) { border-color: var(--s-text-3); color: var(--s-text-0); }
   /* Fixed width so the header never shifts as the label changes. */
   .status { display: inline-flex; align-items: center; gap: 8px; width: 170px; font-size: var(--fs-sm); color: var(--s-text-3); white-space: nowrap; overflow: hidden; }
-  #statusText { overflow: hidden; text-overflow: ellipsis; }
+  /* Ticker tape: a label too long for the box scrolls continuously (two copies, shifted by half). */
+  .ticker { flex: 1; min-width: 0; overflow: hidden; }
+  .ticker.over { -webkit-mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 14px), transparent); mask-image: linear-gradient(90deg, transparent, #000 10px, #000 calc(100% - 14px), transparent); }
+  #statusText { display: inline-block; white-space: nowrap; }
+  #statusText.run { animation: ticker var(--dur, 8s) linear infinite; }
+  #statusText.run span { padding-right: 3em; }
+  @keyframes ticker { to { transform: translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce) { #statusText.run { animation: none; } }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--s-border); }
   .status[data-s="running"] .dot { background: var(--ok); }
   .status[data-s="building"] .dot { background: var(--crt-green); box-shadow: 0 0 8px rgba(var(--crt-green-rgb),0.7); animation: pulse 1s ease-in-out infinite; }
@@ -107,7 +114,6 @@
     .stage { grid-template-columns: 1fr; }
     .folder { flex-basis: 100%; min-width: 0; order: 1; }
     .status { order: 2; flex: 1; width: auto; min-width: 0; }
-    .status #statusText { overflow: hidden; text-overflow: ellipsis; }
     #rebuildBtn, #promptBtn { order: 3; }
     .tabs { order: 4; flex-basis: 100%; }
     .tabs button { flex: 1; }
@@ -131,7 +137,7 @@
       </div>
       <button class="btn ghost" type="button" id="browseBtn">Browse</button>
     </form>
-    <span class="status" id="status" data-s="idle"><i class="dot"></i><span id="statusText">Not watching</span></span>
+    <span class="status" id="status" data-s="idle"><i class="dot"></i><span class="ticker" id="statusClip"><span id="statusText">Not watching</span></span></span>
     <button class="btn ghost" type="button" id="rebuildBtn" disabled>Rebuild</button>
     <button class="btn ghost" type="button" id="promptBtn" aria-expanded="false" aria-controls="drawer" disabled>Prompt</button>
     <div class="tabs" role="tablist">
@@ -223,12 +229,32 @@ function show() {
   }
 }
 
+// Fits the status label, or turns it into a ticker when it's wider than its box. Only redone when the
+// label or the box width changes, so a steady label keeps scrolling smoothly through re-renders.
+let statusLabel = '', statusBoxW = 0;
+function setStatusLabel(label, force) {
+  const clip = $('statusClip'), t = $('statusText');
+  if (label === statusLabel && !force) return;
+  statusLabel = label;
+  statusBoxW = clip.clientWidth;
+  t.classList.remove('run');
+  t.textContent = label;
+  t.title = label;
+  const over = t.offsetWidth > clip.clientWidth + 1;
+  clip.classList.toggle('over', over);
+  if (!over) return;
+  t.replaceChildren(...[0, 1].map(() => Object.assign(document.createElement('span'), { textContent: label })));
+  t.style.setProperty('--dur', `${Math.max(5, t.offsetWidth / 2 / 28)}s`); // ~28px per second
+  t.classList.add('run');
+}
+new ResizeObserver(() => { if (statusLabel && $('statusClip').clientWidth !== statusBoxW) setStatusLabel(statusLabel, true); }).observe($('statusClip'));
+
 function render(s) {
   const prev = current;
   current = { ...current, ...s };
   const label = { idle: 'Not watching', building: 'Building…', running: `Live · ${current.name || ''}`, error: current.error || 'Failed' }[current.status];
   $('status').dataset.s = current.status;
-  $('statusText').textContent = label;
+  setStatusLabel(label);
   // Controls stay put and grey out when there's nothing to act on, so the header never reflows.
   $('rebuildBtn').disabled = current.status === 'idle' || current.mode === 'static';
   $('promptBtn').disabled = current.status === 'idle';
