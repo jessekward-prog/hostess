@@ -69,3 +69,16 @@
     animation: crt-flicker 0.15s steps(2) infinite;
   }
   @media (prefers-reduced-motion: reduce) { .ripple-crt { animation: none; } }
+
+/* Inline variant (crtMonitor({ container })): the same tube, filling a box instead of the page. */
+.cine-inline { position: absolute; inset: 0; z-index: 2; display: flex; }
+.cine-inline[hidden] { display: none; }
+.cine-inline .cine-screen { width: 100%; padding: 12px 16px 10px; border-radius: 10px / 14px; box-shadow: 0 0 0 1px #2a2a2a, inset 0 0 0 1px rgba(255,255,255,0.03); }
+.cine-inline .cine-inner { gap: 8px; height: 100%; }
+.cine-inline .cine-ghost { font-size: 110px; }
+.cine-inline .cine-title { font-size: clamp(15px, 1.6vw, 20px); }
+.cine-inline .cine-ticks .cine-tick { height: 5px; }
+.cine-inline .cine-log { height: auto; flex: 1; min-height: 2.4em; font-size: var(--fs-xs); }
+.cine-inline .cine-hide { position: absolute; top: 0; right: 0; font-size: var(--fs-xs); }
+.cine-inline.in .cine-screen { animation: crt-on 0.45s cubic-bezier(0.2,0.8,0.2,1) both; }
+.cine-inline.out .cine-screen { animation: cine-out 0.5s ease-in both; }

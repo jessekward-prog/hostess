@@ -1,17 +1,18 @@
 // CRT monitor (shared by the dashboard deploy and Workbench loads): a CRT pop-up showing the same events the bars get. Each step's label becomes a title
 // card, the log scrolls under it, and the overlay collapses like a CRT when the deploy lands. "Run in
 // background", Esc or a click outside hides it; the inline bars carry on either way.
-function crtMonitor({ activeId = () => null } = {}) {
+// With `container`, the monitor sits inside that element (absolutely filling it) instead of over the page.
+function crtMonitor({ activeId = () => null, container = null, hideLabel = 'run in background ›' } = {}) {
   let el, title, ticks, log, kicker, ghost, btn, ids = [], hidden = false;
   function build() {
     el = document.createElement('div');
-    el.id = 'cine';
+    if (container) el.className = 'cine-inline'; else el.id = 'cine';
     el.setAttribute('role', 'status');
-    el.innerHTML = '<div class="cine-screen"><div class="cine-ghost" aria-hidden="true"></div><div class="cine-roll" aria-hidden="true"></div><div class="cine-inner"><div class="cine-kicker"><span>Step <b data-n></b> / <b data-t></b></span><span class="cine-app"></span></div><h3 class="cine-title"></h3><div class="cine-ticks"></div><div class="cine-log" aria-hidden="true"></div><button class="cine-hide" type="button">run in background ›</button></div></div>';
+    el.innerHTML = '<div class="cine-screen"><div class="cine-ghost" aria-hidden="true"></div><div class="cine-roll" aria-hidden="true"></div><div class="cine-inner"><div class="cine-kicker"><span>Step <b data-n></b> / <b data-t></b></span><span class="cine-app"></span></div><h3 class="cine-title"></h3><div class="cine-ticks"></div><div class="cine-log" aria-hidden="true"></div><button class="cine-hide" type="button"></button></div></div>';
     [title, ticks, log, kicker, ghost, btn] = ['.cine-title', '.cine-ticks', '.cine-log', '.cine-kicker', '.cine-ghost', '.cine-hide'].map((s) => el.querySelector(s));
     btn.addEventListener('click', close);
     el.addEventListener('click', (e) => { if (e.target === el) close(); });
-    document.body.appendChild(el);
+    (container || document.body).appendChild(el);
   }
   // Typed out a character at a time behind a block cursor, like a terminal; a new title cancels the old one.
   let typeTimer;
@@ -35,20 +36,23 @@ function crtMonitor({ activeId = () => null } = {}) {
     ghost.textContent = String(n).padStart(2, '0');
   }
   const states = new Map();
+  let closeTimer;
   function close() {
     if (!el || el.hidden) return;
     hidden = true;
-    el.className = 'out';
-    setTimeout(() => { el.hidden = true; el.className = ''; }, 500);
+    el.classList.remove('in'); el.classList.add('out');
+    closeTimer = setTimeout(() => { el.hidden = true; el.classList.remove('out'); }, 500);
   }
   addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
   return {
+    close,
     open(firstLabel = 'Reading your app', firstId = 'read') {
       if (!el) build();
+      clearTimeout(closeTimer); // reopened while the last close was still animating
       ids = [firstId]; states.clear(); hidden = false;
       log.innerHTML = ''; kicker.querySelector('.cine-app').textContent = '';
-      btn.textContent = 'run in background ›';
-      el.hidden = false; el.className = 'in';
+      btn.textContent = hideLabel;
+      el.hidden = false; el.classList.remove('out'); el.classList.add('in');
       setTitle(firstLabel);
       renderTicks(states);
     },

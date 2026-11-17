@@ -121,6 +121,8 @@
   .dock-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--s-text-0); font-size: var(--fs-md); font-weight: 600; }
   .dock-toggle svg { width: 14px; height: 14px; color: var(--s-text-3); transition: transform 0.2s var(--ease); }
   .dock-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .dock-head .hint.bad { color: #ff8a84; }
+  .side textarea.bad::placeholder { color: #ff8a84; opacity: 1; }
   .dock-head .hint { flex: 1; min-width: 0; font-size: var(--fs-xs); color: var(--s-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
   .dock-body { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; height: 200px; }
   .dock-body[hidden] { display: none; }
@@ -131,6 +133,8 @@
   .side textarea { flex: 1; min-height: 0; width: 100%; resize: none; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--s-border); background: var(--s-bg); color: var(--s-text-0); font-size: var(--fs-md); line-height: 1.5; }
   .side textarea:focus { outline: none; border-color: var(--s-text-3); }
   #refined { font-size: var(--fs-sm); }
+  .after-box { position: relative; flex: 1; min-height: 0; display: flex; }
+  .after-box textarea { flex: 1; }
   .side .btn.small { height: 28px; padding: 0 10px; font-size: var(--fs-xs); }
   .mid { display: flex; flex-direction: column; justify-content: center; }
   #refineBtn { display: inline-flex; align-items: center; gap: 6px; }
@@ -144,6 +148,8 @@
     .stage { grid-template-columns: 1fr; }
     .dock-body { grid-template-columns: 1fr; height: auto; }
     .side textarea { height: 80px; flex: none; }
+    .after-box { flex: none; height: 176px; } /* room for the progress monitor */
+    .after-box textarea { height: auto; }
     .mid { flex-direction: row; }
     #refineBtn { flex: 1; justify-content: center; }
     .folder { flex-basis: 100%; min-width: 0; order: 1; }
@@ -207,7 +213,7 @@
       <div class="mid"><button class="btn" type="button" id="refineBtn" disabled>Refine <span aria-hidden="true">→</span></button></div>
       <div class="side">
         <div class="side-head"><label for="refined"><b>After</b> · for Claude or another big model</label><button class="btn ghost small" type="button" id="copyBtn" disabled>Copy</button></div>
-        <textarea id="refined" placeholder="The clearer version appears here, with the right technical terms and this app's files. Edit it before copying if you like."></textarea>
+        <div class="after-box" id="afterBox"><textarea id="refined" placeholder="The clearer version appears here, with the right technical terms and this app's files. Edit it before copying if you like."></textarea></div>
       </div>
     </div>
   </section>
@@ -323,7 +329,7 @@ function render(s) {
 // Load screen: the dashboard's CRT deploy monitor (crt-monitor.js), fed by the build's plan/step/log
 // events. It opens when you start watching a folder and whenever a build fails; a rebuild after a save
 // otherwise runs quietly behind the status label, with the old preview still showing.
-let wbActive = null, loading = false, lastPlan = [], logTail = [];
+let wbActive = null, loading = false, lastPlan = [], logTail = [], userStopped = false;
 const cine = crtMonitor({ activeId: () => wbActive });
 const planLabel = (id) => (lastPlan.find((st) => st.id === id) || {}).label || '';
 function addLog(line) {
@@ -348,6 +354,12 @@ events.onmessage = (e) => {
   const ev = JSON.parse(e.data);
   if (ev.type === 'state') {
     const was = current.status;
+    // A full snapshot (has log) arrives on every (re)connect. Idle while this page was watching a folder means
+    // Hostess restarted (an update, say): pick the same folder up again, unless you stopped it yourself.
+    if (ev.state.log && ev.state.status === 'idle' && current.dir && current.status !== 'idle' && !userStopped) {
+      $('dir').value = current.dir;
+      setTimeout(() => $('folderForm').requestSubmit(), 0);
+    }
     if (ev.state.log) logTail = ev.state.log.slice(-40);
     render(ev.state);
     if (ev.state.status === 'running' && ev.state.log) show();
@@ -370,7 +382,7 @@ events.onmessage = (e) => {
 
 $('folderForm').onsubmit = async (e) => {
   e.preventDefault();
-  loading = true; wbActive = 'read'; logTail = [];
+  loading = true; wbActive = 'read'; logTail = []; userStopped = false;
   cine.open('Reading the folder');
   try { render(await api('/api/workbench/start', { method: 'POST', body: JSON.stringify({ dir: $('dir').value }) })); }
   catch (err) { showFailure(err.message); }
@@ -386,7 +398,7 @@ function syncEye() {
 }
 $('dir').addEventListener('input', syncEye);
 $('eyeBtn').onclick = () => {
-  if ($('eyeBtn').getAttribute('aria-pressed') === 'true') api('/api/workbench/stop', { method: 'POST' });
+  if ($('eyeBtn').getAttribute('aria-pressed') === 'true') { userStopped = true; api('/api/workbench/stop', { method: 'POST' }); }
   else $('folderForm').requestSubmit();
 };
 $('rebuildBtn').onclick = () => api('/api/workbench/rebuild', { method: 'POST' });
@@ -424,6 +436,11 @@ try { $('ask').value = localStorage.getItem('workbench-ask') || ''; } catch {}
 $('ask').addEventListener('input', () => { try { localStorage.setItem('workbench-ask', $('ask').value); } catch {} });
 $('ask').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('refineBtn').click(); });
 
+// The After box shows the stages in a small CRT monitor (crt-monitor.js, same as the load screen): it
+// collapses when the first words arrive, and on a failure stays on the stage that stopped, with the reason.
+let refineActive = null;
+const refineMon = crtMonitor({ activeId: () => refineActive, container: $('afterBox'), hideLabel: 'hide ×' });
+const refineLabels = { read: 'Reading the app folder' };
 $('refineBtn').onclick = async () => {
   if (refining) { refining.abort(); return; }
   const request = $('ask').value.trim();
@@ -432,8 +449,13 @@ $('refineBtn').onclick = async () => {
   $('refineBtn').textContent = 'Stop';
   $('refineBtn').disabled = false;
   $('refined').value = '';
+  $('refined').classList.remove('bad');
+  $('refined').placeholder = 'Writing…';
+  $('refineStatus').classList.remove('bad');
   $('copyBtn').disabled = true;
   $('refineStatus').textContent = 'Asking your local AI…';
+  refineActive = 'read';
+  refineMon.open(refineLabels.read, 'read');
   const t0 = performance.now();
   try {
     const r = await fetch('/api/workbench/prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request }), signal: refining.signal });
@@ -448,13 +470,24 @@ $('refineBtn').onclick = async () => {
       for (const p of parts) {
         if (!p.startsWith('data: ')) continue;
         const ev = JSON.parse(p.slice(6));
+        if (ev.type === 'plan') { ev.steps.forEach((st) => { refineLabels[st.id] = st.label; }); refineMon.plan(ev.steps); }
+        if (ev.type === 'step') {
+          if (ev.state === 'active') refineActive = ev.id;
+          refineMon.step(ev.id, ev, refineLabels[ev.id] || ev.id);
+          if (ev.id === 'write' && ev.state === 'active') refineMon.close(); // the words take over the box
+        }
+        if (ev.type === 'log') refineMon.line(ev.line);
         if (ev.type === 'text') { $('refined').value += ev.text; $('refined').scrollTop = $('refined').scrollHeight; $('refineStatus').textContent = 'Writing…'; }
         if (ev.type === 'error') throw new Error(ev.error);
       }
     }
     $('refineStatus').textContent = `Done in ${((performance.now() - t0) / 1000).toFixed(1)}s`;
   } catch (err) {
-    $('refineStatus').textContent = err.name === 'AbortError' ? 'Stopped.' : err.message;
+    const msg = err.name === 'AbortError' ? 'Stopped.' : err.message;
+    $('refineStatus').textContent = msg;
+    if (err.name === 'AbortError') refineMon.close(); else refineMon.fail(msg);
+    // Shown where the answer would have been, in red, so a failed press can't look like nothing happened.
+    if (err.name !== 'AbortError' && !$('refined').value) { $('refined').placeholder = msg; $('refined').classList.add('bad'); $('refineStatus').classList.add('bad'); }
   }
   $('copyBtn').disabled = !$('refined').value.trim();
   $('refineBtn').innerHTML = 'Refine <span aria-hidden="true">→</span>';

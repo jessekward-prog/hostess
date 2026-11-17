@@ -444,7 +444,7 @@ app.post('/api/workbench/prompt', async (req, res) => {
   const ctrl = new AbortController();
   res.on('close', () => ctrl.abort());
   try {
-    await workbench.refinePrompt(request, (text) => emit({ type: 'text', text }), ctrl.signal);
+    await workbench.refinePrompt(request, (text) => emit({ type: 'text', text }), ctrl.signal, emit);
     emit({ type: 'done' });
   } catch (err) {
     if (!ctrl.signal.aborted) emit({ type: 'error', error: err.message });
