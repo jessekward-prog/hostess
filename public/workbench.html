@@ -400,6 +400,7 @@ events.onmessage = (e) => {
 
 $('folderForm').onsubmit = async (e) => {
   e.preventDefault();
+  setRecent(false); // the menu opens while you type a path; starting it is done with the menu
   loading = true; wbActive = 'read'; logTail = []; userStopped = false;
   cine.open('Reading the folder');
   try { render(await api('/api/workbench/start', { method: 'POST', body: JSON.stringify({ dir: $('dir').value }) })); }
