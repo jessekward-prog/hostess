@@ -1404,14 +1404,14 @@ function progDismiss() {
     progTimer = setTimeout(() => { progEl.hidden = true; progEl.innerHTML = ''; progEl.className = ''; progEl.style.maxHeight = ''; prog = null; }, 450);
   }, 1200);
 }
-function progStart() {
+function progStart(firstLabel = 'Reading your app') {
   clearTimeout(progTimer);
   progEl.className = '';
   progEl.style.maxHeight = '';
   progEl.innerHTML = '';
   progEl.hidden = false;
-  prog = { rows: new Map(), active: null };
-  progRow('read', 'Reading your app');
+  prog = { rows: new Map(), active: null, running: true };
+  progRow('read', firstLabel);
   progSet('read', { state: 'active' });
 }
 function progFail() { if (prog && prog.active) progSet(prog.active, { state: 'failed' }); }
@@ -1431,8 +1431,14 @@ function progEvent(ev) {
     return ev.record;
   }
 }
-async function runDeploy(path, opts) {
-  progStart();
+// First step reads "Pulling from the repo" when the source is a git URL (the clone is the slow part of it).
+const isRemoteSource = (src) => /^(https?:\/\/|ssh:\/\/|git:\/\/|git@)/i.test(String(src).trim());
+async function runDeploy(path, opts, firstLabel) {
+  if (prog && prog.running) throw new Error('Another deploy is still running. Wait for it to finish.');
+  progStart(firstLabel);
+  try { return await streamDeploy(path, opts); } finally { if (prog) prog.running = false; }
+}
+async function streamDeploy(path, opts) {
   let res;
   try { res = await fetch(path, opts); } catch (err) { progFail(); throw err; }
   if (!res.ok || !res.body) {
@@ -1518,7 +1524,8 @@ deployForm.addEventListener('submit', async (e) => {
   deployBtn.disabled = true;
   deployBtn.textContent = 'Deploying…';
   try {
-    const rec = await runDeploy('/api/apps?stream=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: sourceInput.value.trim() }) });
+    const src = sourceInput.value.trim();
+    const rec = await runDeploy('/api/apps?stream=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: src }) }, isRemoteSource(src) ? 'Pulling from the repo' : undefined);
     deployLog.textContent = `Deployed "${rec.name}".`;
     deployLog.hidden = false;
     sourceInput.value = '';
@@ -1882,20 +1889,23 @@ function marketplaceCard(item) {
   `;
   const btn = el.querySelector('.marketplace-download');
   if (!installed) {
+    // Same progress bars as the Deploy box: close the store, show the steps up top, then the new app's card.
     btn.addEventListener('click', async () => {
       btn.disabled = true;
       btn.textContent = 'Downloading…';
-      const stopRipple = mountRippleField(el, RIPPLE_COLOR.ok);
+      closeMarketplace();
+      showError('');
+      deployLog.hidden = true;
+      document.querySelector('.deploy-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
       try {
-        await api('/api/apps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: item.repo }) });
-        stopRipple();
-        closeMarketplace();
-        await load();
+        const rec = await runDeploy('/api/apps?stream=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: item.repo }) }, 'Pulling from the repo');
+        deployLog.textContent = `Deployed "${rec.name}".`;
+        deployLog.hidden = false;
+        await revealNewApp(rec.name);
       } catch (err) {
-        stopRipple();
+        showError(err.message);
         btn.disabled = false;
         btn.textContent = 'Download';
-        alert(err.message);
       }
     });
   }
