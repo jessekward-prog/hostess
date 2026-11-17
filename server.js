@@ -200,6 +200,11 @@ app.post('/api/apps/:name/gateway/disable', (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/cache/clear', async (req, res) => {
+  try { res.json(await engine.clearCaches()); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+});
+
 // Manual "Update Hostess": the same pull-and-restart the 10-minute poll does, on demand.
 app.post('/api/update', async (req, res) => {
   try {
