@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "express": "^5.2.1",
+    "fflate": "^0.8.3",
     "js-yaml": "^4.1.0",
     "qrcode": "^1.5.4"
   }

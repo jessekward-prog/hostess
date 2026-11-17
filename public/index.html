@@ -242,6 +242,22 @@
     flex: 1; background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 8px;
     padding: 9px 12px; font-size: var(--fs-base); color: var(--s-text-0); outline: none;
   }
+  .upload-eyebrow { margin-top: 18px; }
+  .upload-pick {
+    flex: 1; display: block; background: var(--s-surface-2); border: 1px dashed var(--s-border); border-radius: 8px;
+    padding: 9px 12px; font-size: var(--fs-base); color: var(--s-text-3); cursor: pointer; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: border-color 0.15s, color 0.15s;
+  }
+  .upload-pick:hover, .upload-row.drag .upload-pick { border-color: var(--s-accent); color: var(--s-text-0); }
+  .upload-pick.has-file { color: var(--s-text-0); border-style: solid; }
+  .paste-link { margin-top: 10px; background: none; border: 0; padding: 0; color: var(--s-text-3); font: inherit; font-size: var(--fs-md); cursor: pointer; }
+  .paste-link:hover { color: var(--s-text-0); }
+  #paste-panel { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+  #paste-text {
+    width: 100%; box-sizing: border-box; background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 8px;
+    padding: 9px 12px; font: inherit; font-size: var(--fs-md); color: var(--s-text-0); outline: none; resize: vertical;
+  }
+  #paste-text:focus { border-color: var(--s-accent); }
   .deploy-row input:focus { border-color: var(--s-accent); }
   .deploy-row input::placeholder { color: var(--s-text-3); }
   .deploy-btn { background: var(--s-accent); color: var(--s-bg); border-radius: 8px; padding: 9px 18px; font-size: var(--fs-base); font-weight: 600; }
@@ -554,7 +570,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
             <span class="mark"><svg width="30" height="30" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="42" stroke="#fff" stroke-width="6"/><g stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23"/><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23" transform="rotate(120,50,50)"/><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23" transform="rotate(240,50,50)"/></g><circle cx="50" cy="50" r="8" stroke="#fff" stroke-width="4.4"/><g stroke="#fff" stroke-width="4.4" stroke-linecap="round"><line x1="50" y1="44" x2="50" y2="56"/><line x1="50" y1="44" x2="50" y2="56" transform="rotate(60,50,50)"/><line x1="50" y1="44" x2="50" y2="56" transform="rotate(120,50,50)"/></g></svg></span><span id="brand-text">Hostess</span><span class="caret-blink">_</span></h1>
-          <p class="tagline">Paste a repo URL or local path with an <code style="color:var(--s-text-0)">app.yaml</code> at its root to build, deploy, and manage it here.</p>
+          <p class="tagline">Paste a repo URL, or upload a zipped app folder with an <code style="color:var(--s-text-0)">app.yaml</code> at its root, to build, deploy, and manage it here. No GitHub needed.</p>
         </div>
 
         <div class="header-mascot" id="hecate" title="Hecate — three faces, one doorway">
@@ -641,6 +657,17 @@
         <input type="text" id="source-input" placeholder="https://github.com/you/your-app or /path/to/repo" required autocomplete="off">
         <button type="submit" class="deploy-btn" id="deploy-btn">Deploy</button>
       </form>
+      <div class="eyebrow upload-eyebrow">// or upload an app</div>
+      <div class="deploy-row upload-row" id="upload-drop">
+        <label class="upload-pick" for="upload-input" id="upload-label">Drop a .zip here, or click to choose</label>
+        <input type="file" id="upload-input" accept=".zip,application/zip" hidden>
+        <button type="button" class="deploy-btn" id="upload-btn" disabled>Upload</button>
+      </div>
+      <button type="button" class="paste-link" id="paste-toggle">Paste an AI reply instead ›</button>
+      <div id="paste-panel" hidden>
+        <textarea id="paste-text" rows="8" spellcheck="false" placeholder="Paste the whole reply. Each file needs a ### path/to/file heading followed by a code block."></textarea>
+        <button type="button" class="deploy-btn" id="paste-btn">Deploy pasted app</button>
+      </div>
       <div class="deploy-error" id="deploy-error" hidden></div>
       <div class="deploy-log" id="deploy-log" hidden></div>
     </div>
@@ -1304,6 +1331,67 @@ deployForm.addEventListener('submit', async (e) => {
     deployBtn.disabled = false;
     deployBtn.textContent = 'Deploy';
   }
+});
+
+// ── Upload a zip / paste an AI reply: both POST to the server, which saves them under imports/<name>/.
+const uploadInput = document.getElementById('upload-input');
+const uploadLabel = document.getElementById('upload-label');
+const uploadBtn = document.getElementById('upload-btn');
+const uploadDrop = document.getElementById('upload-drop');
+const pasteToggle = document.getElementById('paste-toggle');
+const pastePanel = document.getElementById('paste-panel');
+const pasteText = document.getElementById('paste-text');
+const pasteBtn = document.getElementById('paste-btn');
+
+function pickZip(file) {
+  if (!file) return;
+  if (!/\.zip$/i.test(file.name)) { showError('That is not a .zip. Zip the app folder first.'); return; }
+  showError('');
+  uploadInput.pickedFile = file;
+  uploadLabel.textContent = file.name;
+  uploadLabel.classList.add('has-file');
+  uploadBtn.disabled = false;
+}
+uploadInput.addEventListener('change', () => pickZip(uploadInput.files[0]));
+uploadDrop.addEventListener('dragover', (e) => { e.preventDefault(); uploadDrop.classList.add('drag'); });
+uploadDrop.addEventListener('dragleave', () => uploadDrop.classList.remove('drag'));
+uploadDrop.addEventListener('drop', (e) => { e.preventDefault(); uploadDrop.classList.remove('drag'); pickZip(e.dataTransfer.files[0]); });
+pasteToggle.addEventListener('click', () => {
+  pastePanel.hidden = !pastePanel.hidden;
+  pasteToggle.textContent = pastePanel.hidden ? 'Paste an AI reply instead ›' : 'Paste an AI reply instead ‹';
+  if (!pastePanel.hidden) pasteText.focus();
+});
+
+async function sendImport(btn, idleText, path, opts) {
+  showError('');
+  deployLog.hidden = true;
+  btn.disabled = true;
+  btn.textContent = 'Deploying…';
+  try {
+    const rec = await api(path, { method: 'POST', ...opts });
+    deployLog.textContent = `${rec.updated ? 'Updated' : 'Deployed'} "${rec.name}".`;
+    deployLog.hidden = false;
+    await load();
+    return true;
+  } catch (err) {
+    showError(err.message);
+    return false;
+  } finally {
+    btn.textContent = idleText;
+    btn.disabled = idleText === 'Upload' && !uploadInput.pickedFile;
+  }
+}
+uploadBtn.addEventListener('click', async () => {
+  if (await sendImport(uploadBtn, 'Upload', '/api/apps/upload', { headers: { 'Content-Type': 'application/zip' }, body: uploadInput.pickedFile })) {
+    uploadInput.value = '';
+    uploadInput.pickedFile = null;
+    uploadLabel.textContent = 'Drop a .zip here, or click to choose';
+    uploadLabel.classList.remove('has-file');
+    uploadBtn.disabled = true;
+  }
+});
+pasteBtn.addEventListener('click', async () => {
+  if (await sendImport(pasteBtn, 'Deploy pasted app', '/api/apps/paste', { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: pasteText.value }) })) pasteText.value = '';
 });
 
 // ── Go Online — one Quick Tunnel to this dashboard, apps expose their own

@@ -215,6 +215,18 @@ app.post('/api/apps', async (req, res) => {
   }
 });
 
+// Upload a .zip of an app folder, or paste a chat AI's reply ("### path" + code block per file).
+// Both end up as imports/<name>/ and deploy like any local path (lib/import.js).
+const importer = require('./lib/import');
+const runImport = async (res, getFiles) => {
+  try { res.json(await importer.importFiles(getFiles())); }
+  catch (err) { res.status(400).json({ error: err.message }); }
+};
+app.post('/api/apps/upload', express.raw({ type: () => true, limit: '50mb' }), (req, res) =>
+  runImport(res, () => importer.filesFromZip(req.body)));
+app.post('/api/apps/paste', (req, res) =>
+  runImport(res, () => importer.filesFromText(String((req.body || {}).text || ''))));
+
 app.post('/api/apps/:name/redeploy', async (req, res) => {
   try {
     res.json(await engine.redeployApp(req.params.name));
