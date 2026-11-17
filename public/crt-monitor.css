@@ -1,0 +1,62 @@
+/* CRT monitor pop-up, shared by the dashboard's deploy (index.html) and Workbench loads (workbench.html).
+   Uses the page's --s-* / --crt-green tokens. */
+  @keyframes crt-on {
+    0%   { transform: scale(0.02, 0.006); filter: brightness(5); opacity: 0; }
+    12%  { opacity: 1; }
+    38%  { transform: scale(1, 0.006); filter: brightness(4); }
+    72%  { transform: scale(1, 1.03); filter: brightness(1.7); }
+    100% { transform: none; filter: none; }
+  }
+  @keyframes crt-flicker { 0% { opacity: 1; } 50% { opacity: 0.93; } 100% { opacity: 1; } }
+  @keyframes loading-flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.15; } }
+  @keyframes cursor-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+  /* Deploy monitor: the real deploy stream (plan / step / log / done / error) in a CRT pop-up over the
+     dimmed dashboard. The inline bars under the deploy box still run; this is a view on the same events. */
+  #cine { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: rgba(0,0,0,0.6); }
+  #cine.in { animation: cine-dim-in 0.3s ease both; }
+  #cine.out { animation: cine-dim-in 0.5s ease reverse both; }
+  @keyframes cine-dim-in { from { background: rgba(0,0,0,0); } }
+  /* The tube: a bezel ring around a rounded screen; scanlines + flicker over the content, barrel-dark edges,
+     a slow rolling refresh band, and RGB fringing on the title. Decoration sits above content, ignores the pointer. */
+  .cine-screen { position: relative; width: min(760px, 100%); overflow: hidden; padding: 34px 38px 28px;
+    background: radial-gradient(ellipse at center, #111 0%, #030303 80%); border-radius: 22px / 30px;
+    box-shadow: 0 0 0 1px #2a2a2a, 0 0 0 9px #0b0b0b, 0 0 0 10px #262626, 0 30px 90px rgba(0,0,0,0.8), 0 0 60px rgba(255,255,255,0.04); }
+  .cine-screen::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 3; mix-blend-mode: multiply;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.55) 0 1px, transparent 1px 3px); animation: crt-flicker 0.15s steps(2) infinite; }
+  .cine-screen::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 4; border-radius: inherit;
+    box-shadow: inset 0 0 90px 18px rgba(0,0,0,0.85), inset 0 0 0 1px rgba(255,255,255,0.05); }
+  .cine-roll { position: absolute; inset: 0; pointer-events: none; z-index: 2; mix-blend-mode: screen;
+    background: linear-gradient(180deg, transparent 0, rgba(255,255,255,0.045) 45%, rgba(255,255,255,0.07) 50%, transparent 58%) 0 0 / 100% 40% no-repeat;
+    animation: cine-roll 5s linear infinite; }
+  @keyframes cine-roll { from { background-position: 0 -200%; } to { background-position: 0 300%; } }
+  #cine.in .cine-screen { animation: crt-on 0.55s cubic-bezier(0.2,0.8,0.2,1) both; }
+  #cine.out .cine-screen { animation: cine-out 0.5s ease-in both; }
+  @keyframes cine-out { 0% { transform: none; } 45% { transform: scale(1, 0.004); filter: brightness(3); } 100% { transform: scale(0, 0.004); filter: brightness(6); opacity: 0; } }
+  .cine-ghost { position: absolute; right: 0.02em; bottom: -0.2em; font-family: Georgia, serif; font-size: 240px; line-height: 1;
+    color: transparent; -webkit-text-stroke: 1px rgba(255,255,255,0.09); filter: blur(0.6px); pointer-events: none; user-select: none; }
+  .cine-inner { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 18px; animation: cine-jitter 4.5s steps(1) infinite; }
+  @keyframes cine-jitter { 0%, 100% { transform: none; } 61% { transform: translateX(1.5px); } 62% { transform: translateX(-1px) skewX(-0.6deg); } 63% { transform: none; } 88% { transform: translateY(1px); } 89% { transform: none; } }
+  .cine-kicker { font-size: var(--fs-xs); letter-spacing: 0.24em; text-transform: uppercase; color: var(--s-text-3); display: flex; gap: 14px; align-items: center; }
+  .cine-kicker b { color: var(--s-text-0); font-weight: 400; }
+  .cine-kicker .cine-app { color: var(--ok); }
+  .cine-title { font-family: var(--s-font); font-weight: 400; font-size: clamp(22px, 4vw, 36px); line-height: 1.15; letter-spacing: -0.02em;
+    color: var(--s-text-0); margin: 0; min-height: 1.15em; white-space: pre-wrap;
+    text-shadow: -1.5px 0 rgba(255,40,80,0.55), 1.5px 0 rgba(40,200,255,0.55), 0 0 22px rgba(255,255,255,0.28); }
+  .cine-title .prompt { color: var(--s-text-3); text-shadow: none; }
+  .cine-title .cursor { display: inline-block; width: 0.55em; height: 0.95em; margin-left: 0.06em; vertical-align: -0.1em; background: currentColor; animation: cursor-blink 1s step-end infinite;
+    box-shadow: -1.5px 0 rgba(255,40,80,0.55), 1.5px 0 rgba(40,200,255,0.55), 0 0 14px rgba(255,255,255,0.4); }
+  .cine-title.ok { color: var(--ok); text-shadow: -1.5px 0 rgba(255,40,80,0.45), 1.5px 0 rgba(40,200,255,0.45), 0 0 28px rgba(63,179,127,0.6); }
+  .cine-title.bad { color: #ff9a90; text-shadow: -1.5px 0 rgba(255,40,80,0.6), 1.5px 0 rgba(40,200,255,0.35), 0 0 28px rgba(224,86,79,0.5); }
+  .cine-ticks { display: flex; gap: 6px; }
+  .cine-tick { flex: 1; height: 6px; background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 2px; }
+  .cine-tick.active { background: repeating-conic-gradient(var(--s-text-0) 0 25%, transparent 0 50%) 0 0 / 4px 4px; animation: loading-flash 1.1s ease-in-out infinite; }
+  .cine-tick.done { background: var(--s-text-1); }
+  .cine-tick.failed { background: var(--danger); border-color: var(--danger); }
+  .cine-log { margin: 0; height: 8em; overflow: hidden; font-size: var(--fs-sm); line-height: 1.6; color: var(--crt-green);
+    text-shadow: 0 0 6px rgba(var(--crt-green-rgb),0.45); white-space: pre-wrap; word-break: break-all;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 45%); mask-image: linear-gradient(180deg, transparent 0, #000 45%);
+    display: flex; flex-direction: column; justify-content: flex-end; }
+  .cine-log .bad { color: #ff9a90; text-shadow: none; }
+  .cine-hide { align-self: flex-start; font-size: var(--fs-sm); color: var(--s-text-3); }
+  .cine-hide:hover { color: var(--s-text-0); }

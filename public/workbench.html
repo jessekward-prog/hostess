@@ -27,7 +27,7 @@
   [hidden] { display: none !important; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
 
-  .app { position: relative; display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr); height: 100dvh; }
+  .app { position: relative; display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr); height: 100dvh; }
   /* The dashboard's chosen sidebar theme (bg-themes.js) paints behind everything; the bars sit above it. */
   .app > :not(canvas) { position: relative; z-index: 1; }
   header.top { display: flex; align-items: center; gap: 12px; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); border-bottom: 1px solid var(--s-border); background: var(--s-surface); flex-wrap: wrap; }
@@ -100,11 +100,6 @@
   .drawer-row { display: flex; gap: 8px; align-items: center; }
   .drawer-row .hint { flex: 1; font-size: var(--fs-xs); color: var(--s-text-3); }
   .stage-wrap { position: relative; display: grid; min-height: 0; }
-  .logbar { border-top: 1px solid var(--s-border); background: var(--s-surface); padding-bottom: env(safe-area-inset-bottom); }
-  .logbar summary { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 16px; cursor: pointer; font-size: var(--fs-sm); color: var(--s-text-3); list-style: none; }
-  .logbar summary::-webkit-details-marker { display: none; }
-  .logbar summary .last { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .logbar pre { margin: 0; padding: 10px 16px; max-height: 30vh; overflow-y: auto; font-size: var(--fs-xs); white-space: pre-wrap; word-break: break-word; border-top: 1px solid var(--s-border); }
 
   .tabs { display: none; }
   @media (max-width: 899px) {
@@ -120,6 +115,7 @@
     .view:not(.active) { display: none !important; }
   }
 </style>
+<link rel="stylesheet" href="/crt-monitor.css">
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="bg-gain" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncA id="bg-gain-a" type="linear" slope="1"/></feComponentTransfer></filter></svg>
@@ -168,13 +164,10 @@
   </aside>
   </div>
 
-  <details class="logbar" id="logbar">
-    <summary><span>Log</span><span class="last" id="logLast">Pick a folder with an app in it. Every time a file in it changes, the app is rebuilt and both views reload.</span></summary>
-    <pre id="log"></pre>
-  </details>
 </div>
 
 <script src="/bg-themes.js"></script>
+<script src="/crt-monitor.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
 
@@ -260,39 +253,63 @@ function render(s) {
   $('promptBtn').disabled = current.status === 'idle';
   if (current.dir && document.activeElement !== $('dir')) $('dir').value = current.dir;
   syncEye();
-  if (current.status === 'error') $('logbar').open = true;
   if (prev.status !== current.status && current.status !== 'running') show();
 }
 
+// Load screen: the dashboard's CRT deploy monitor (crt-monitor.js), fed by the build's plan/step/log
+// events. It opens when you start watching a folder and whenever a build fails; a rebuild after a save
+// otherwise runs quietly behind the status label, with the old preview still showing.
+let wbActive = null, loading = false, lastPlan = [], logTail = [];
+const cine = crtMonitor({ activeId: () => wbActive });
+const planLabel = (id) => (lastPlan.find((st) => st.id === id) || {}).label || '';
 function addLog(line) {
-  const pre = $('log');
-  const stick = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 4;
-  pre.textContent += line + '\n';
-  if (pre.textContent.length > 200000) pre.textContent = pre.textContent.slice(-100000);
-  if (stick) pre.scrollTop = pre.scrollHeight;
-  $('logLast').textContent = line;
+  logTail.push(line);
+  if (logTail.length > 40) logTail.shift();
+  cine.line(line);
+}
+function showFailure(msg) {
+  if (!loading) {
+    cine.open('Rebuilding');
+    cine.plan(lastPlan);
+    // Steps before the one that failed went through.
+    for (const st of [{ id: 'read' }, ...lastPlan]) { if (st.id === wbActive) break; cine.step(st.id, { state: 'done' }); }
+    for (const l of logTail.slice(-12)) cine.line(l);
+  }
+  loading = false;
+  cine.fail(msg);
 }
 
 const events = new EventSource('/api/workbench/events');
 events.onmessage = (e) => {
   const ev = JSON.parse(e.data);
   if (ev.type === 'state') {
-    if (ev.state.log) { $('log').textContent = ''; ev.state.log.forEach(addLog); }
+    const was = current.status;
+    if (ev.state.log) logTail = ev.state.log.slice(-40);
     render(ev.state);
     if (ev.state.status === 'running' && ev.state.log) show();
+    if (ev.state.status === 'error' && (was !== 'error' || ev.state.log)) showFailure(ev.state.error || 'The build failed.');
+  } else if (ev.type === 'plan') {
+    lastPlan = ev.steps;
+    if (loading) { cine.step('read', { state: 'done' }); cine.plan(ev.steps); }
+  } else if (ev.type === 'step') {
+    if (ev.state === 'active') wbActive = ev.id;
+    if (loading) cine.step(ev.id, ev, planLabel(ev.id));
   } else if (ev.type === 'log') {
-    if (current.status === 'building' && $('log').textContent && /^Building /.test(ev.line)) $('log').textContent = '';
+    if (/^Building /.test(ev.line)) logTail = [];
     addLog(ev.line);
   } else if (ev.type === 'reload') {
     current.status = 'running';
     show();
+    if (loading) { loading = false; cine.done(current.name || ''); }
   }
 };
 
 $('folderForm').onsubmit = async (e) => {
   e.preventDefault();
-  try { $('log').textContent = ''; render(await api('/api/workbench/start', { method: 'POST', body: JSON.stringify({ dir: $('dir').value }) })); }
-  catch (err) { addLog(err.message); render({ status: 'error', error: err.message }); }
+  loading = true; wbActive = 'read'; logTail = [];
+  cine.open('Reading the folder');
+  try { render(await api('/api/workbench/start', { method: 'POST', body: JSON.stringify({ dir: $('dir').value }) })); }
+  catch (err) { showFailure(err.message); }
 };
 // Open eye only while the folder in the box is the one being watched; editing the path closes it,
 // so a click (or Enter) then switches to the new folder.
@@ -315,7 +332,7 @@ $('browseBtn').onclick = async () => {
   try {
     const { dir } = await api('/api/workbench/pick', { method: 'POST' });
     if (dir) { $('dir').value = dir; $('folderForm').requestSubmit(); }
-  } catch (err) { addLog(err.message); $('logbar').open = true; }
+  } catch (err) { cine.open('Opening the folder dialog'); cine.fail(err.message); }
   $('browseBtn').disabled = false;
 };
 
