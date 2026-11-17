@@ -276,8 +276,8 @@ const PLATFORM = [
     desc: 'A short hand-picked list of apps that install in one click.',
   },
   {
-    title: 'Forge',
-    desc: 'Describe an app, watch your local model write it, try it in a sandboxed preview, then install it as a normal Hostess app.',
+    title: 'Workbench',
+    desc: 'Point it at an app folder on this machine and see it at phone and desktop size side by side. Every time a file changes, the app is rebuilt the way a deploy would build it and both views reload.',
   },
 ];
 

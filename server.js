@@ -15,7 +15,7 @@ const gateway = require('./lib/gateway');
 const registry = require('./lib/registry');
 const tailscale = require('./lib/tailscale');
 const marketplace = require('./lib/marketplace');
-const forge = require('./lib/forge');
+const workbench = require('./lib/workbench');
 
 const app = express();
 const manifest = require('./lib/manifest');
@@ -412,103 +412,34 @@ app.post('/api/push/test', async (req, res) => {
   }
 });
 
-// Forge (lib/forge.js). Generation and install stream as server-sent events so the page can show
-// the model's work as it happens.
+// Workbench (lib/workbench.js): one watched folder, rebuilt on every change. Events stream as
+// server-sent events so the page reloads its previews the moment the new build answers.
 function sse(res) {
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' });
   return (event) => res.write(`data: ${JSON.stringify(event)}\n\n`);
 }
 
-app.get('/api/forge/settings', (req, res) => res.json({ vault: settings.get('forgeVault') || '', style: settings.get('forgeStyle') || '' }));
+app.get('/api/workbench', (req, res) => res.json(workbench.status()));
 
-app.put('/api/forge/settings', (req, res) => {
-  const body = req.body || {};
-  if (typeof body.vault === 'string') {
-    const vault = body.vault.trim();
-    if (vault && !fs.existsSync(vault)) return res.status(400).json({ error: `No folder at ${vault}` });
-    settings.set('forgeVault', vault);
-  }
-  if (typeof body.style === 'string') settings.set('forgeStyle', body.style.trim().slice(0, 500));
-  res.json({ vault: settings.get('forgeVault') || '', style: settings.get('forgeStyle') || '' });
-});
-
-app.post('/api/forge/generate', async (req, res) => {
-  const { requests, html, model, think, fix, stage, spec, plan, step, style, seed } = req.body || {};
-  if (!Array.isArray(requests) || !requests.length || !requests.every((r) => typeof r === 'string')) {
-    return res.status(400).json({ error: 'Describe the app first.' });
-  }
+app.get('/api/workbench/events', (req, res) => {
   const emit = sse(res);
-  const ctrl = new AbortController();
-  res.on('close', () => ctrl.abort());
-  try {
-    if (stage === 'step' && !(spec && Array.isArray(plan) && Number.isInteger(step) && plan[step])) throw new Error('A build step needs the spec, the plan and a step number.');
-    await forge.generate({ requests, html: typeof html === 'string' ? html : '', model, think: think === true, fix: fix === true, stage, spec, plan, step, style, seed: Number.isInteger(seed) ? seed : undefined }, emit, ctrl.signal);
-    emit({ type: 'done' });
-  } catch (err) {
-    if (!ctrl.signal.aborted) emit({ type: 'error', error: err.message });
-  }
-  res.end();
+  emit({ type: 'state', state: workbench.status() });
+  const off = workbench.subscribe(emit);
+  req.on('close', off);
 });
 
-app.post('/api/forge/ai', async (req, res) => {
-  try { res.json({ text: await forge.previewAi(req.body || {}) }); }
-  catch (err) { res.status(502).json({ error: err.message }); }
-});
-
-app.get('/api/forge/kit', (req, res) => res.json({ head: forge.kitHead() }));
-
-// Photos and documents picked in the Forge preview. The preview can't reach a built app's own
-// /api/files, so they live here: in memory, oldest dropped past 200 MB, readable without login under
-// an unguessable id (the sandboxed preview sends no cookie), writable only when logged in.
-const previewFiles = new Map();
-let previewBytes = 0;
-app.post('/api/forge/files', express.raw({ type: () => true, limit: '25mb' }), (req, res) => {
-  const body = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-  if (!body.length) return res.status(400).json({ error: 'The file was empty.' });
-  const id = require('crypto').randomBytes(12).toString('hex');
-  const name = String(req.query.name || 'file').replace(/[^\w.\- ]+/g, '_').slice(0, 120);
-  const type = String(req.headers['content-type'] || 'application/octet-stream').slice(0, 100);
-  previewFiles.set(id, { body, type, name });
-  previewBytes += body.length;
-  for (const [k, v] of previewFiles) { if (previewBytes <= 200e6) break; previewFiles.delete(k); previewBytes -= v.body.length; }
-  res.json({ id, url: `/forge-files/${id}`, name, type, size: body.length });
-});
-app.get('/forge-files/:id', (req, res) => {
-  const f = previewFiles.get(req.params.id);
-  if (!f) return res.status(404).end();
-  // Photos and PDFs open in the page; anything that could run as a page here (HTML, SVG) downloads.
-  const how = SAFE_INLINE_RE.test(f.type) ? 'inline' : 'attachment';
-  res.set({ 'X-Content-Type-Options': 'nosniff', 'Content-Type': f.type, 'Content-Disposition': `${how}; filename="${f.name.replace(/"/g, '')}"` }).send(f.body);
-});
-
-app.get('/api/forge/projects', (req, res) => res.json(forge.listProjects()));
-
-app.get('/api/forge/projects/:name', (req, res) => {
-  try { res.json(forge.getProject(req.params.name)); }
-  catch (err) { res.status(404).json({ error: err.message }); }
-});
-
-app.put('/api/forge/projects/:name', (req, res) => {
-  try { forge.saveProject({ ...req.body, name: req.params.name }); res.json({ ok: true }); }
+app.post('/api/workbench/start', async (req, res) => {
+  try { res.json(await workbench.start((req.body || {}).dir)); }
   catch (err) { res.status(400).json({ error: err.message }); }
 });
 
-app.delete('/api/forge/projects/:name', (req, res) => {
-  if (registry.get(req.params.name)) return res.status(400).json({ error: 'This app is installed. Remove it from the dashboard first.' });
-  try { forge.deleteProject(req.params.name); res.json({ ok: true }); }
-  catch (err) { res.status(400).json({ error: err.message }); }
-});
+app.post('/api/workbench/stop', async (req, res) => { await workbench.stop(); res.json({ ok: true }); });
 
-app.post('/api/forge/projects/:name/install', async (req, res) => {
-  const emit = sse(res);
-  try {
-    const dir = forge.saveProject({ ...req.body, name: req.params.name });
-    const record = await engine.deployApp(dir, (line) => emit({ type: 'log', line }));
-    emit({ type: 'done', port: record.port });
-  } catch (err) {
-    emit({ type: 'error', error: err.message });
-  }
-  res.end();
+app.post('/api/workbench/rebuild', (req, res) => { workbench.rebuild(); res.json({ ok: true }); });
+
+app.get('/api/workbench/dirs', (req, res) => {
+  try { res.json(workbench.listDirs(req.query.path)); }
+  catch (err) { res.status(400).json({ error: err.message }); }
 });
 
 for (const f of ['registry.json', 'settings.json', 'auth.json']) {
@@ -517,7 +448,8 @@ for (const f of ['registry.json', 'settings.json', 'auth.json']) {
 
 app.listen(PORT, '127.0.0.1', () => {
   console.log(`hostess dashboard: http://localhost:${PORT}`);
-  // A lab copy (a second checkout used for testing, e.g. Forge experiments) must not pull
+  workbench.cleanup();
+  // A lab copy (a second checkout used for testing) must not pull
   // itself up to main or redeploy anyone's apps.
   if (!process.env.HOSTESS_LAB) {
     autoupdate.start(console.log);
