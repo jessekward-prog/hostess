@@ -62,9 +62,10 @@
   .recent-empty { padding: 10px; font-size: var(--fs-sm); color: var(--s-text-3); }
   .recent-row { display: flex; align-items: stretch; border-radius: 8px; }
   .recent-row:hover, .recent-row.hi { background: var(--s-surface-2); }
-  .recent-pick { flex: 1; min-width: 0; display: grid; grid-template-columns: 10px 1fr auto; column-gap: 10px; align-items: center; padding: 8px 10px; min-height: 48px; text-align: left; }
-  .recent-pick .dot { width: 6px; height: 6px; border-radius: 50%; background: transparent; }
-  .recent-row.live .dot { background: var(--crt-green); box-shadow: 0 0 6px rgba(var(--crt-green-rgb),0.8); }
+  .recent-pick { flex: 1; min-width: 0; display: grid; grid-template-columns: 32px 1fr auto; column-gap: 12px; align-items: center; padding: 8px 10px; min-height: 48px; text-align: left; }
+  .recent-logo { grid-row: 1 / 3; position: relative; width: 32px; height: 32px; border-radius: 8px; background: var(--s-surface-2); box-shadow: 0 0 0 1px var(--s-border); display: grid; place-items: center; color: var(--s-text-1); font-size: var(--fs-md); text-transform: uppercase; }
+  .recent-logo img { width: 100%; height: 100%; object-fit: contain; border-radius: 8px; }
+  .recent-row.live .recent-logo::after { content: ''; position: absolute; right: -3px; bottom: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--crt-green); box-shadow: 0 0 0 2px var(--s-surface), 0 0 6px rgba(var(--crt-green-rgb),0.8); }
   .recent-pick b { color: var(--s-text-0); font-weight: 500; font-size: var(--fs-md); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .recent-pick small { grid-column: 2; color: var(--s-text-3); font-size: var(--fs-xs); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
   .recent-pick time { grid-row: 1; grid-column: 3; color: var(--s-text-3); font-size: var(--fs-xs); }
@@ -105,6 +106,12 @@
   .device { position: absolute; left: 50%; top: 0; transform-origin: top center; border-radius: 12px; overflow: hidden; background: var(--s-surface); box-shadow: 0 0 0 1px var(--s-border), 0 10px 30px rgba(0,0,0,0.5); }
   .device iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; transition: opacity 0.18s; }
   .device iframe.back { opacity: 0; pointer-events: none; }
+  /* Loading placeholder: the dashboard's ripple field (crt-monitor.js) with a flashing LOADING, under a frame
+     that stays hidden until the app has loaded, so a preview is never a blank white box. */
+  .loading-ph { position: absolute; inset: 0; overflow: hidden; display: flex; align-items: center; justify-content: center; background: var(--s-bg); }
+  .loading-word { position: relative; z-index: 1; font-family: Georgia, 'Times New Roman', serif; font-size: 22px; letter-spacing: 0.4em; padding-left: 0.4em; color: var(--ok); text-shadow: 0 0 10px rgba(63,179,127,0.55); animation: loading-flash 1.1s ease-in-out infinite; }
+  .device[data-w="1280"] .loading-word { font-size: 34px; }
+  @media (prefers-reduced-motion: reduce) { .loading-word { animation: none; } }
   .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--s-text-3); font-size: var(--fs-md); background: var(--s-bg); }
 
 
@@ -224,22 +231,38 @@ function appUrl() { return `${location.protocol}//${location.hostname}:${current
 
 // Double-buffered: the new page loads behind the old one and swaps in once it has loaded, so a
 // reload never flashes white.
+function placeholder(d) {
+  if (d.querySelector('.loading-ph')) return;
+  const el = Object.assign(document.createElement('div'), { className: 'loading-ph', innerHTML: '<span class="loading-word">LOADING</span>' });
+  d.appendChild(el); // on the page first: the ripple sizes itself from the element and skips its first ring at 0×0
+  el._stop = mountRippleField(el, RIPPLE_COLOR.ok, { scale: 1, speed: 120 });
+}
+function clearDevice(d, keep) {
+  for (const x of [...d.children]) if (x !== keep) { if (x._stop) x._stop(); x.remove(); }
+}
+
+// Double-buffered: a new page always loads hidden, behind the old page or the loading placeholder, and
+// swaps in once loaded, so a reload never flashes white.
 function show() {
   const live = current.port && current.status !== 'idle';
   $('openLink').setAttribute('aria-disabled', !live);
   if (live) $('openLink').href = appUrl(); else $('openLink').removeAttribute('href');
   for (const d of devices) {
-    if (!live) { d.innerHTML = `<div class="empty">${current.status === 'idle' ? 'Nothing to show yet' : ''}</div>`; continue; }
-    if (!d.querySelector('iframe') && current.status !== 'running') { d.innerHTML = '<div class="empty">Building…</div>'; continue; }
+    if (!live) { clearDevice(d); d.insertAdjacentHTML('beforeend', `<div class="empty">${current.status === 'idle' ? 'Nothing to show yet' : ''}</div>`); continue; }
+    const old = d.querySelector('iframe:not(.back)');
+    if (!old) { d.querySelectorAll('.empty').forEach((x) => x.remove()); placeholder(d); }
     if (current.status !== 'running') continue;
     d.querySelectorAll('iframe.back').forEach((x) => x.remove()); // a newer reload supersedes one still loading
-    const old = d.querySelector('iframe');
     const f = document.createElement('iframe');
     f.title = `${d.dataset.w}px preview`;
-    f.className = old ? 'back' : '';
+    f.className = 'back';
     f.src = appUrl();
-    f.onload = () => { f.className = ''; d.querySelectorAll('iframe, .empty').forEach((x) => x !== f && x.remove()); };
-    if (!old) d.querySelectorAll('.empty').forEach((x) => x.remove());
+    let done = false;
+    // isConnected: a newer reload removed this frame, so it must not clear the device.
+    const reveal = () => { if (done || !f.isConnected) return; done = true; f.className = ''; clearDevice(d, f); };
+    // A short beat after load lets the app's own script paint; the timeout covers a page whose load never fires.
+    f.onload = () => setTimeout(reveal, 150);
+    setTimeout(reveal, 20000);
     d.appendChild(f);
   }
 }
@@ -434,7 +457,13 @@ function drawRecent() {
     row.className = 'recent-row' + (current.status !== 'idle' && r.dir === current.dir ? ' live' : '') + (i === recentHi ? ' hi' : '');
     const pick = document.createElement('button');
     pick.type = 'button'; pick.className = 'recent-pick';
-    pick.innerHTML = '<i class="dot"></i><b></b><time></time><small></small>';
+    pick.innerHTML = '<span class="recent-logo" aria-hidden="true"></span><b></b><time></time><small></small>';
+    const logo = pick.querySelector('.recent-logo');
+    logo.textContent = r.name[0] || '?';
+    if (r.logo) {
+      const img = Object.assign(new Image(), { alt: '', src: `/api/workbench/recent/logo?dir=${encodeURIComponent(r.dir)}&v=${r.at}` });
+      img.onload = () => logo.replaceChildren(img); // keep the letter if the file won't load
+    }
     pick.querySelector('b').textContent = r.name;
     pick.querySelector('small').textContent = `\u200E${r.dir}\u200E`; // LRM: rtl only moves the ellipsis to the left
     pick.querySelector('time').textContent = ago(r.at);

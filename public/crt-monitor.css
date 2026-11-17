@@ -1,5 +1,5 @@
-/* CRT monitor pop-up, shared by the dashboard's deploy (index.html) and Workbench loads (workbench.html).
-   Uses the page's --s-* / --crt-green tokens. */
+/* CRT pieces shared by the dashboard (index.html) and Workbench (workbench.html): the monitor pop-up and the
+   ripple field. Uses the page's --s-* / --crt-green tokens. */
   @keyframes crt-on {
     0%   { transform: scale(0.02, 0.006); filter: brightness(5); opacity: 0; }
     12%  { opacity: 1; }
@@ -60,3 +60,12 @@
   .cine-log .bad { color: #ff9a90; text-shadow: none; }
   .cine-hide { align-self: flex-start; font-size: var(--fs-sm); color: var(--s-text-3); }
   .cine-hide:hover { color: var(--s-text-0); }
+  /* CRT layer for every ripple field (mountRippleField adds it right after the ripple canvas). It is part of the
+     background: it sits under .card-content (z-index 1), so text and buttons stay crisp on top of it. */
+  .ripple-crt {
+    position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.5) 0px, rgba(0,0,0,0.5) 1px, transparent 1px, transparent 3px),
+                radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.72) 100%);
+    animation: crt-flicker 0.15s steps(2) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) { .ripple-crt { animation: none; } }

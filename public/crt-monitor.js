@@ -87,3 +87,69 @@ function crtMonitor({ activeId = () => null } = {}) {
     },
   };
 }
+
+// Chunky dithered ripple ring — same Bayer-dot bitmap technique as reverb's
+// CrtBackdrop / shelf-cmd's RippleField, ported to plain canvas. Shared by the
+// dashboard (cards, grid loading) and Workbench (frame loading). Mounted on a card for the duration of a redeploy/stop/
+// etc. call; `colorRgb` is an "r,g,b" string so it can borrow --ok/--warn/
+// --danger directly. Returns a stop() that must be called before the card
+// is torn down, or the rAF loop and ResizeObserver just keep running.
+const RIPPLE_BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+function mountRippleField(container, colorRgb, opts = {}) {
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
+  container.prepend(canvas);
+  const crt = document.createElement('div');
+  crt.className = 'ripple-crt';
+  canvas.after(crt);
+  const ctx = canvas.getContext('2d');
+  const ripples = [];
+  let W = 0, H = 0, raf;
+
+  function push() {
+    if (!W || !H) return;
+    ripples.push({ t0: performance.now(), x: W / 2, y: H / 2 });
+  }
+  function size() {
+    W = container.clientWidth; H = container.clientHeight;
+    canvas.width = W; canvas.height = H;
+  }
+  size();
+  const ro = new ResizeObserver(size);
+  ro.observe(container);
+  push();
+  const amb = setInterval(push, 2800);
+
+  function draw(now) {
+    ctx.clearRect(0, 0, W, H);
+    const S = opts.scale || W / 390; // dot, band and speed all scale with this (default: the card's width)
+    const step = Math.max(3, Math.round(6 * S));
+    const dot = Math.max(2, Math.round(4 * S));
+    for (let i = ripples.length - 1; i >= 0; i--) {
+      if (now - ripples[i].t0 > 4200) ripples.splice(i, 1);
+    }
+    ctx.fillStyle = `rgb(${colorRgb})`;
+    for (let y = 2; y < H; y += step) {
+      for (let x = 2; x < W; x += step) {
+        let v = 0;
+        for (const r of ripples) {
+          const t = (now - r.t0) / 1000;
+          const R = t * (opts.speed || 60) * S;
+          const d = Math.hypot(x - r.x, y - r.y);
+          const g = Math.exp(-Math.pow((d - R) / (22 * S), 2));
+          v += g * Math.exp(-t * 0.5);
+        }
+        const bx = ((x / step) | 0) & 3, by = ((y / step) | 0) & 3;
+        const thr = RIPPLE_BAYER[by * 4 + bx] / 16;
+        if (v <= thr * 1.1 + 0.05) continue;
+        ctx.globalAlpha = Math.min(0.5, v);
+        ctx.fillRect(x, y, dot, dot);
+      }
+    }
+    raf = requestAnimationFrame(draw);
+  }
+  raf = requestAnimationFrame(draw);
+
+  return () => { cancelAnimationFrame(raf); clearInterval(amb); ro.disconnect(); canvas.remove(); crt.remove(); };
+}
+const RIPPLE_COLOR = { ok: '63,179,127', warn: '224,165,63', danger: '224,86,79' };

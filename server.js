@@ -452,6 +452,13 @@ app.post('/api/workbench/prompt', async (req, res) => {
   res.end();
 });
 
+app.get('/api/workbench/recent/logo', (req, res) => {
+  const file = workbench.recentLogo(String(req.query.dir || ''));
+  if (!file) return res.status(404).end();
+  res.set(UNTRUSTED_FILE_HEADERS); // an SVG can carry script; same handling as /api/apps/:name/logo
+  res.sendFile(file, (err) => { if (err && !res.headersSent) res.status(404).end(); });
+});
+
 app.delete('/api/workbench/recent', (req, res) => { workbench.forget(String((req.body || {}).dir || '')); res.json(workbench.status().recent); });
 
 app.post('/api/workbench/pick', async (req, res) => {
