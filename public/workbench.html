@@ -373,6 +373,12 @@ events.onmessage = (e) => {
       setTimeout(() => $('folderForm').requestSubmit(), 0);
     }
     if (ev.state.log) logTail = ev.state.log.slice(-40);
+    // A folder started from somewhere else (another tab, the API) gets the load screen too. A rebuild
+    // after a save (same folder, was running) stays quiet.
+    if (ev.state.status === 'building' && !loading && (was === 'idle' || (ev.state.dir && ev.state.dir !== current.dir))) {
+      loading = true; wbActive = 'read'; logTail = [];
+      cine.open('Reading the folder');
+    }
     render(ev.state);
     if (ev.state.status === 'running' && ev.state.log) show();
     if (ev.state.status === 'error' && (was !== 'error' || ev.state.log)) showFailure(ev.state.error || 'The build failed.');

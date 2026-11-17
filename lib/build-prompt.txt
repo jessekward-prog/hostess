@@ -1,4 +1,4 @@
-Build me a small web app (a PWA) that will run on Hostess, a self-hosted app server. First ask me up to 5 short questions about what it should do, then build it.
+Build me a small web app (a PWA) that will run on Hostess, a self-hosted app server. First ask me up to 5 short questions about what it should do, then build it. If you are working on your own and nobody can answer (an agent or a background task), choose sensible defaults instead, list them in one line each, and carry on.
 
 DELIVERY
 - If you can create files: make a new folder named after the app and write everything into it.
