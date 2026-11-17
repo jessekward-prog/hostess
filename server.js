@@ -437,6 +437,21 @@ app.post('/api/workbench/stop', async (req, res) => { await workbench.stop(); re
 
 app.post('/api/workbench/rebuild', (req, res) => { workbench.rebuild(); res.json({ ok: true }); });
 
+app.post('/api/workbench/prompt', async (req, res) => {
+  const request = String((req.body || {}).request || '').trim().slice(0, 8000);
+  if (!request) return res.status(400).json({ error: 'Say what you want changed first.' });
+  const emit = sse(res);
+  const ctrl = new AbortController();
+  res.on('close', () => ctrl.abort());
+  try {
+    await workbench.refinePrompt(request, (text) => emit({ type: 'text', text }), ctrl.signal);
+    emit({ type: 'done' });
+  } catch (err) {
+    if (!ctrl.signal.aborted) emit({ type: 'error', error: err.message });
+  }
+  res.end();
+});
+
 app.post('/api/workbench/pick', async (req, res) => {
   try { res.json({ dir: await workbench.pickFolder() }); }
   catch (err) { res.status(400).json({ error: err.message }); }

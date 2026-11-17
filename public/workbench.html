@@ -65,6 +65,19 @@
   .device iframe.back { opacity: 0; pointer-events: none; }
   .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--s-text-3); font-size: var(--fs-md); background: var(--s-bg); }
 
+
+  .drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 5; width: min(460px, 100%); display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; padding-bottom: max(14px, env(safe-area-inset-bottom)); background: var(--s-surface); border-left: 1px solid var(--s-border); box-shadow: -12px 0 40px rgba(0,0,0,0.55); animation: slide 0.25s var(--ease); }
+  @keyframes slide { from { transform: translateX(24px); opacity: 0; } }
+  .drawer-head { display: flex; align-items: center; gap: 8px; color: var(--s-text-0); font-size: var(--fs-md); }
+  .drawer-head b { flex: 1; font-weight: 600; }
+  .drawer label { font-size: var(--fs-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--s-text-3); }
+  .drawer textarea { width: 100%; resize: none; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--s-border); background: var(--s-bg); color: var(--s-text-0); font-size: var(--fs-md); line-height: 1.5; }
+  .drawer textarea:focus { outline: none; border-color: var(--s-text-3); }
+  #ask { min-height: 96px; }
+  #refined { flex: 1; min-height: 160px; font-size: var(--fs-sm); }
+  .drawer-row { display: flex; gap: 8px; align-items: center; }
+  .drawer-row .hint { flex: 1; font-size: var(--fs-xs); color: var(--s-text-3); }
+  .stage-wrap { position: relative; display: grid; min-height: 0; }
   .logbar { border-top: 1px solid var(--s-border); background: var(--s-surface); padding-bottom: env(safe-area-inset-bottom); }
   .logbar summary { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 16px; cursor: pointer; font-size: var(--fs-sm); color: var(--s-text-3); list-style: none; }
   .logbar summary::-webkit-details-marker { display: none; }
@@ -80,7 +93,7 @@
     .folder { flex-basis: 100%; min-width: 0; order: 1; }
     .status { order: 2; flex: 1; min-width: 0; overflow: hidden; }
     .status #statusText { overflow: hidden; text-overflow: ellipsis; }
-    #rebuildBtn, #stopBtn { order: 3; }
+    #rebuildBtn, #stopBtn, #promptBtn { order: 3; }
     .tabs { order: 4; flex-basis: 100%; }
     .tabs button { flex: 1; }
     .view:not(.active) { display: none !important; }
@@ -101,12 +114,14 @@
     <span class="status" id="status" data-s="idle"><i class="dot"></i><span id="statusText">Not watching</span></span>
     <button class="btn ghost" type="button" id="rebuildBtn" hidden>Rebuild</button>
     <button class="btn ghost" type="button" id="stopBtn" hidden>Stop</button>
+    <button class="btn ghost" type="button" id="promptBtn" aria-expanded="false" aria-controls="drawer">Prompt</button>
     <div class="tabs" role="tablist">
       <button role="tab" aria-selected="true" data-view="phone">Phone</button>
       <button role="tab" aria-selected="false" data-view="desktop">Desktop</button>
     </div>
   </header>
 
+  <div class="stage-wrap">
   <main class="stage">
     <section class="view active" data-view="phone">
       <div class="view-head">Phone · 390 × 844</div>
@@ -117,6 +132,16 @@
       <div class="fit"><div class="device" data-w="1280" data-h="800"></div></div>
     </section>
   </main>
+  <aside class="drawer" id="drawer" hidden aria-label="Prompt builder">
+    <div class="drawer-head"><b>Prompt builder</b><button class="btn ghost" type="button" id="drawerClose" aria-label="Close">✕</button></div>
+    <label for="ask">What do you want changed?</label>
+    <textarea id="ask" placeholder="e.g. the bookmark cards are cramped on phones, and add a way to sort by date"></textarea>
+    <div class="drawer-row"><span class="hint" id="askHint">Your local AI rewrites this with the app's files and any build error, ready for Claude or another big model.</span><button class="btn" type="button" id="refineBtn">Refine</button></div>
+    <label for="refined">Prompt</label>
+    <textarea id="refined" placeholder="The refined prompt appears here. You can edit it before copying."></textarea>
+    <div class="drawer-row"><span class="hint" id="refineStatus"></span><button class="btn ghost" type="button" id="copyBtn" disabled>Copy</button></div>
+  </aside>
+  </div>
 
   <details class="logbar" id="logbar">
     <summary><span>Log</span><span class="last" id="logLast">Pick a folder with an app in it. Every time a file in it changes, the app is rebuilt and both views reload.</span></summary>
@@ -239,6 +264,64 @@ document.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => {
   document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.dataset.view === b.dataset.view));
   devices.forEach(fit);
 });
+
+// Prompt builder (POST /api/workbench/prompt streams the local AI's answer as it writes).
+let refining = null;
+const drawer = $('drawer');
+function setDrawer(open) {
+  drawer.hidden = !open;
+  $('promptBtn').setAttribute('aria-expanded', open);
+  if (open) $('ask').focus();
+}
+$('promptBtn').onclick = () => setDrawer(drawer.hidden);
+$('drawerClose').onclick = () => setDrawer(false);
+addEventListener('keydown', (e) => { if (e.key === 'Escape' && !drawer.hidden) setDrawer(false); });
+try { $('ask').value = localStorage.getItem('workbench-ask') || ''; } catch {}
+$('ask').addEventListener('input', () => { try { localStorage.setItem('workbench-ask', $('ask').value); } catch {} });
+$('ask').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('refineBtn').click(); });
+
+$('refineBtn').onclick = async () => {
+  if (refining) { refining.abort(); return; }
+  const request = $('ask').value.trim();
+  if (!request) { $('ask').focus(); return; }
+  refining = new AbortController();
+  $('refineBtn').textContent = 'Stop';
+  $('refined').value = '';
+  $('copyBtn').disabled = true;
+  $('refineStatus').textContent = 'Asking your local AI…';
+  const t0 = performance.now();
+  try {
+    const r = await fetch('/api/workbench/prompt', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request }), signal: refining.signal });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+    const reader = r.body.getReader(), dec = new TextDecoder();
+    let buf = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const parts = buf.split('\n\n'); buf = parts.pop();
+      for (const p of parts) {
+        if (!p.startsWith('data: ')) continue;
+        const ev = JSON.parse(p.slice(6));
+        if (ev.type === 'text') { $('refined').value += ev.text; $('refined').scrollTop = $('refined').scrollHeight; $('refineStatus').textContent = 'Writing…'; }
+        if (ev.type === 'error') throw new Error(ev.error);
+      }
+    }
+    $('refineStatus').textContent = `Done in ${((performance.now() - t0) / 1000).toFixed(1)}s`;
+  } catch (err) {
+    $('refineStatus').textContent = err.name === 'AbortError' ? 'Stopped.' : err.message;
+  }
+  $('copyBtn').disabled = !$('refined').value.trim();
+  $('refineBtn').textContent = 'Refine';
+  refining = null;
+};
+$('refined').addEventListener('input', () => { $('copyBtn').disabled = !$('refined').value.trim(); });
+$('copyBtn').onclick = async () => {
+  try { await navigator.clipboard.writeText($('refined').value); }
+  catch { $('refined').select(); document.execCommand('copy'); }
+  $('copyBtn').textContent = 'Copied';
+  setTimeout(() => { $('copyBtn').textContent = 'Copy'; }, 1500);
+};
 
 // Pick up where it left off: the last folder starts watching again on open.
 api('/api/workbench').then((s) => {
