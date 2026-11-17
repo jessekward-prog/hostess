@@ -508,6 +508,84 @@
   .bg-range::-moz-range-thumb { width: 10px; height: 16px; border-radius: 2px; background: var(--s-accent); border: 1px solid var(--s-bg); }
   .bg-reset { font-size: var(--fs-xs); color: var(--s-text-1); text-decoration: underline; }
   .bg-reset:hover { color: var(--s-accent); }
+
+  /* CRT power states. load() compares each app's status with the last load: a card that just started
+     powers on (line → full picture), one that just stopped collapses to a line then a dot, and a card that
+     isn't running stays dim with its picture "burned in". The first load boots every card, staggered. */
+  .grid .card.crt-on { animation: crt-on 0.62s cubic-bezier(0.2,0.8,0.2,1) both; animation-delay: calc(var(--i, 0) * 55ms); }
+  .grid .card.crt-off { animation: crt-off 0.7s ease-in both; }
+  .grid .card.is-off { filter: grayscale(1) brightness(0.62) contrast(1.15); }
+  .grid .card.is-off:hover { filter: grayscale(0.6) brightness(0.9); }
+  .grid .card.is-off::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.35) 0 1px, transparent 1px 3px), radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.6) 100%); }
+  @keyframes crt-on {
+    0%   { transform: scale(0.02, 0.006); filter: brightness(5); opacity: 0; }
+    12%  { opacity: 1; }
+    38%  { transform: scale(1, 0.006); filter: brightness(4); }
+    72%  { transform: scale(1, 1.03); filter: brightness(1.7); }
+    100% { transform: none; filter: none; }
+  }
+  @keyframes crt-off {
+    0%   { transform: none; filter: none; }
+    35%  { transform: scale(1, 0.006); filter: brightness(4); }
+    65%  { transform: scale(0.02, 0.006); filter: brightness(6); opacity: 1; }
+    66%  { opacity: 0; }
+    67%  { transform: none; opacity: 0; filter: grayscale(1) brightness(0.62); }
+    100% { transform: none; opacity: 1; filter: grayscale(1) brightness(0.62) contrast(1.15); }
+  }
+  .h2-count.flip { display: inline-block; animation: flip 0.5s steps(5) both; }
+  @keyframes flip { 0% { transform: rotateX(90deg); opacity: 0; } 100% { transform: none; opacity: 1; } }
+
+  /* Deploy monitor: the real deploy stream (plan / step / log / done / error) in a CRT pop-up over the
+     dimmed dashboard. The inline bars under the deploy box still run; this is a view on the same events. */
+  #cine { position: fixed; inset: 0; z-index: 90; display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: rgba(0,0,0,0.6); }
+  #cine.in { animation: cine-dim-in 0.3s ease both; }
+  #cine.out { animation: cine-dim-in 0.5s ease reverse both; }
+  @keyframes cine-dim-in { from { background: rgba(0,0,0,0); } }
+  /* The tube: a bezel ring around a rounded screen; scanlines + flicker over the content, barrel-dark edges,
+     a slow rolling refresh band, and RGB fringing on the title. Decoration sits above content, ignores the pointer. */
+  .cine-screen { position: relative; width: min(760px, 100%); overflow: hidden; padding: 34px 38px 28px;
+    background: radial-gradient(ellipse at center, #111 0%, #030303 80%); border-radius: 22px / 30px;
+    box-shadow: 0 0 0 1px #2a2a2a, 0 0 0 9px #0b0b0b, 0 0 0 10px #262626, 0 30px 90px rgba(0,0,0,0.8), 0 0 60px rgba(255,255,255,0.04); }
+  .cine-screen::before { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 3; mix-blend-mode: multiply;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.55) 0 1px, transparent 1px 3px); animation: crt-flicker 0.15s steps(2) infinite; }
+  .cine-screen::after { content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 4; border-radius: inherit;
+    box-shadow: inset 0 0 90px 18px rgba(0,0,0,0.85), inset 0 0 0 1px rgba(255,255,255,0.05); }
+  .cine-roll { position: absolute; inset: 0; pointer-events: none; z-index: 2; mix-blend-mode: screen;
+    background: linear-gradient(180deg, transparent 0, rgba(255,255,255,0.045) 45%, rgba(255,255,255,0.07) 50%, transparent 58%) 0 0 / 100% 40% no-repeat;
+    animation: cine-roll 5s linear infinite; }
+  @keyframes cine-roll { from { background-position: 0 -200%; } to { background-position: 0 300%; } }
+  #cine.in .cine-screen { animation: crt-on 0.55s cubic-bezier(0.2,0.8,0.2,1) both; }
+  #cine.out .cine-screen { animation: cine-out 0.5s ease-in both; }
+  @keyframes cine-out { 0% { transform: none; } 45% { transform: scale(1, 0.004); filter: brightness(3); } 100% { transform: scale(0, 0.004); filter: brightness(6); opacity: 0; } }
+  .cine-ghost { position: absolute; right: 0.02em; bottom: -0.2em; font-family: Georgia, serif; font-size: 240px; line-height: 1;
+    color: transparent; -webkit-text-stroke: 1px rgba(255,255,255,0.09); filter: blur(0.6px); pointer-events: none; user-select: none; }
+  .cine-inner { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 18px; animation: cine-jitter 4.5s steps(1) infinite; }
+  @keyframes cine-jitter { 0%, 100% { transform: none; } 61% { transform: translateX(1.5px); } 62% { transform: translateX(-1px) skewX(-0.6deg); } 63% { transform: none; } 88% { transform: translateY(1px); } 89% { transform: none; } }
+  .cine-kicker { font-size: var(--fs-xs); letter-spacing: 0.24em; text-transform: uppercase; color: var(--s-text-3); display: flex; gap: 14px; align-items: center; }
+  .cine-kicker b { color: var(--s-text-0); font-weight: 400; }
+  .cine-kicker .cine-app { color: var(--ok); }
+  .cine-title { font-family: var(--s-font); font-weight: 400; font-size: clamp(22px, 4vw, 36px); line-height: 1.15; letter-spacing: -0.02em;
+    color: var(--s-text-0); margin: 0; min-height: 1.15em; white-space: pre-wrap;
+    text-shadow: -1.5px 0 rgba(255,40,80,0.55), 1.5px 0 rgba(40,200,255,0.55), 0 0 22px rgba(255,255,255,0.28); }
+  .cine-title .prompt { color: var(--s-text-3); text-shadow: none; }
+  .cine-title .cursor { display: inline-block; width: 0.55em; height: 0.95em; margin-left: 0.06em; vertical-align: -0.1em; background: currentColor; animation: cursor-blink 1s step-end infinite;
+    box-shadow: -1.5px 0 rgba(255,40,80,0.55), 1.5px 0 rgba(40,200,255,0.55), 0 0 14px rgba(255,255,255,0.4); }
+  .cine-title.ok { color: var(--ok); text-shadow: -1.5px 0 rgba(255,40,80,0.45), 1.5px 0 rgba(40,200,255,0.45), 0 0 28px rgba(63,179,127,0.6); }
+  .cine-title.bad { color: #ff9a90; text-shadow: -1.5px 0 rgba(255,40,80,0.6), 1.5px 0 rgba(40,200,255,0.35), 0 0 28px rgba(224,86,79,0.5); }
+  .cine-ticks { display: flex; gap: 6px; }
+  .cine-tick { flex: 1; height: 6px; background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 2px; }
+  .cine-tick.active { background: repeating-conic-gradient(var(--s-text-0) 0 25%, transparent 0 50%) 0 0 / 4px 4px; animation: loading-flash 1.1s ease-in-out infinite; }
+  .cine-tick.done { background: var(--s-text-1); }
+  .cine-tick.failed { background: var(--danger); border-color: var(--danger); }
+  .cine-log { margin: 0; height: 8em; overflow: hidden; font-size: var(--fs-sm); line-height: 1.6; color: var(--crt-green);
+    text-shadow: 0 0 6px rgba(var(--crt-green-rgb),0.45); white-space: pre-wrap; word-break: break-all;
+    -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 45%); mask-image: linear-gradient(180deg, transparent 0, #000 45%);
+    display: flex; flex-direction: column; justify-content: flex-end; }
+  .cine-log .bad { color: #ff9a90; text-shadow: none; }
+  .cine-hide { align-self: flex-start; font-size: var(--fs-sm); color: var(--s-text-3); }
+  .cine-hide:hover { color: var(--s-text-0); }
 </style>
 </head>
 <body>
@@ -1384,6 +1462,7 @@ async function loadAiLink(name, el) {
   });
 }
 
+let lastStatus = null; // name → running, from the previous load(); drives the CRT power on/off animations
 async function load() {
   let apps = [];
   showGridLoading();
@@ -1408,10 +1487,25 @@ async function load() {
 
   document.getElementById('stat-total').textContent = apps.length;
   document.getElementById('stat-running').textContent = apps.filter(a => a.status === 'running').length;
-  document.getElementById('deployed-count').textContent = apps.length ? `${apps.filter(a => a.status === 'running').length}/${apps.length} running` : '';
+  const countEl = document.getElementById('deployed-count');
+  const countText = apps.length ? `${apps.filter(a => a.status === 'running').length}/${apps.length} running` : '';
+  if (lastStatus && countEl.textContent !== countText) { countEl.classList.remove('flip'); void countEl.offsetWidth; countEl.classList.add('flip'); }
+  countEl.textContent = countText;
 
-  apps.forEach(app => {
-    grid.appendChild(appCard(app));
+  const prevStatus = lastStatus;
+  lastStatus = new Map(apps.map((a) => [a.name, a.status === 'running']));
+  apps.forEach((app, i) => {
+    const card = appCard(app);
+    const on = app.status === 'running';
+    const was = prevStatus && prevStatus.get(app.name);
+    if (!on) card.classList.add('is-off');
+    const fx = !prevStatus ? (on && 'crt-on') : was === undefined ? 'crt-on' : was !== on ? (on ? 'crt-on' : 'crt-off') : '';
+    if (fx) {
+      card.style.setProperty('--i', prevStatus ? 0 : i);
+      card.classList.add(fx);
+      card.addEventListener('animationend', (e) => { if (e.target === card) card.classList.remove(fx); });
+    }
+    grid.appendChild(card);
     const row = document.createElement('button');
     row.className = 'row';
     row.innerHTML = `<span class="status-dot ${statusClass(app.status)}"></span><span class="truncate flex-1" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${app.name}</span>`;
@@ -1442,6 +1536,7 @@ function progSet(id, ev) {
   const r = prog && prog.rows.get(id);
   if (!r) return;
   if (ev.state) { r.row.className = 'pg-step ' + ev.state; if (ev.state === 'active') prog.active = id; }
+  cine.step(id, ev, r.row.querySelector('.pg-label').textContent);
   if (ev.state === 'done') r.detail.textContent = '';
   else if (ev.detail !== undefined) r.detail.textContent = ev.detail;
 }
@@ -1463,17 +1558,110 @@ function progStart(firstLabel = 'Reading your app') {
   progEl.innerHTML = '';
   progEl.hidden = false;
   prog = { rows: new Map(), active: null, running: true };
+  cine.open();
   progRow('read', firstLabel);
   progSet('read', { state: 'active' });
 }
+
+// ── Deploy monitor: a CRT pop-up showing the same events the bars get. Each step's label becomes a title
+// card, the log scrolls under it, and the overlay collapses like a CRT when the deploy lands. "Run in
+// background", Esc or a click outside hides it; the inline bars carry on either way.
+const cine = (() => {
+  let el, title, ticks, log, kicker, ghost, btn, ids = [], hidden = false;
+  function build() {
+    el = document.createElement('div');
+    el.id = 'cine';
+    el.setAttribute('role', 'status');
+    el.innerHTML = '<div class="cine-screen"><div class="cine-ghost" aria-hidden="true"></div><div class="cine-roll" aria-hidden="true"></div><div class="cine-inner"><div class="cine-kicker"><span>Step <b data-n></b> / <b data-t></b></span><span class="cine-app"></span></div><h3 class="cine-title"></h3><div class="cine-ticks"></div><div class="cine-log" aria-hidden="true"></div><button class="cine-hide" type="button">run in background ›</button></div></div>';
+    [title, ticks, log, kicker, ghost, btn] = ['.cine-title', '.cine-ticks', '.cine-log', '.cine-kicker', '.cine-ghost', '.cine-hide'].map((s) => el.querySelector(s));
+    btn.addEventListener('click', close);
+    el.addEventListener('click', (e) => { if (e.target === el) close(); });
+    document.body.appendChild(el);
+  }
+  // Typed out a character at a time behind a block cursor, like a terminal; a new title cancels the old one.
+  let typeTimer;
+  const instant = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function setTitle(text, tone = '') {
+    clearTimeout(typeTimer);
+    title.className = 'cine-title ' + tone;
+    title.innerHTML = '<span class="prompt">&gt; </span><span class="typed"></span><span class="cursor"></span>';
+    const typed = title.querySelector('.typed');
+    let i = instant ? text.length - 1 : 0;
+    (function typeChar() {
+      typed.textContent = text.slice(0, ++i);
+      if (i < text.length) typeTimer = setTimeout(typeChar, 30 + Math.random() * 45);
+    })();
+  }
+  function renderTicks(states) {
+    ticks.innerHTML = ids.map((id) => `<span class="cine-tick ${states.get(id) || ''}"></span>`).join('');
+    const n = Math.max(1, ids.indexOf(prog && prog.active) + 1);
+    kicker.querySelector('[data-n]').textContent = n;
+    kicker.querySelector('[data-t]').textContent = ids.length;
+    ghost.textContent = String(n).padStart(2, '0');
+  }
+  const states = new Map();
+  function close() {
+    if (!el || el.hidden) return;
+    hidden = true;
+    el.className = 'out';
+    setTimeout(() => { el.hidden = true; el.className = ''; }, 500);
+  }
+  addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  return {
+    open() {
+      if (!el) build();
+      ids = ['read']; states.clear(); hidden = false;
+      log.innerHTML = ''; kicker.querySelector('.cine-app').textContent = '';
+      btn.textContent = 'run in background ›';
+      el.hidden = false; el.className = 'in';
+      setTitle('Reading your app');
+      renderTicks(states);
+    },
+    plan(steps) { ids = ['read', ...steps.map((s) => s.id)]; renderTicks(states); },
+    step(id, ev, label) {
+      if (!el || hidden) return;
+      if (ev.state) states.set(id, ev.state);
+      if (ev.state === 'active') setTitle(label);
+      renderTicks(states);
+    },
+    line(msg, bad) {
+      if (!el || hidden) return;
+      const d = document.createElement('div');
+      d.textContent = msg;
+      if (bad) d.className = 'bad';
+      log.appendChild(d);
+      while (log.children.length > 40) log.firstChild.remove();
+    },
+    async done(name) {
+      if (!el || hidden) return;
+      ids.forEach((id) => states.set(id, 'done'));
+      renderTicks(states);
+      kicker.querySelector('.cine-app').textContent = name;
+      setTitle('Live.', 'ok');
+      await new Promise((ok) => setTimeout(ok, 1100));
+      close();
+      await new Promise((ok) => setTimeout(ok, 500));
+    },
+    fail(msg) {
+      if (!el || hidden) return;
+      if (prog && prog.active) states.set(prog.active, 'failed');
+      renderTicks(states);
+      setTitle('It stopped here.', 'bad');
+      this.line(msg, true);
+      btn.textContent = 'close ×';
+    },
+  };
+})();
 function progFail() { if (prog && prog.active) progSet(prog.active, { state: 'failed' }); }
 function progEvent(ev) {
   if (ev.type === 'plan') {
     progSet('read', { state: 'done' });
     for (const st of ev.steps) progRow(st.id, st.label);
+    cine.plan(ev.steps);
   } else if (ev.type === 'step') {
     progSet(ev.id, ev);
   } else if (ev.type === 'log') {
+    cine.line(String(ev.msg));
     if (prog.active) progSet(prog.active, { detail: String(ev.msg).slice(0, 90) });
   } else if (ev.type === 'error') {
     progFail();
@@ -1488,7 +1676,11 @@ const isRemoteSource = (src) => /^(https?:\/\/|ssh:\/\/|git:\/\/|git@)/i.test(St
 async function runDeploy(path, opts, firstLabel) {
   if (prog && prog.running) throw new Error('Another deploy is still running. Wait for it to finish.');
   progStart(firstLabel);
-  try { return await streamDeploy(path, opts); } finally { if (prog) prog.running = false; }
+  try {
+    const rec = await streamDeploy(path, opts);
+    await cine.done(rec.name);
+    return rec;
+  } catch (err) { cine.fail(err.message); throw err; } finally { if (prog) prog.running = false; }
 }
 async function streamDeploy(path, opts) {
   let res;
