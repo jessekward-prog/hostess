@@ -243,6 +243,27 @@
     padding: 9px 12px; font-size: var(--fs-base); color: var(--s-text-0); outline: none;
   }
   .folder-btn { display: inline-flex; align-items: center; background: var(--s-surface-2); color: var(--s-text-0); border: 1px solid var(--s-border); cursor: pointer; white-space: nowrap; }
+  /* Each task gets a PlayStation face-button colour (same palette as the OS accents on the docs page).
+     The bar is a looping fill, not a measurement: it fills slowly, fades, and starts over while the task runs. */
+  #deploy-progress { --ps-cross: #4f8fe0; --ps-circle: #e5645f; --ps-triangle: #3fb37f; --ps-square: #e0559c; margin-top: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .pg-step[data-ps="cross"] { --pg: var(--ps-cross); }
+  .pg-step[data-ps="circle"] { --pg: var(--ps-circle); }
+  .pg-step[data-ps="triangle"] { --pg: var(--ps-triangle); }
+  .pg-step[data-ps="square"] { --pg: var(--ps-square); }
+  .pg-head { display: flex; align-items: baseline; gap: 8px; font-size: var(--fs-md); }
+  .pg-glyph { color: var(--pg); width: 1.2em; text-align: center; opacity: 0.35; }
+  .pg-step.active .pg-glyph, .pg-step.done .pg-glyph { opacity: 1; }
+  .pg-label { color: var(--s-text-0); white-space: nowrap; }
+  .pg-step.pending .pg-label { color: var(--s-text-3); }
+  .pg-detail { margin-left: auto; min-width: 0; color: var(--s-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pg-bar { height: 6px; margin-top: 5px; background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 4px; overflow: hidden; }
+  .pg-fill { height: 100%; width: 0; background: var(--pg); }
+  .pg-step.active .pg-fill { animation: pg-loop 2.8s ease-in-out infinite; box-shadow: 0 0 10px var(--pg); }
+  .pg-step.done .pg-fill { width: 100%; opacity: 0.55; }
+  .pg-step.failed .pg-fill { width: 100%; background: var(--danger); }
+  .pg-step.failed .pg-label, .pg-step.failed .pg-glyph { color: #ff9a90; opacity: 1; }
+  @keyframes pg-loop { 0% { width: 0; opacity: 1; } 80% { width: 100%; opacity: 1; } 100% { width: 100%; opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .pg-step.active .pg-fill { animation: none; width: 100%; opacity: 0.6; } }
   .upload-eyebrow { margin-top: 18px; }
   .upload-pick {
     flex: 1; display: block; background: var(--s-surface-2); border: 1px dashed var(--s-border); border-radius: 8px;
@@ -672,6 +693,7 @@
         <textarea id="paste-text" rows="8" spellcheck="false" placeholder="Paste the whole reply. Each file needs a ### path/to/file heading followed by a code block."></textarea>
         <button type="button" class="deploy-btn" id="paste-btn">Deploy pasted app</button>
       </div>
+      <div id="deploy-progress" hidden></div>
       <div class="deploy-error" id="deploy-error" hidden></div>
       <div class="deploy-log" id="deploy-log" hidden></div>
     </div>
@@ -1319,6 +1341,81 @@ async function load() {
   applyAiConfigured();
 }
 
+// ── Deploy progress. The server streams {plan|step|log} events, then {done|error} (see streamJob in
+// server.js); each step gets a bar: real percentage for the image build, a sliding stripe otherwise.
+const progEl = document.getElementById('deploy-progress');
+let prog = null;
+const PS = { read: ['✕', 'cross'], check: ['✕', 'cross'], build: ['△', 'triangle'], db: ['□', 'square'], push: ['○', 'circle'], search: ['○', 'circle'], start: ['△', 'triangle'] };
+function progRow(id, label) {
+  const [glyph, colour] = PS[id] || PS.check;
+  const row = document.createElement('div');
+  row.className = 'pg-step pending';
+  row.dataset.ps = colour;
+  row.innerHTML = '<div class="pg-head"><span class="pg-glyph"></span><span class="pg-label"></span><span class="pg-detail"></span></div><div class="pg-bar"><div class="pg-fill"></div></div>';
+  row.querySelector('.pg-glyph').textContent = glyph;
+  row.querySelector('.pg-label').textContent = label;
+  progEl.appendChild(row);
+  prog.rows.set(id, { row, detail: row.querySelector('.pg-detail') });
+}
+function progSet(id, ev) {
+  const r = prog && prog.rows.get(id);
+  if (!r) return;
+  if (ev.state) { r.row.className = 'pg-step ' + ev.state; if (ev.state === 'active') prog.active = id; }
+  if (ev.state === 'done') r.detail.textContent = '';
+  else if (ev.detail !== undefined) r.detail.textContent = ev.detail;
+}
+function progStart() {
+  progEl.innerHTML = '';
+  progEl.hidden = false;
+  prog = { rows: new Map(), active: null };
+  progRow('read', 'Reading your app');
+  progSet('read', { state: 'active' });
+}
+function progFail() { if (prog && prog.active) progSet(prog.active, { state: 'failed' }); }
+function progEvent(ev) {
+  if (ev.type === 'plan') {
+    progSet('read', { state: 'done' });
+    for (const st of ev.steps) progRow(st.id, st.label);
+  } else if (ev.type === 'step') {
+    progSet(ev.id, ev);
+  } else if (ev.type === 'log') {
+    if (prog.active) progSet(prog.active, { detail: String(ev.msg).slice(0, 90) });
+  } else if (ev.type === 'error') {
+    progFail();
+    throw new Error(ev.error);
+  } else if (ev.type === 'done') {
+    for (const id of prog.rows.keys()) progSet(id, { state: 'done' });
+    return ev.record;
+  }
+}
+async function runDeploy(path, opts) {
+  progStart();
+  let res;
+  try { res = await fetch(path, opts); } catch (err) { progFail(); throw err; }
+  if (!res.ok || !res.body) {
+    const d = await res.json().catch(() => ({}));
+    progFail();
+    throw new Error(d.error || res.statusText);
+  }
+  const reader = res.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '';
+  let record = null;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl);
+      buf = buf.slice(nl + 1);
+      if (line) record = progEvent(JSON.parse(line)) || record;
+    }
+  }
+  if (!record) { progFail(); throw new Error('Lost the connection to Hostess before the deploy finished.'); }
+  return record;
+}
+
 deployForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   showError('');
@@ -1326,7 +1423,9 @@ deployForm.addEventListener('submit', async (e) => {
   deployBtn.disabled = true;
   deployBtn.textContent = 'Deploying…';
   try {
-    await api('/api/apps', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: sourceInput.value.trim() }) });
+    const rec = await runDeploy('/api/apps?stream=1', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ source: sourceInput.value.trim() }) });
+    deployLog.textContent = `Deployed "${rec.name}".`;
+    deployLog.hidden = false;
     sourceInput.value = '';
     await load();
   } catch (err) {
@@ -1415,7 +1514,7 @@ async function sendImport(btn, idleText, path, opts) {
   btn.disabled = true;
   btn.textContent = 'Deploying…';
   try {
-    const rec = await api(path, { method: 'POST', ...opts });
+    const rec = await runDeploy(path, { method: 'POST', ...opts });
     deployLog.textContent = `${rec.updated ? 'Updated' : 'Deployed'} "${rec.name}".`;
     deployLog.hidden = false;
     await load();

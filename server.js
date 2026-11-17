@@ -218,6 +218,7 @@ app.get('/api/marketplace', (req, res) => {
 app.post('/api/apps', async (req, res) => {
   const { source } = req.body || {};
   if (!source) return res.status(400).json({ error: 'Missing "source" (repo URL or local path)' });
+  if (req.query.stream) return streamJob(res, (emit, log) => engine.deployApp(source, log, emit));
   try {
     const record = await engine.deployApp(source);
     res.json(record);
@@ -229,10 +230,16 @@ app.post('/api/apps', async (req, res) => {
 // Upload a .zip of an app folder, or paste a chat AI's reply ("### path" + code block per file).
 // Both end up as imports/<name>/ and deploy like any local path (lib/import.js).
 const importer = require('./lib/import');
-const runImport = async (res, getFiles) => {
-  try { res.json(await importer.importFiles(getFiles())); }
-  catch (err) { res.status(400).json({ error: err.message }); }
-};
+// Deploys stream newline-delimited JSON so the dashboard can draw progress: {type:'plan'|'step'|'log'},
+// then one final {type:'done',record} or {type:'error',error}.
+async function streamJob(res, job) {
+  res.writeHead(200, { 'Content-Type': 'application/x-ndjson', 'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no' });
+  const emit = (ev) => res.write(JSON.stringify(ev) + '\n');
+  try { emit({ type: 'done', record: await job(emit, (msg) => emit({ type: 'log', msg })) }); }
+  catch (err) { emit({ type: 'error', error: err.message }); }
+  res.end();
+}
+const runImport = (res, getFiles) => streamJob(res, (emit, log) => importer.importFiles(getFiles(), log, emit));
 app.post('/api/apps/upload', express.raw({ type: () => true, limit: '50mb' }), (req, res) =>
   runImport(res, () => importer.filesFromZip(req.body)));
 app.post('/api/apps/folder', express.raw({ type: () => true, limit: '50mb' }), (req, res) =>
