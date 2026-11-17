@@ -264,6 +264,11 @@
   #deploy-progress.fade { max-height: 0 !important; opacity: 0; margin-top: 0; }
   @keyframes pg-loop { 0% { width: 0; opacity: 1; } 80% { width: 100%; opacity: 1; } 100% { width: 100%; opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { .pg-step.active .pg-fill { animation: none; width: 100%; opacity: 0.6; } }
+  .grid .grid-loading { grid-column: 1 / -1; min-height: 300px; }
+  .grid .grid-loading .card-content { align-items: center; justify-content: center; }
+  .grid-loading .loading-word { position: relative; z-index: 1; font-size: var(--fs-lg, 18px); letter-spacing: 0.5em; padding-left: 0.5em; color: var(--ok); animation: loading-flash 1.1s ease-in-out infinite; }
+  @keyframes loading-flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.15; } }
+  @media (prefers-reduced-motion: reduce) { .grid-loading .loading-word { animation: none; } }
   .upload-eyebrow { margin-top: 18px; }
   .upload-pick {
     flex: 1; display: block; background: var(--s-surface-2); border: 1px dashed var(--s-border); border-radius: 8px;
@@ -1309,7 +1314,9 @@ async function loadAiLink(name, el) {
 
 async function load() {
   let apps = [];
+  showGridLoading();
   try { apps = await api('/api/apps'); } catch (err) {
+    hideGridLoading();
     if (err.needsSetup) return showAuthOverlay('setup');
     if (err.needsLogin) return showAuthOverlay('login');
     showError(err.message);
@@ -1321,6 +1328,7 @@ async function load() {
   installedAppNames = new Set(apps.map((a) => a.name));
   renderMarketplaceGrid();
 
+  hideGridLoading();
   clearPlaceholder();
   grid.innerHTML = '';
   sidebarApps.innerHTML = '';
@@ -1433,6 +1441,24 @@ async function runDeploy(path, opts) {
 
 // A new app's card: once the bars finish, hold a rippling placeholder in the grid until the real card
 // replaces it (load() swaps it out). Apps that already have a card (redeploys) skip this.
+// While the app list is loading and the grid is empty (page open, after an update restart), fill it with
+// one big ripple and a flashing LOADING; load() swaps it out as soon as it has the apps.
+let gridLoading = null;
+function showGridLoading() {
+  if (gridLoading || grid.children.length) return;
+  const el = document.createElement('div');
+  el.className = 'card grid-loading';
+  el.innerHTML = '<div class="card-content"><span class="loading-word">LOADING</span></div>';
+  grid.appendChild(el);
+  gridLoading = { el, stop: mountRippleField(el, RIPPLE_COLOR.ok) };
+}
+function hideGridLoading() {
+  if (!gridLoading) return;
+  gridLoading.stop();
+  gridLoading.el.remove();
+  gridLoading = null;
+}
+
 let placeholder = null;
 function clearPlaceholder() {
   if (!placeholder) return;
@@ -1792,6 +1818,7 @@ if (isLocalView()) {
   loopbackBadge.lastChild.textContent = 'Accessed via Hostess quick tunnel';
 }
 
+showGridLoading();
 checkAuth().then(load);
 
 // ── Marketplace — a curated list of ready-to-deploy apps (lib/marketplace.js).
