@@ -235,6 +235,8 @@ const runImport = async (res, getFiles) => {
 };
 app.post('/api/apps/upload', express.raw({ type: () => true, limit: '50mb' }), (req, res) =>
   runImport(res, () => importer.filesFromZip(req.body)));
+app.post('/api/apps/folder', express.raw({ type: () => true, limit: '50mb' }), (req, res) =>
+  runImport(res, () => importer.filesFromFrames(req.body)));
 app.post('/api/apps/paste', (req, res) =>
   runImport(res, () => importer.filesFromText(String((req.body || {}).text || ''))));
 

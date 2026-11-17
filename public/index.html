@@ -242,6 +242,7 @@
     flex: 1; background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 8px;
     padding: 9px 12px; font-size: var(--fs-base); color: var(--s-text-0); outline: none;
   }
+  .folder-btn { display: inline-flex; align-items: center; background: var(--s-surface-2); color: var(--s-text-0); border: 1px solid var(--s-border); cursor: pointer; white-space: nowrap; }
   .upload-eyebrow { margin-top: 18px; }
   .upload-pick {
     flex: 1; display: block; background: var(--s-surface-2); border: 1px dashed var(--s-border); border-radius: 8px;
@@ -662,6 +663,8 @@
       <div class="deploy-row upload-row" id="upload-drop">
         <label class="upload-pick" for="upload-input" id="upload-label">Drop a .zip here, or click to choose</label>
         <input type="file" id="upload-input" accept=".zip,application/zip" hidden>
+        <label class="deploy-btn folder-btn" for="folder-input">Choose folder</label>
+        <input type="file" id="folder-input" webkitdirectory hidden>
         <button type="button" class="deploy-btn" id="upload-btn" disabled>Upload</button>
       </div>
       <button type="button" class="paste-link" id="paste-toggle">Paste an AI reply instead ›</button>
@@ -1366,14 +1369,35 @@ const pastePanel = document.getElementById('paste-panel');
 const pasteText = document.getElementById('paste-text');
 const pasteBtn = document.getElementById('paste-btn');
 
-function pickZip(file) {
-  if (!file) return;
-  if (!/\.zip$/i.test(file.name)) { showError('That is not a .zip. Zip the app folder first.'); return; }
-  showError('');
-  uploadInput.pickedFile = file;
-  uploadLabel.textContent = file.name;
+const IDLE_LABEL = 'Drop a .zip here, or click to choose';
+function setPicked(text) {
+  uploadLabel.textContent = text;
   uploadLabel.classList.add('has-file');
   uploadBtn.disabled = false;
+}
+function pickZip(file) {
+  if (!file) return;
+  if (!/\.zip$/i.test(file.name)) { showError('That is not a .zip. Zip the app folder first, or use Choose folder.'); return; }
+  showError('');
+  uploadInput.pickedFile = file;
+  uploadInput.pickedFolder = null;
+  setPicked(file.name);
+}
+// Folder picker: skip node_modules and .git on this side so they never travel (the server skips them too).
+const SKIP_PATH = /(^|\/)(node_modules|\.git|__MACOSX)(\/|$)|(^|\/)\.DS_Store$/;
+const folderInput = document.getElementById('folder-input');
+folderInput.addEventListener('change', () => {
+  const files = [...folderInput.files].filter((f) => !SKIP_PATH.test(f.webkitRelativePath));
+  if (!files.length) return;
+  showError('');
+  uploadInput.pickedFile = null;
+  uploadInput.pickedFolder = files;
+  setPicked(`${files[0].webkitRelativePath.split('/')[0]} (${files.length} files)`);
+});
+function folderBody(files) {
+  const parts = [];
+  for (const f of files) parts.push(JSON.stringify({ path: f.webkitRelativePath, size: f.size }) + '\n', f);
+  return new Blob(parts);
 }
 uploadInput.addEventListener('change', () => pickZip(uploadInput.files[0]));
 uploadDrop.addEventListener('dragover', (e) => { e.preventDefault(); uploadDrop.classList.add('drag'); });
@@ -1401,14 +1425,20 @@ async function sendImport(btn, idleText, path, opts) {
     return false;
   } finally {
     btn.textContent = idleText;
-    btn.disabled = idleText === 'Upload' && !uploadInput.pickedFile;
+    btn.disabled = idleText === 'Upload' && !uploadInput.pickedFile && !uploadInput.pickedFolder;
   }
 }
 uploadBtn.addEventListener('click', async () => {
-  if (await sendImport(uploadBtn, 'Upload', '/api/apps/upload', { headers: { 'Content-Type': 'application/zip' }, body: uploadInput.pickedFile })) {
+  const folder = uploadInput.pickedFolder;
+  const ok = folder
+    ? await sendImport(uploadBtn, 'Upload', '/api/apps/folder', { headers: { 'Content-Type': 'application/octet-stream' }, body: folderBody(folder) })
+    : await sendImport(uploadBtn, 'Upload', '/api/apps/upload', { headers: { 'Content-Type': 'application/zip' }, body: uploadInput.pickedFile });
+  if (ok) {
     uploadInput.value = '';
+    folderInput.value = '';
     uploadInput.pickedFile = null;
-    uploadLabel.textContent = 'Drop a .zip here, or click to choose';
+    uploadInput.pickedFolder = null;
+    uploadLabel.textContent = IDLE_LABEL;
     uploadLabel.classList.remove('has-file');
     uploadBtn.disabled = true;
   }
