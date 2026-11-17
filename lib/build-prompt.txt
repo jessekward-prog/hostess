@@ -38,7 +38,7 @@ RULES
    - Session = random 32-byte token in a cookie: HttpOnly, SameSite=Lax, and Secure only when the request header X-Forwarded-Proto is https.
    - Throttle PIN attempts per IP AND with a global cap (traffic arrives through a proxy, so every visitor can share one IP).
    - The PIN input must accept the number row and the numpad. If you use a real <input>, validate on submit; never block keys.
-   - After a correct PIN the app appears immediately with no reload (fetch "/" and swap the document in).
+   - After a correct PIN the app appears immediately, with no manual refresh: call location.replace('/'). Never document.write the fetched page over the PIN page: its top-level const/let names survive and the app's own script throws "already declared".
    - Every route that changes data needs a valid session. Serve any images or downloads via cookie auth, since <img> and <audio> can't send headers.
 
 6. Use only relative URLs. No hardcoded domain, port or origin anywhere. The app is reached from localhost, a private network address and a changing tunnel address.
