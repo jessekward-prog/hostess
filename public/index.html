@@ -272,16 +272,17 @@
   .grid .grid-loading { grid-column: 1 / -1; min-height: 300px; }
   .grid .grid-loading .card-content { align-items: center; justify-content: center; }
   .grid-loading .loading-word { position: relative; z-index: 1; font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 22px; letter-spacing: 0.4em; padding-left: 0.4em; color: var(--ok); animation: loading-flash 1.1s ease-in-out infinite; }
-  /* CRT: scanlines + vignette over the whole panel (same recipe as the Hecate canvas), a slow brightness flicker, glow on the word. */
-  .grid .grid-loading::after {
-    content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; mix-blend-mode: multiply;
-    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.34) 0px, rgba(0,0,0,0.34) 1px, transparent 1px, transparent 3px),
-                radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.55) 100%);
+  /* CRT layer for every ripple field (mountRippleField adds it right after the ripple canvas). It is part of the
+     background: it sits under .card-content (z-index 1), so text and buttons stay crisp on top of it. */
+  .ripple-crt {
+    position: absolute; inset: 0; pointer-events: none; mix-blend-mode: multiply;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.5) 0px, rgba(0,0,0,0.5) 1px, transparent 1px, transparent 3px),
+                radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.72) 100%);
     animation: crt-flicker 0.15s steps(2) infinite;
   }
   .grid-loading .loading-word { text-shadow: 0 0 10px rgba(63,179,127,0.55); }
   @keyframes crt-flicker { 0% { opacity: 1; } 50% { opacity: 0.93; } 100% { opacity: 1; } }
-  @media (prefers-reduced-motion: reduce) { .grid .grid-loading::after { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .ripple-crt { animation: none; } }
   @keyframes loading-flash { 0%, 100% { opacity: 1; } 50% { opacity: 0.15; } }
   @media (prefers-reduced-motion: reduce) { .grid-loading .loading-word { animation: none; } }
   .upload-eyebrow { margin-top: 18px; }
@@ -861,6 +862,9 @@ function mountRippleField(container, colorRgb, opts = {}) {
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
   container.prepend(canvas);
+  const crt = document.createElement('div');
+  crt.className = 'ripple-crt';
+  canvas.after(crt);
   const ctx = canvas.getContext('2d');
   const ripples = [];
   let W = 0, H = 0, raf;
@@ -909,7 +913,7 @@ function mountRippleField(container, colorRgb, opts = {}) {
   }
   raf = requestAnimationFrame(draw);
 
-  return () => { cancelAnimationFrame(raf); clearInterval(amb); ro.disconnect(); canvas.remove(); };
+  return () => { cancelAnimationFrame(raf); clearInterval(amb); ro.disconnect(); canvas.remove(); crt.remove(); };
 }
 const RIPPLE_COLOR = { ok: '63,179,127', warn: '224,165,63', danger: '224,86,79' };
 
