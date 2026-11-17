@@ -1870,6 +1870,24 @@ if (isLocalView()) {
   loopbackBadge.lastChild.textContent = 'Accessed via Hostess quick tunnel';
 }
 
+// Phone layout: Hecate is a backdrop (see the 640px media block), and her horizontal centre follows the Clear cache
+// button's centre, measured, so it holds whatever wraps the button row into (2 or 3 buttons, any width).
+(function alignHecate() {
+  const row = document.querySelector('.header-row'), mascot = document.getElementById('hecate'), btn = document.getElementById('clearCacheBtn');
+  const phone = matchMedia('(max-width: 640px)');
+  function place() {
+    if (!phone.matches) { mascot.style.left = mascot.style.right = mascot.style.transform = ''; return; }
+    const r = row.getBoundingClientRect(), b = btn.getBoundingClientRect();
+    mascot.style.left = `${b.left + b.width / 2 - r.left}px`;
+    mascot.style.right = 'auto';
+    mascot.style.transform = 'translateX(-50%)';
+  }
+  const ro = new ResizeObserver(place);
+  ro.observe(row); ro.observe(btn);
+  phone.addEventListener('change', place);
+  place();
+})();
+
 showGridLoading();
 checkAuth().then(load);
 
