@@ -178,6 +178,7 @@
   h1 .mark { display: flex; align-items: center; justify-content: center; width: 52px; height: 52px; border-radius: 6px; border: 1.5px solid var(--s-text-0); }
   @keyframes cursor-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
   .caret-blink { animation: cursor-blink 1s step-end infinite; }
+  .tg-short { display: none; }
   .tagline { color: var(--s-text-1); font-size: var(--fs-lg); max-width: 60ch; margin: 0; line-height: 1.6; }
 
   /* Hecate — three-faced statue mascot, dithered CRT-style. Composited once
@@ -219,7 +220,20 @@
      unconditionally) is meant to center. The loopback line still needs to
      wrap here, or its forced nowrap would overflow a narrow viewport. */
   @media (max-width: 640px) {
-    .header-row { grid-template-columns: 1fr; row-gap: 20px; }
+    .header-row { grid-template-columns: 1fr; row-gap: 0; position: relative; }
+    main { overflow-x: clip; }
+    /* Hecate keeps her full size but drops behind the title as a dim backdrop, bleeding off the right edge. */
+    .header-mascot { position: absolute; right: -34px; top: -14px; z-index: 0; opacity: 0.42; pointer-events: none; }
+    .hecate-plaque { display: none; }
+    .header-left { position: relative; z-index: 1; min-height: 172px; }
+    .tagline { max-width: 58%; }
+    .tg-full { display: none; }
+    .tg-short { display: inline; }
+    .conn-bar { margin-top: 20px; }
+    /* doubled class: the base upload rules are defined later in the file and would otherwise win */
+    .deploy-row.upload-row { flex-wrap: wrap; }
+    .deploy-row.upload-row .upload-pick { flex: 1 1 100%; }
+    .deploy-row.upload-row .folder-btn, .deploy-row.upload-row #upload-btn { flex: 1 1 0; justify-content: center; }
     .conn-status { white-space: normal; }
     .conn-bar { justify-self: stretch; max-width: none; align-items: stretch; gap: 16px; }
     .conn-actions { flex-direction: row; flex-wrap: wrap; gap: 10px; }
@@ -614,7 +628,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
             </button>
             <span class="mark"><svg width="30" height="30" viewBox="0 0 100 100" fill="none"><circle cx="50" cy="50" r="42" stroke="#fff" stroke-width="6"/><g stroke="#fff" stroke-width="6" stroke-linecap="round"><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23"/><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23" transform="rotate(120,50,50)"/><path d="M50,41 C56,30 68,33 68,22 C68,13 59,9 51,13 C45,16 46,22 52,23" transform="rotate(240,50,50)"/></g><circle cx="50" cy="50" r="8" stroke="#fff" stroke-width="4.4"/><g stroke="#fff" stroke-width="4.4" stroke-linecap="round"><line x1="50" y1="44" x2="50" y2="56"/><line x1="50" y1="44" x2="50" y2="56" transform="rotate(60,50,50)"/><line x1="50" y1="44" x2="50" y2="56" transform="rotate(120,50,50)"/></g></svg></span><span id="brand-text">Hostess</span><span class="caret-blink">_</span></h1>
-          <p class="tagline">Paste a repo URL, or upload a zipped app folder with an <code style="color:var(--s-text-0)">app.yaml</code> at its root, to build, deploy, and manage it here. No GitHub needed.</p>
+          <p class="tagline"><span class="tg-full">Paste a repo URL, or upload a zipped app folder with an <code style="color:var(--s-text-0)">app.yaml</code> at its root, to build, deploy, and manage it here. No GitHub needed.</span><span class="tg-short">Upload a zipped app or paste a repo URL. No GitHub needed.</span></p>
         </div>
 
         <div class="header-mascot" id="hecate" title="Hecate — three faces, one doorway">
