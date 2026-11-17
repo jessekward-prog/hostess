@@ -27,7 +27,9 @@
   [hidden] { display: none !important; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
 
-  .app { display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr); height: 100dvh; }
+  .app { position: relative; display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr); height: 100dvh; }
+  /* The dashboard's chosen sidebar theme (bg-themes.js) paints behind everything; the bars sit above it. */
+  .app > :not(canvas) { position: relative; z-index: 1; }
   header.top { display: flex; align-items: center; gap: 12px; padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); border-bottom: 1px solid var(--s-border); background: var(--s-surface); flex-wrap: wrap; }
   .back { display: inline-flex; align-items: center; gap: 6px; color: var(--s-text-3); text-decoration: none; font-size: var(--fs-sm); min-height: 44px; }
   .back:hover { color: var(--s-text-0); }
@@ -51,7 +53,7 @@
 
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 
-  .stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr); gap: 16px; padding: 16px; min-height: 0; background: repeating-linear-gradient(45deg, #070707 0 10px, #0b0b0b 10px 20px); }
+  .stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr); gap: 16px; padding: 16px; min-height: 0; }
   .view { display: flex; flex-direction: column; min-height: 0; min-width: 0; gap: 8px; }
   .view-head { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--s-text-3); }
   .view-head a { margin-left: auto; color: var(--s-text-3); text-transform: none; letter-spacing: 0; }
@@ -86,6 +88,7 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="bg-gain" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncA id="bg-gain-a" type="linear" slope="1"/></feComponentTransfer></filter></svg>
 <div class="app">
   <header class="top">
     <a class="back" href="/"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg><span>Hostess</span></a>
@@ -121,8 +124,17 @@
   </details>
 </div>
 
+<script src="/bg-themes.js"></script>
 <script>
 const $ = (id) => document.getElementById(id);
+
+// Same theme and intensity as the dashboard sidebar (its THEME panel saves them in localStorage).
+(() => {
+  const load = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+  const intensity = parseFloat(load('hostess-bg-int'));
+  document.getElementById('bg-gain-a').setAttribute('slope', Number.isFinite(intensity) ? intensity : 0.5);
+  mountBackground(document.querySelector('.app'), BG_THEMES[load('hostess-bg')] ? load('hostess-bg') : 'ascii');
+})();
 const api = async (url, opts = {}) => {
   const r = await fetch(url, { ...opts, headers: { 'Content-Type': 'application/json' } });
   const body = await r.json().catch(() => ({}));
