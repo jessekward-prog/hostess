@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Hostess</title>
 <link rel="icon" type="image/svg+xml" href="/icon.svg">
 <meta name="theme-color" content="#000000">
@@ -166,7 +166,13 @@
   .sidebar-stats a:hover { color: var(--s-accent); text-decoration: underline; }
 
   main { flex: 1; min-width: 0; padding: 32px 32px 90px; max-width: 1000px; margin: 0 auto; }
-  @media (max-width: 1023px) { main { padding: 20px 16px 60px; } }
+  /* Installed on iOS the status bar is translucent (viewport-fit=cover), so keep clear of the notch and home bar. */
+  @media (max-width: 1023px) {
+    main { padding: calc(20px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(60px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left)); }
+    aside.sidebar { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  }
+  body { overscroll-behavior-y: none; }
+  @media (pointer: coarse) { .row, .myai-toggle { min-height: 44px; } }
 
   header.top { margin-bottom: 44px; }
   /* Grid (not flex) so the outer columns can anchor to the row's edges while
@@ -238,8 +244,15 @@
     .conn-status { white-space: normal; }
     .conn-bar { justify-self: stretch; max-width: none; align-items: stretch; gap: 16px; }
     .conn-actions { flex-direction: row; flex-wrap: wrap; gap: 10px; }
-    .conn-btn { flex: 1 1 0; width: auto; min-width: 0; min-height: 44px; padding: 6px 8px; white-space: nowrap; }
+    /* Grow from the label's own width so the row wraps (3 + 2) instead of squeezing five labels into
+       equal slots where they overflow into each other. */
+    .conn-btn { flex: 1 1 auto; width: auto; min-width: 0; min-height: 44px; padding: 6px 12px; white-space: nowrap; }
     .conn-hint { flex-basis: 100%; }
+    /* Card footer actions are finger-sized on phones. */
+    .app-foot { padding: 4px 6px; }
+    .app-foot .icon-btn { min-width: 44px; min-height: 44px; justify-content: center; }
+    .app-foot .icon-btn svg { width: 18px; height: 18px; }
+    .reveal-toggle { min-height: 36px; }
   }
 
   h2 { font-family: Georgia, 'Times New Roman', serif; font-size: 20px; letter-spacing: -0.01em; color: var(--s-text-0); margin: 0 0 14px; display: flex; align-items: center; gap: 14px; }
@@ -448,6 +461,15 @@
   .marketplace-card .app-card-head { padding: 22px 20px 0; }
   .marketplace-card .app-logo-fallback { width: 34px; height: 34px; font-size: var(--fs-xl); border-radius: 8px; }
   .marketplace-card .app-logo { width: 34px; height: 34px; border-radius: 8px; }
+  /* Phones: one column (two truncated names to "tiny…"), a near-full-screen sheet, tighter gutters. */
+  @media (max-width: 640px) {
+    #marketplace-grid { grid-template-columns: 1fr; }
+    #marketplace-overlay, #build-overlay { width: calc(100vw - 16px); height: calc(100dvh - 16px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+    .marketplace-head { padding: 8px 8px 8px 16px; }
+    .marketplace-head .icon-btn { min-height: 44px; padding: 0 12px; }
+    .marketplace-body { padding: 14px; }
+    .build-tabs > * { min-height: 40px; padding-left: 12px; padding-right: 12px; }
+  }
   .marketplace-card .app-title { font-size: var(--fs-2xl); }
   .marketplace-card .app-desc { height: auto; -webkit-line-clamp: 4; margin: 12px 20px 18px; font-size: var(--fs-lg); }
   .marketplace-download { width: calc(100% - 40px); margin: 0 20px 20px; padding: 13px 18px; font-size: var(--fs-lg); }
@@ -1856,7 +1878,9 @@ const pastePanel = document.getElementById('paste-panel');
 const pasteText = document.getElementById('paste-text');
 const pasteBtn = document.getElementById('paste-btn');
 
-const IDLE_LABEL = 'Drop a .zip here, or click to choose';
+// Touch screens can't drag a file in, and the long wording truncates at phone width.
+const IDLE_LABEL = matchMedia('(pointer: coarse)').matches ? 'Tap to choose a .zip' : 'Drop a .zip here, or click to choose';
+uploadLabel.textContent = IDLE_LABEL;
 function setPicked(text) {
   uploadLabel.textContent = text;
   uploadLabel.classList.add('has-file');
