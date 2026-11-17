@@ -1490,7 +1490,8 @@ function showPlaceholder(name) {
   clearPlaceholder();
   const el = document.createElement('div');
   el.className = 'card';
-  el.innerHTML = '<div class="card-content"><div class="app-card-head"><div class="app-title-row"><span class="app-logo-fallback"></span><p class="app-title"></p></div><span class="status-pill created">starting</span></div><p class="app-desc">Starting up…</p><button class="open-app-btn" type="button" disabled><span class="open-app-btn-label"><span>Launching</span></span></button></div>';
+  el.style.minHeight = '160px'; // without the button the card is short; keep room for the ripples
+  el.innerHTML = '<div class="card-content"><div class="app-card-head"><div class="app-title-row"><span class="app-logo-fallback"></span><p class="app-title"></p></div><span class="status-pill created">starting</span></div><p class="app-desc">Starting up…</p></div>';
   el.querySelector('.app-logo-fallback').textContent = name[0].toUpperCase();
   el.querySelector('.app-title').textContent = name;
   grid.appendChild(el);
