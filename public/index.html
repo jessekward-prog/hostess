@@ -223,13 +223,14 @@
     .header-row { grid-template-columns: 1fr; row-gap: 0; position: relative; }
     main { overflow-x: clip; }
     /* Hecate keeps her full size but drops behind the title as a dim backdrop, bleeding off the right edge. */
-    .header-mascot { position: absolute; right: -34px; top: -14px; z-index: 0; opacity: 0.42; pointer-events: none; }
+    /* Explicit width: out of flow she would shrink-wrap to her 140px minimum instead of her real 225px. */
+    .header-mascot { position: absolute; width: 225px; max-width: none; min-width: 0; right: -34px; top: -14px; z-index: 0; opacity: 0.42; pointer-events: none; }
     .hecate-plaque { display: none; }
     .header-left { position: relative; z-index: 1; min-height: 172px; }
     .tagline { max-width: 58%; }
     .tg-full { display: none; }
     .tg-short { display: inline; }
-    .conn-bar { margin-top: 20px; }
+    .conn-bar { margin-top: 20px; position: relative; z-index: 1; } /* buttons and status paint above the backdrop */
     /* doubled class: the base upload rules are defined later in the file and would otherwise win */
     .deploy-row.upload-row { flex-wrap: wrap; }
     .deploy-row.upload-row .upload-pick { flex: 1 1 100%; }
