@@ -461,6 +461,17 @@ app.get('/api/workbench/recent/logo', (req, res) => {
 
 app.delete('/api/workbench/recent', (req, res) => { workbench.forget(String((req.body || {}).dir || '')); res.json(workbench.status().recent); });
 
+app.post('/api/workbench/launch', async (req, res) => {
+  const send = sse(res);
+  try {
+    const record = await workbench.launch({ replace: (req.body || {}).replace === true }, send);
+    send({ type: 'done', name: record.name, port: record.port });
+  } catch (err) {
+    send({ type: err.code === 'REPLACE' ? 'confirm' : 'error', error: err.message });
+  }
+  res.end();
+});
+
 app.post('/api/workbench/pick', async (req, res) => {
   try { res.json({ dir: await workbench.pickFolder() }); }
   catch (err) { res.status(400).json({ error: err.message }); }
