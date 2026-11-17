@@ -469,7 +469,13 @@
     .marketplace-head .icon-btn { min-height: 44px; padding: 0 12px; }
     .marketplace-body { padding: 14px; }
     .build-tabs > * { min-height: 40px; padding-left: 12px; padding-right: 12px; }
-  }
+    /* App cards collapse to name, status, description, Open App and the action row; "details" opens the rest. */
+    #apps-grid .card-expand { display: inline-flex; }
+    #apps-grid .app-foot [data-act="delete"] span { display: none; } /* icon only, or "details" pushes it off the card */
+    #apps-grid .card:not(.expanded) :is(.app-body, .gateway-toggle-row, .gateway-url, .reveal-toggle, .reveal-panel, [data-role="ailink-section"]) { display: none !important; }  }
+  .card-expand { display: none; }
+  .card-expand .chev { display: inline-block; transition: transform 0.2s cubic-bezier(0.32,0.72,0,1); }
+  .card.expanded .card-expand .chev { transform: rotate(180deg); }
   .marketplace-card .app-title { font-size: var(--fs-2xl); }
   .marketplace-card .app-desc { height: auto; -webkit-line-clamp: 4; margin: 12px 20px 18px; font-size: var(--fs-lg); }
   .marketplace-download { width: calc(100% - 40px); margin: 0 20px 20px; padding: 13px 18px; font-size: var(--fs-lg); }
@@ -1075,6 +1081,7 @@ function guardChip(g) {
   return `<span class="chip guard-${g.risk}" title="${lines.join('\n').replace(/"/g, '&quot;')}">guard: ${g.risk}</span>`;
 }
 
+const expandedCards = new Set();
 function appCard(app) {
   const sc = statusClass(app.status);
   const local = isLocalView();
@@ -1148,7 +1155,10 @@ function appCard(app) {
         <button class="icon-btn" data-act="scrape" title="Scrape logo + description">${iconSvg('scrape')}</button>
         ${local ? `<button class="icon-btn" data-act="ts-open" title="Private link (Tailscale)" hidden>${iconSvg('open')}</button>` : ''}
       </div>
-      <button class="icon-btn danger" data-act="delete" title="Delete">${iconSvg('trash')}<span>delete</span></button>
+      <div style="display:flex;gap:2px;">
+        <button class="icon-btn card-expand" data-act="expand" type="button" aria-expanded="${expandedCards.has(app.name)}"><span>details</span><span class="chev">▾</span></button>
+        <button class="icon-btn danger" data-act="delete" title="Delete">${iconSvg('trash')}<span>delete</span></button>
+      </div>
     </div>
     </div>
   `;
@@ -1232,6 +1242,15 @@ function appCard(app) {
       }
     });
   }
+
+  // Phones only (CSS hides the button elsewhere): the card's extras fold behind "details". The open set is
+  // kept by name so a re-render from load() (after stop/start/redeploy) doesn't snap cards shut.
+  if (expandedCards.has(app.name)) el.classList.add('expanded');
+  el.querySelector('[data-act="expand"]').addEventListener('click', (e) => {
+    const open = el.classList.toggle('expanded');
+    e.currentTarget.setAttribute('aria-expanded', open);
+    if (open) expandedCards.add(app.name); else expandedCards.delete(app.name);
+  });
 
   el.querySelector('[data-act="redeploy"]').addEventListener('click', async (e) => {
     const btn = e.currentTarget; btn.disabled = true;
