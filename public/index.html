@@ -260,6 +260,8 @@
   .pg-step.done .pg-fill { width: 100%; opacity: 0.55; }
   .pg-step.failed .pg-fill { width: 100%; background: var(--danger); }
   .pg-step.failed .pg-label { color: #ff9a90; }
+  #deploy-progress { overflow: hidden; transition: max-height 0.45s ease, opacity 0.3s ease, margin 0.45s ease; }
+  #deploy-progress.fade { max-height: 0 !important; opacity: 0; margin-top: 0; }
   @keyframes pg-loop { 0% { width: 0; opacity: 1; } 80% { width: 100%; opacity: 1; } 100% { width: 100%; opacity: 0; } }
   @media (prefers-reduced-motion: reduce) { .pg-step.active .pg-fill { animation: none; width: 100%; opacity: 0.6; } }
   .upload-eyebrow { margin-top: 18px; }
@@ -1361,7 +1363,21 @@ function progSet(id, ev) {
   if (ev.state === 'done') r.detail.textContent = '';
   else if (ev.detail !== undefined) r.detail.textContent = ev.detail;
 }
+// On success, let the finished bars sit a moment, then fold them away (height + fade, so the grid
+// below eases up instead of jumping). A failed deploy never calls this: its red bar stays.
+let progTimer;
+function progDismiss() {
+  clearTimeout(progTimer);
+  progTimer = setTimeout(() => {
+    progEl.style.maxHeight = progEl.scrollHeight + 'px';
+    requestAnimationFrame(() => progEl.classList.add('fade'));
+    progTimer = setTimeout(() => { progEl.hidden = true; progEl.innerHTML = ''; progEl.className = ''; progEl.style.maxHeight = ''; prog = null; }, 450);
+  }, 1200);
+}
 function progStart() {
+  clearTimeout(progTimer);
+  progEl.className = '';
+  progEl.style.maxHeight = '';
   progEl.innerHTML = '';
   progEl.hidden = false;
   prog = { rows: new Map(), active: null };
@@ -1440,6 +1456,7 @@ async function revealNewApp(name) {
       await new Promise((ok) => setTimeout(ok, 1500)); // long enough for the ripples to read as a card spinning up
     }
     await load();
+    progDismiss();
   } finally {
     clearPlaceholder();
   }
