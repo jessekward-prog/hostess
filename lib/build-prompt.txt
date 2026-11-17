@@ -1,0 +1,59 @@
+Build me a small web app (a PWA) that will run on Hostess, a self-hosted app server. First ask me up to 5 short questions about what it should do, then build it.
+
+DELIVERY
+- If you can create files: make a new folder named after the app and write everything into it.
+- If you can't (plain chat): reply with every file under a heading "### path/to/file" followed by one code block. Send complete files, never snippets, and tell me to save them into one folder.
+
+FILES (all at the folder root)
+app.yaml, Dockerfile, server.js, .dockerignore, .gitattributes, and public/ containing index.html, pin.html, manifest.json, sw.js, icon.svg.
+
+RULES
+
+1. app.yaml:
+     name: lowercase letters, numbers, hyphens, 2-50 chars
+     port: 3000
+     dataDir: /data
+     description: under 200 chars
+     icon: public/icon.svg
+   (Add `env:` listing any env var names the app reads. Add `postgres: true` only if I ask for a database.)
+
+2. Zero npm dependencies. Plain Node 22 (http, fs, crypto). No package.json install step, no build step. Dockerfile:
+     FROM node:22-alpine
+     WORKDIR /app
+     COPY . .
+     ENV PORT=3000
+     RUN mkdir -p /data && chown node:node /data
+     USER node
+     EXPOSE 3000
+     CMD ["node","server.js"]
+
+3. server.js listens on process.env.PORT || 3000, on 0.0.0.0. It must boot and serve with no environment variables set. Handle SIGTERM and SIGINT by closing the server and exiting 0. Never exit because an optional setting is missing.
+
+4. Save all user data as files under /data (JSON is fine), never inside the app folder: the container is rebuilt on every update and anything else is lost. Write files atomically (write a temp file, then rename). Booting must be safe when /data already has data in it.
+
+5. PIN gate in front of EVERYTHING except manifest.json, icon.svg and sw.js:
+   - First run with no PIN set: show "Set your PIN" (enter twice, must match, 4+ digits). Store only a scrypt hash with a random salt.
+   - After that: show "Enter PIN". Compare with crypto.timingSafeEqual.
+   - While locked, "/" serves public/pin.html. Once unlocked, "/" serves public/index.html. The app's own files are never served to a locked visitor.
+   - Session = random 32-byte token in a cookie: HttpOnly, SameSite=Lax, and Secure only when the request header X-Forwarded-Proto is https.
+   - Throttle PIN attempts per IP AND with a global cap (traffic arrives through a proxy, so every visitor can share one IP).
+   - The PIN input must accept the number row and the numpad. If you use a real <input>, validate on submit; never block keys.
+   - After a correct PIN the app appears immediately with no reload (fetch "/" and swap the document in).
+   - Every route that changes data needs a valid session. Serve any images or downloads via cookie auth, since <img> and <audio> can't send headers.
+
+6. Use only relative URLs. No hardcoded domain, port or origin anywhere. The app is reached from localhost, a private network address and a changing tunnel address.
+
+7. Never hardcode a secret. Never use curl|sh in the Dockerfile. No privileged mode, no host networking, no Docker socket.
+
+8. If the app needs an AI model, read LM_STUDIO_URL, LM_STUDIO_API_KEY and LM_STUDIO_MODEL (Hostess fills these in) and call {LM_STUDIO_URL}/v1/chat/completions. Omit "model" if LM_STUDIO_MODEL is empty. Use a 120s timeout, never set max_tokens below 700, and strip <think>...</think> from replies. If it is unreachable, say so in the UI and keep working. For notifications read NTFY_URL, NTFY_TOKEN, NTFY_TOPIC.
+
+9. PWA: phone-first layout (viewport meta, 44px tap targets, safe-area insets). manifest.json with start_url "/" and display "standalone". sw.js caches only manifest.json and icon.svg; never /api/, never a 401, never an HTML page, never a request with a Range header. The app must work if the service worker fails. Show empty states and visible error messages on failed saves.
+
+10. File names: exact, consistent case everywhere (the server is case-sensitive). .gitattributes contains `* text=auto eol=lf`. .dockerignore lists node_modules and .git.
+
+LOGO
+Create public/icon.svg: a simple placeholder logo for the app, square (viewBox 0 0 512 512), no text smaller than 80px, no external images or fonts, one or two flat colours on a solid rounded-square background so it still reads at 48px. It should suggest what the app does. Use it for the manifest icon too (type image/svg+xml, sizes "any"), and set `icon: public/icon.svg` in app.yaml. I'll swap in a real logo later.
+
+BEFORE YOU FINISH
+If you can run commands: run `docker build -t check .`, then `docker run -d -p 3000:3000 check`, request / and confirm you get the PIN screen, then remove the container. Report what you could not test.
+Finish by listing the files, how the app works in 3 lines, and one line telling me to zip the folder (or copy your whole reply) and put it in Hostess's upload box.

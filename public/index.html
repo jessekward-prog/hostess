@@ -423,7 +423,7 @@
 
   .modal-backdrop { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 190; }
   .modal-backdrop.open { display: block; }
-  #marketplace-overlay {
+  #marketplace-overlay, #build-overlay {
     position: fixed; z-index: 200; top: 50%; left: 50%; transform: translate(-50%, -50%);
     width: min(1100px, 94vw); height: min(85vh, 820px);
     display: flex; flex-direction: column; overflow: hidden; margin: 0;
@@ -432,6 +432,18 @@
   .marketplace-head h2 { margin: 0; font-size: 20px; }
   .marketplace-head h2::after { content: none; }
   .marketplace-body { flex: 1; overflow-y: auto; padding: 22px; }
+  #build-overlay { width: min(900px, 94vw); }
+  .build-body { display: flex; flex-direction: column; gap: 14px; }
+  .build-tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+  .build-blurb { margin: 0; color: var(--s-text-1); line-height: 1.6; }
+  .build-steps { margin: 0; padding-left: 22px; color: var(--s-text-2, var(--s-text-1)); font-size: var(--fs-md); line-height: 1.7; }
+  #build-text {
+    flex: 1; min-height: 220px; width: 100%; box-sizing: border-box; resize: none; outline: none;
+    background: var(--s-surface-2); border: 1px solid var(--s-border); border-radius: 8px; padding: 12px 14px;
+    color: var(--s-text-0); font: inherit; font-size: var(--fs-sm); line-height: 1.55;
+  }
+  .build-actions { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
+  .build-meta { color: var(--s-text-3); font-size: var(--fs-sm); }
   #marketplace-grid { grid-template-columns: repeat(2, 1fr); }
   .marketplace-card .app-card-head { padding: 22px 20px 0; }
   .marketplace-card .app-logo-fallback { width: 34px; height: 34px; font-size: var(--fs-xl); border-radius: 8px; }
@@ -514,6 +526,10 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 10l-6.1 1.2L12 17l-1.9-5.8L4 10l6.1-1.2z"/><path d="M19 17v4M17 19h4"/></svg>
         <span>Forge</span>
       </a>
+      <button class="row marketplace-btn" id="buildBtn" type="button">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        <span>Build</span>
+      </button>
       <span class="section-label">Apps</span>
       <div id="sidebar-apps"></div>
     </nav>
@@ -756,6 +772,27 @@
   <div class="marketplace-body">
     <div class="grid" id="marketplace-grid"></div>
     <p class="empty" id="marketplace-empty" hidden>Nothing here yet.</p>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="buildBackdrop"></div>
+<div class="card" id="build-overlay" hidden>
+  <div class="marketplace-head">
+    <h2>Build</h2>
+    <button class="icon-btn" id="buildCloseBtn" type="button">close ✕</button>
+  </div>
+  <div class="marketplace-body build-body">
+    <div class="build-tabs">
+      <button type="button" class="myai-preset active" data-bp="newApp">Start a new app</button>
+      <button type="button" class="myai-preset" data-bp="compliance">Fix an existing app</button>
+    </div>
+    <p class="build-blurb" id="build-blurb"></p>
+    <ol class="build-steps" id="build-steps"></ol>
+    <textarea id="build-text" readonly spellcheck="false" aria-label="Prompt"></textarea>
+    <div class="build-actions">
+      <button type="button" class="deploy-btn" id="build-copy">Copy prompt</button>
+      <span class="build-meta" id="build-meta"></span>
+    </div>
   </div>
 </div>
 
@@ -1973,6 +2010,58 @@ function closeMarketplace() {
 marketplaceBtn.addEventListener('click', openMarketplace);
 marketplaceCloseBtn.addEventListener('click', closeMarketplace);
 marketplaceBackdrop.addEventListener('click', closeMarketplace);
+
+// ── Build: the two starter prompts (new app / fix an existing one), served by /api/build/prompts.
+const BUILD_TABS = {
+  newApp: {
+    blurb: 'For a brand new app. Paste this into ChatGPT, Claude, Gemini or an AI agent in VS Code. It asks a few questions, then builds a folder Hostess can run, with a PIN screen and a placeholder logo.',
+    steps: ['Copy the prompt and paste it into your AI.', 'Answer its questions. It builds the app.', 'Zip the folder it makes, or copy its whole reply.', 'Back on the dashboard, drop the zip in the upload box, or use "Paste an AI reply".'],
+  },
+  compliance: {
+    blurb: 'For an app you already have that Hostess will not build or run. It is the same prompt as the "Copy prompt" button on the website\'s rules page: a five-phase checklist the AI works through one step at a time.',
+    steps: ['Open your app\'s folder in an AI coding tool in agent mode (Claude Code, Cursor, VS Code).', 'Paste the prompt as your first message.', 'Review what it changed. It leaves everything uncommitted.', 'Zip the folder or push it to GitHub, then upload or deploy it here.'],
+  },
+};
+const buildOverlay = document.getElementById('build-overlay');
+const buildBackdrop = document.getElementById('buildBackdrop');
+const buildText = document.getElementById('build-text');
+const buildCopy = document.getElementById('build-copy');
+let buildPrompts = null;
+let buildTab = 'newApp';
+function renderBuild() {
+  const t = BUILD_TABS[buildTab];
+  document.querySelectorAll('.build-tabs [data-bp]').forEach((b) => b.classList.toggle('active', b.dataset.bp === buildTab));
+  document.getElementById('build-blurb').textContent = t.blurb;
+  document.getElementById('build-steps').innerHTML = t.steps.map((x) => `<li>${x.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</li>`).join('');
+  const text = buildPrompts ? buildPrompts[buildTab] : 'Loading…';
+  buildText.value = text;
+  document.getElementById('build-meta').textContent = buildPrompts ? `${text.length.toLocaleString()} characters` : '';
+  buildCopy.textContent = 'Copy prompt';
+}
+async function openBuild() {
+  buildOverlay.hidden = false;
+  buildBackdrop.classList.add('open');
+  renderBuild();
+  if (buildPrompts) return;
+  try { buildPrompts = await api('/api/build/prompts'); } catch (err) { buildText.value = err.message; return; }
+  renderBuild();
+}
+function closeBuild() {
+  buildOverlay.hidden = true;
+  buildBackdrop.classList.remove('open');
+}
+document.getElementById('buildBtn').addEventListener('click', openBuild);
+document.getElementById('buildCloseBtn').addEventListener('click', closeBuild);
+buildBackdrop.addEventListener('click', closeBuild);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !buildOverlay.hidden) closeBuild(); });
+document.querySelector('.build-tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-bp]'); if (b) { buildTab = b.dataset.bp; renderBuild(); } });
+buildCopy.addEventListener('click', async () => {
+  if (!buildPrompts) return;
+  try { await navigator.clipboard.writeText(buildText.value); }
+  catch { buildText.select(); document.execCommand('copy'); } // plain-http or blocked clipboard API
+  buildCopy.textContent = 'Copied ✓';
+  setTimeout(() => { buildCopy.textContent = 'Copy prompt'; }, 2000);
+});
 
 // ── MY AI panel — same "input your server info" pattern as shelf-cmd's
 // MyAiPanel.jsx, ported to vanilla JS/inline-expand since this dashboard has

@@ -200,6 +200,12 @@ app.post('/api/apps/:name/gateway/disable', (req, res) => {
   res.json({ ok: true });
 });
 
+// The Build tab's two prompts (lib/buildprompts.js).
+app.get('/api/build/prompts', (req, res) => {
+  try { res.json(require('./lib/buildprompts').load()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/cache/clear', async (req, res) => {
   try { res.json(await engine.clearCaches()); }
   catch (err) { res.status(400).json({ error: err.message }); }
