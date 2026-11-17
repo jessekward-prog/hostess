@@ -437,8 +437,8 @@ app.post('/api/workbench/stop', async (req, res) => { await workbench.stop(); re
 
 app.post('/api/workbench/rebuild', (req, res) => { workbench.rebuild(); res.json({ ok: true }); });
 
-app.get('/api/workbench/dirs', (req, res) => {
-  try { res.json(workbench.listDirs(req.query.path)); }
+app.post('/api/workbench/pick', async (req, res) => {
+  try { res.json({ dir: await workbench.pickFolder() }); }
   catch (err) { res.status(400).json({ error: err.message }); }
 });
 

@@ -49,12 +49,6 @@
   .status[data-s="error"] { color: #ff8a84; }
   @keyframes pulse { 50% { opacity: 0.35; } }
 
-  .picker { position: absolute; top: 64px; left: 16px; right: 16px; max-width: 560px; margin-left: auto; z-index: 50; max-height: 60vh; display: flex; flex-direction: column; border-radius: 10px; background: var(--s-surface); border: 1px solid var(--s-border); box-shadow: 0 12px 40px rgba(0,0,0,0.6); animation: rise 0.2s var(--ease); }
-  .picker-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--s-border); font-size: var(--fs-sm); color: var(--s-text-0); }
-  .picker-head span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
-  .picker-list { overflow-y: auto; padding: 6px; }
-  .picker-list button { display: block; width: 100%; text-align: left; padding: 0 10px; min-height: 40px; border-radius: 6px; font-size: var(--fs-md); color: var(--s-text-1); }
-  .picker-list button:hover { background: var(--s-surface-2); color: var(--s-text-0); }
   @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 
   .stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.4fr); gap: 16px; padding: 16px; min-height: 0; background: repeating-linear-gradient(45deg, #070707 0 10px, #0b0b0b 10px 20px); }
@@ -64,7 +58,7 @@
   .view-head a:hover { color: var(--s-text-0); }
   .fit { flex: 1; min-height: 0; position: relative; overflow: hidden; }
   /* The device is laid out at its real size and scaled to fit, so the app sees a true 390px / 1280px viewport. */
-  .device { position: absolute; left: 50%; top: 0; transform-origin: top center; border-radius: 12px; overflow: hidden; background: #fff; box-shadow: 0 0 0 1px var(--s-border), 0 10px 30px rgba(0,0,0,0.5); }
+  .device { position: absolute; left: 50%; top: 0; transform-origin: top center; border-radius: 12px; overflow: hidden; background: var(--s-surface); box-shadow: 0 0 0 1px var(--s-border), 0 10px 30px rgba(0,0,0,0.5); }
   .device iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; transition: opacity 0.18s; }
   .device iframe.back { opacity: 0; pointer-events: none; }
   .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--s-text-3); font-size: var(--fs-md); background: var(--s-bg); }
@@ -109,11 +103,6 @@
       <button role="tab" aria-selected="false" data-view="desktop">Desktop</button>
     </div>
   </header>
-
-  <div class="picker" id="picker" hidden>
-    <div class="picker-head"><button class="btn ghost" type="button" id="upBtn" aria-label="Up one folder">..</button><span id="pickerPath"></span><button class="btn" type="button" id="pickBtn">Use this folder</button></div>
-    <div class="picker-list" id="pickerList"></div>
-  </div>
 
   <main class="stage">
     <section class="view active" data-view="phone">
@@ -218,30 +207,20 @@ events.onmessage = (e) => {
 
 $('folderForm').onsubmit = async (e) => {
   e.preventDefault();
-  $('picker').hidden = true;
   try { $('log').textContent = ''; render(await api('/api/workbench/start', { method: 'POST', body: JSON.stringify({ dir: $('dir').value }) })); }
   catch (err) { addLog(err.message); render({ status: 'error', error: err.message }); }
 };
 $('stopBtn').onclick = () => api('/api/workbench/stop', { method: 'POST' });
 $('rebuildBtn').onclick = () => api('/api/workbench/rebuild', { method: 'POST' });
 
-async function browse(p) {
+$('browseBtn').onclick = async () => {
+  $('browseBtn').disabled = true;
   try {
-    const r = await api('/api/workbench/dirs?path=' + encodeURIComponent(p || ''));
-    $('pickerPath').textContent = r.dir;
-    $('pickerPath').dataset.dir = r.dir;
-    $('upBtn').dataset.dir = r.parent;
-    $('pickBtn').textContent = r.isApp ? 'Watch this app' : 'Use this folder';
-    $('pickerList').replaceChildren(...r.dirs.map((name) => Object.assign(document.createElement('button'), {
-      type: 'button', textContent: name + '/', onclick: () => browse(r.dir.replace(/[\\/]$/, '') + '/' + name),
-    })));
-    $('picker').hidden = false;
-  } catch (err) { addLog(err.message); }
-}
-$('browseBtn').onclick = () => ($('picker').hidden ? browse($('dir').value) : ($('picker').hidden = true));
-$('upBtn').onclick = () => browse($('upBtn').dataset.dir);
-$('pickBtn').onclick = () => { $('dir').value = $('pickerPath').dataset.dir; $('folderForm').requestSubmit(); };
-addEventListener('keydown', (e) => { if (e.key === 'Escape') $('picker').hidden = true; });
+    const { dir } = await api('/api/workbench/pick', { method: 'POST' });
+    if (dir) { $('dir').value = dir; $('folderForm').requestSubmit(); }
+  } catch (err) { addLog(err.message); $('logbar').open = true; }
+  $('browseBtn').disabled = false;
+};
 
 document.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => {
   document.querySelectorAll('.tabs button').forEach((x) => x.setAttribute('aria-selected', x === b));
