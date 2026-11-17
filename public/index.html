@@ -564,7 +564,7 @@
           <span class="myai-label">SIDEBAR BACKGROUND</span>
           <div class="myai-presets" id="theme-options"></div>
           <div class="bg-slider"><span class="myai-label">INTENSITY</span><span class="myai-label" id="bg-intensity-v"></span></div>
-          <input type="range" class="bg-range" id="bg-intensity" min="0.3" max="3" step="0.1" value="1" aria-label="Background intensity">
+          <input type="range" class="bg-range" id="bg-intensity" min="0.3" max="3" step="0.1" value="0.5" aria-label="Background intensity">
           <div style="border-top:1px solid var(--s-border);margin:10px 0 2px;"></div>
           <span class="myai-label">ACCENT</span>
           <div class="bg-slider"><span class="myai-label">COLOUR</span><span class="myai-label"><span id="bg-hue-v"></span> <button type="button" class="bg-reset" id="bg-hue-reset" hidden>reset</button></span></div>
@@ -2286,7 +2286,7 @@ function mountBackground(container, name) {
   const intIn = document.getElementById('bg-intensity'), hueIn = document.getElementById('bg-hue'), satIn = document.getElementById('accent-sat');
   const store = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
   const load = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
-  let current = BG_THEMES[load('hostess-bg')] ? load('hostess-bg') : 'waves';
+  let current = BG_THEMES[load('hostess-bg')] ? load('hostess-bg') : 'ascii';
   let stop = () => {};
 
   function apply(name) {
@@ -2331,7 +2331,7 @@ function mountBackground(container, name) {
   document.getElementById('bg-hue-reset').addEventListener('click', () => { satIn.value = 100; document.getElementById('accent-sat-v').textContent = '100%'; store('hostess-accent-sat', 100); setHue(null); });
 
   const si = parseFloat(load('hostess-bg-int')), sh = load('hostess-bg-hue');
-  intIn.value = Number.isFinite(si) ? si : 1; setIntensity(+intIn.value);
+  intIn.value = Number.isFinite(si) ? si : 0.5; setIntensity(+intIn.value);
   const ss = load('hostess-accent-sat'); if (ss) satIn.value = ss;
   document.getElementById('accent-sat-v').textContent = `${satIn.value}%`;
   if (sh !== null && sh !== '') { hueIn.value = sh; setHue(+sh); } else setHue(null);
