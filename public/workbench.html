@@ -27,7 +27,7 @@
   [hidden] { display: none !important; }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; } }
 
-  .app { position: relative; display: grid; grid-template-rows: auto 1fr; grid-template-columns: minmax(0, 1fr); height: 100dvh; }
+  .app { position: relative; display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: minmax(0, 1fr); height: 100dvh; }
   /* The dashboard's chosen sidebar theme (bg-themes.js) paints behind everything; the bars sit above it. */
   .app > :not(canvas) { position: relative; z-index: 1; }
   .app > header.top { z-index: 3; } /* above the stage, so the recent-folders menu overlaps the previews */
@@ -115,17 +115,25 @@
   .empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; color: var(--s-text-3); font-size: var(--fs-md); background: var(--s-bg); }
 
 
-  .drawer { position: absolute; top: 0; right: 0; bottom: 0; z-index: 5; width: min(460px, 100%); display: flex; flex-direction: column; gap: 10px; padding: 14px 16px; padding-bottom: max(14px, env(safe-area-inset-bottom)); background: var(--s-surface); border-left: 1px solid var(--s-border); box-shadow: -12px 0 40px rgba(0,0,0,0.55); animation: slide 0.25s var(--ease); }
-  @keyframes slide { from { transform: translateX(24px); opacity: 0; } }
-  .drawer-head { display: flex; align-items: center; gap: 8px; color: var(--s-text-0); font-size: var(--fs-md); }
-  .drawer-head b { flex: 1; font-weight: 600; }
-  .drawer label { font-size: var(--fs-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--s-text-3); }
-  .drawer textarea { width: 100%; resize: none; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--s-border); background: var(--s-bg); color: var(--s-text-0); font-size: var(--fs-md); line-height: 1.5; }
-  .drawer textarea:focus { outline: none; border-color: var(--s-text-3); }
-  #ask { min-height: 96px; }
-  #refined { flex: 1; min-height: 160px; font-size: var(--fs-sm); }
-  .drawer-row { display: flex; gap: 8px; align-items: center; }
-  .drawer-row .hint { flex: 1; font-size: var(--fs-xs); color: var(--s-text-3); }
+  /* Prompt builder, docked along the bottom: Before (what you typed) → After (the local AI's rewrite). */
+  .dock { border-top: 1px solid var(--s-border); background: var(--s-surface); padding: 0 16px max(12px, env(safe-area-inset-bottom)); }
+  .dock-head { display: flex; align-items: center; gap: 12px; min-height: 44px; }
+  .dock-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; color: var(--s-text-0); font-size: var(--fs-md); font-weight: 600; }
+  .dock-toggle svg { width: 14px; height: 14px; color: var(--s-text-3); transition: transform 0.2s var(--ease); }
+  .dock-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); }
+  .dock-head .hint { flex: 1; min-width: 0; font-size: var(--fs-xs); color: var(--s-text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
+  .dock-body { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; height: 200px; }
+  .dock-body[hidden] { display: none; }
+  .side { display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+  .side-head { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+  .side-head label { flex: 1; font-size: var(--fs-xs); letter-spacing: 0.12em; text-transform: uppercase; color: var(--s-text-3); }
+  .side-head label b { color: var(--s-text-1); font-weight: 600; }
+  .side textarea { flex: 1; min-height: 0; width: 100%; resize: none; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--s-border); background: var(--s-bg); color: var(--s-text-0); font-size: var(--fs-md); line-height: 1.5; }
+  .side textarea:focus { outline: none; border-color: var(--s-text-3); }
+  #refined { font-size: var(--fs-sm); }
+  .side .btn.small { height: 28px; padding: 0 10px; font-size: var(--fs-xs); }
+  .mid { display: flex; flex-direction: column; justify-content: center; }
+  #refineBtn { display: inline-flex; align-items: center; gap: 6px; }
   .stage-wrap { position: relative; display: grid; min-height: 0; }
 
   .tabs { display: none; }
@@ -134,9 +142,13 @@
     .tabs button { height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid var(--s-border); font-size: var(--fs-sm); color: var(--s-text-3); }
     .tabs button[aria-selected="true"] { color: var(--s-text-0); border-color: var(--s-text-3); }
     .stage { grid-template-columns: 1fr; }
+    .dock-body { grid-template-columns: 1fr; height: auto; }
+    .side textarea { height: 80px; flex: none; }
+    .mid { flex-direction: row; }
+    #refineBtn { flex: 1; justify-content: center; }
     .folder { flex-basis: 100%; min-width: 0; order: 1; }
     .status { order: 2; flex: 1; width: auto; min-width: 0; }
-    #rebuildBtn, #promptBtn { order: 3; }
+    #rebuildBtn { order: 3; }
     .tabs { order: 4; flex-basis: 100%; }
     .tabs button { flex: 1; }
     .view:not(.active) { display: none !important; }
@@ -164,7 +176,6 @@
     </form>
     <span class="status" id="status" data-s="idle"><i class="dot"></i><span class="ticker" id="statusClip"><span id="statusText">Not watching</span></span></span>
     <button class="btn ghost" type="button" id="rebuildBtn" disabled>Rebuild</button>
-    <button class="btn ghost" type="button" id="promptBtn" aria-expanded="false" aria-controls="drawer" disabled>Prompt</button>
     <div class="tabs" role="tablist">
       <button role="tab" aria-selected="true" data-view="phone">Phone</button>
       <button role="tab" aria-selected="false" data-view="desktop">Desktop</button>
@@ -182,16 +193,24 @@
       <div class="fit"><div class="device" data-w="1280" data-h="800"></div></div>
     </section>
   </main>
-  <aside class="drawer" id="drawer" hidden aria-label="Prompt builder">
-    <div class="drawer-head"><b>Prompt builder</b><button class="btn ghost" type="button" id="drawerClose" aria-label="Close">✕</button></div>
-    <label for="ask">What do you want changed?</label>
-    <textarea id="ask" placeholder="e.g. the bookmark cards are cramped on phones, and add a way to sort by date"></textarea>
-    <div class="drawer-row"><span class="hint" id="askHint">Your local AI rewrites this with the app's files and any build error, ready for Claude or another big model.</span><button class="btn" type="button" id="refineBtn">Refine</button></div>
-    <label for="refined">Prompt</label>
-    <textarea id="refined" placeholder="The refined prompt appears here. You can edit it before copying."></textarea>
-    <div class="drawer-row"><span class="hint" id="refineStatus"></span><button class="btn ghost" type="button" id="copyBtn" disabled>Copy</button></div>
-  </aside>
   </div>
+  <section class="dock" aria-label="Prompt builder">
+    <div class="dock-head">
+      <button class="dock-toggle" type="button" id="dockToggle" aria-expanded="true" aria-controls="dockBody"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>Prompt builder</button>
+      <span class="hint" id="refineStatus">Say what you want in your own words; your local AI turns it into a prompt Claude will get right.</span>
+    </div>
+    <div class="dock-body" id="dockBody">
+      <div class="side">
+        <div class="side-head"><label for="ask"><b>Before</b> · your words</label></div>
+        <textarea id="ask" placeholder="e.g. i want the text to go sideways when it doesn't fit"></textarea>
+      </div>
+      <div class="mid"><button class="btn" type="button" id="refineBtn" disabled>Refine <span aria-hidden="true">→</span></button></div>
+      <div class="side">
+        <div class="side-head"><label for="refined"><b>After</b> · for Claude or another big model</label><button class="btn ghost small" type="button" id="copyBtn" disabled>Copy</button></div>
+        <textarea id="refined" placeholder="The clearer version appears here, with the right technical terms and this app's files. Edit it before copying if you like."></textarea>
+      </div>
+    </div>
+  </section>
 
 </div>
 
@@ -295,7 +314,7 @@ function render(s) {
   setStatusLabel(label);
   // Controls stay put and grey out when there's nothing to act on, so the header never reflows.
   $('rebuildBtn').disabled = current.status === 'idle' || current.mode === 'static';
-  $('promptBtn').disabled = current.status === 'idle';
+  if (!refining) $('refineBtn').disabled = current.status === 'idle'; // the rewrite describes the watched app
   if (current.dir && document.activeElement !== $('dir')) $('dir').value = current.dir;
   syncEye();
   if (prev.status !== current.status && current.status !== 'running') show();
@@ -389,15 +408,18 @@ document.querySelectorAll('.tabs button').forEach((b) => b.onclick = () => {
 
 // Prompt builder (POST /api/workbench/prompt streams the local AI's answer as it writes).
 let refining = null;
-const drawer = $('drawer');
-function setDrawer(open) {
-  drawer.hidden = !open;
-  $('promptBtn').setAttribute('aria-expanded', open);
-  if (open) $('ask').focus();
+function setDock(open) {
+  $('dockBody').hidden = !open;
+  $('dockToggle').setAttribute('aria-expanded', open);
+  try { localStorage.setItem('workbench-dock', open ? 'open' : 'closed'); } catch {}
 }
-$('promptBtn').onclick = () => setDrawer(drawer.hidden);
-$('drawerClose').onclick = () => setDrawer(false);
-addEventListener('keydown', (e) => { if (e.key === 'Escape' && !drawer.hidden) setDrawer(false); });
+$('dockToggle').onclick = () => setDock($('dockBody').hidden);
+// Open by default, except on a phone-width screen where it would squeeze the preview to a sliver.
+{
+  let saved = null;
+  try { saved = localStorage.getItem('workbench-dock'); } catch {}
+  if (saved === 'closed' || (!saved && matchMedia('(max-width: 899px)').matches)) { $('dockBody').hidden = true; $('dockToggle').setAttribute('aria-expanded', 'false'); }
+}
 try { $('ask').value = localStorage.getItem('workbench-ask') || ''; } catch {}
 $('ask').addEventListener('input', () => { try { localStorage.setItem('workbench-ask', $('ask').value); } catch {} });
 $('ask').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('refineBtn').click(); });
@@ -408,6 +430,7 @@ $('refineBtn').onclick = async () => {
   if (!request) { $('ask').focus(); return; }
   refining = new AbortController();
   $('refineBtn').textContent = 'Stop';
+  $('refineBtn').disabled = false;
   $('refined').value = '';
   $('copyBtn').disabled = true;
   $('refineStatus').textContent = 'Asking your local AI…';
@@ -434,7 +457,8 @@ $('refineBtn').onclick = async () => {
     $('refineStatus').textContent = err.name === 'AbortError' ? 'Stopped.' : err.message;
   }
   $('copyBtn').disabled = !$('refined').value.trim();
-  $('refineBtn').textContent = 'Refine';
+  $('refineBtn').innerHTML = 'Refine <span aria-hidden="true">→</span>';
+  $('refineBtn').disabled = current.status === 'idle';
   refining = null;
 };
 $('refined').addEventListener('input', () => { $('copyBtn').disabled = !$('refined').value.trim(); });
