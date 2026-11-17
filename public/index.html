@@ -207,6 +207,11 @@
   .conn-btn:active { background: var(--dither-lit-dense), var(--s-bg); }
   .conn-btn.on { border-color: rgba(63,179,127,0.4); color: var(--ok); }
   .conn-hint { color: var(--s-text-1); }
+  .conn-actions { position: relative; z-index: 10; }
+  .conn-btn.armed { border-color: rgba(224,86,79,0.6); color: var(--danger); background: rgba(224,86,79,0.1); }
+  .conn-btn.armed:hover { border-color: var(--danger); color: var(--danger); }
+  /* Floats over the page instead of sitting in the column, so arming the button never shifts the others. */
+  .cache-hint { position: absolute; top: calc(100% + 8px); right: 0; width: 240px; z-index: 20; padding: 10px 12px; border: 1px solid rgba(224,86,79,0.4); border-radius: 8px; background: var(--s-surface); color: var(--s-text-1); font-size: var(--fs-md); line-height: 1.5; }
 
   /* Below 640px the three-column header stacks into one column. The title
      and the connection buttons keep their normal (non-centered) alignment
@@ -418,6 +423,7 @@
   }
   .conn-btn:active::after, .deploy-btn:active::after { opacity: 0; }
   .conn-btn:active, .deploy-btn:active { transform: translate(2px, 2px); }
+  .conn-btn.armed::after { background: repeating-conic-gradient(rgba(224,86,79,0.4) 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
   .conn-btn.on::after { background: repeating-conic-gradient(rgba(63,179,127,0.4) 0 25%, transparent 0 50%) 0 0 / 4px 4px; }
   .deploy-btn { position: relative; }
   .deploy-row { isolation: isolate; }
@@ -620,7 +626,7 @@
             <button id="onlineBtn" class="conn-btn" type="button">Go Online</button>
             <button id="updateBtn" class="conn-btn" type="button">Update Hostess</button>
             <button id="clearCacheBtn" class="conn-btn" type="button">Clear cache</button>
-            <span id="cacheHint" class="conn-hint" style="display:none;">Clears Docker's build cache and unused image layers, plus this page's cache. Apps keep running; the next build is slower. Click again to confirm.</span>
+            <div id="cacheHint" class="cache-hint" hidden>Clears Docker's build cache and unused image layers, plus this page's cache. Apps keep running; the next build is slower. Click again to confirm, or click anywhere else to cancel.</div>
             <button id="installBtn" class="conn-btn" type="button" style="display:none;">Install as App</button>
             <span id="installHint" class="conn-hint" style="display:none;">tap Share, then "Add to Home Screen"</span>
           </div>
@@ -1536,16 +1542,27 @@ updateBtn.addEventListener('click', async () => {
 // staging folders (lib/engine.js clearCaches); then this browser's cached copy of the dashboard goes too.
 const clearCacheBtn = document.getElementById('clearCacheBtn');
 const cacheHint = document.getElementById('cacheHint');
-let cacheArmed = null;
+let cacheArmed = false;
+function disarmCache() {
+  cacheArmed = false;
+  clearCacheBtn.textContent = 'Clear cache';
+  clearCacheBtn.classList.remove('armed');
+  cacheHint.hidden = true;
+}
+// Double press: the first click arms (red, "Confirm clear"); a click anywhere else, or Escape, disarms.
+document.addEventListener('click', (e) => { if (cacheArmed && e.target !== clearCacheBtn) disarmCache(); });
+document.addEventListener('keydown', (e) => { if (cacheArmed && e.key === 'Escape') disarmCache(); });
 clearCacheBtn.addEventListener('click', async () => {
   if (!cacheArmed) {
+    cacheArmed = true;
     clearCacheBtn.textContent = 'Confirm clear';
-    cacheHint.style.display = '';
-    cacheArmed = setTimeout(() => { cacheArmed = null; clearCacheBtn.textContent = 'Clear cache'; cacheHint.style.display = 'none'; }, 6000);
+    clearCacheBtn.classList.add('armed');
+    cacheHint.hidden = false;
     return;
   }
-  clearTimeout(cacheArmed);
-  cacheHint.style.display = 'none';
+  cacheArmed = false;
+  clearCacheBtn.classList.remove('armed');
+  cacheHint.hidden = true;
   clearCacheBtn.disabled = true;
   clearCacheBtn.textContent = 'Clearing…';
   try {
@@ -1560,7 +1577,6 @@ clearCacheBtn.addEventListener('click', async () => {
     showError(err.message);
     clearCacheBtn.textContent = 'Clear cache';
     clearCacheBtn.disabled = false;
-    cacheArmed = null;
   }
 });
 
